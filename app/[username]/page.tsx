@@ -18,18 +18,41 @@ export default function PerfilPublicoPage() {
     async function cargarPerfil() {
       if (!username) return;
 
-      // Buscamos al artista por su nombre de usuario y traemos sus bloques configurados
-      const { data, error } = await supabase
-        .from("artist")
-        .select("blocks")
-        .eq("username", username)
-        .single();
+      // 1. Buscamos el perfil usando el username (asumiendo que Nova Reyes u otro tenga una columna username o display_name)
+      // Como tu editor usa un "fakeUserId" fijo, si aún no tienes columna 'username' en 'profiles', filtraremos temporalmente por display_name o el id si es necesario.
+      // Aquí buscamos en la tabla 'profiles'
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        // Cambiar por .eq("username", username) cuando añadas la columna. Por ahora dejamos la lógica estructurada:
+        .eq("display_name", username.replace("-", " ")) 
+        .maybeSingle();
 
-      if (error || !data) {
+      if (profileError || !profile) {
+        setError(true);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Traemos los bloques asociados a ese perfil ordenados por su posición
+      const { data: dbBlocks, error: blocksError } = await supabase
+        .from("profile_blocks")
+        .select("*")
+        .eq("profile_id", profile.id)
+        .eq("is_visible", true)
+        .order("position_index", { ascending: true });
+
+      if (blocksError || !dbBlocks) {
         setError(true);
       } else {
-        // Asignamos los bloques recuperados de Supabase (si no hay, lista vacía)
-        setBlocks((data.blocks as Block[]) || []);
+        // 3. Mapeamos el formato de la base de datos al formato del frontend (Block)
+        const mappedBlocks: Block[] = dbBlocks.map((b) => ({
+          id: b.id, // o genera uno si tu front requiere string uuid alternativo
+          type: b.block_type,
+          data: b.content || {},
+        }));
+        
+        setBlocks(mappedBlocks);
       }
       setLoading(false);
     }
@@ -56,7 +79,6 @@ export default function PerfilPublicoPage() {
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
       <main className="mx-auto max-w-2xl">
-        {/* Reutilizamos el PreviewCanvas en modo solo lectura (sin funciones de edición) */}
         <PreviewCanvas
           blocks={blocks}
           selectedId={null}
