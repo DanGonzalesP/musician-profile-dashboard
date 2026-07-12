@@ -4,6 +4,7 @@ import { useState } from "react"
 import type { Block } from "@/lib/blocks"
 import { CanvasBlock } from "@/components/canvas-block"
 import { MousePointerClick } from "lucide-react"
+import { MusicPlayer } from "@/components/music-player"
 
 type Props = {
   blocks: Block[]
@@ -34,6 +35,21 @@ export function PreviewCanvas({
     onDropAt(index)
     setDropIndex(null)
   }
+
+  const mockTracks = [
+    {
+      id: "1",
+      title: "Sample Song 1",
+      audio_file_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+      duration_seconds: 372
+    },
+    {
+      id: "2",
+      title: "Sample Song 2",
+      audio_file_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+      duration_seconds: 423
+    }
+  ]
 
   const Indicator = ({ index }: { index: number }) => (
     <div
@@ -122,7 +138,13 @@ export function PreviewCanvas({
                     onMove={(dir) => onMove(block.id, dir)}
                     onDragStart={() => onReorderStart(i)}
                     onDragEnd={onDragEnd}
-                  />
+                  >
+                    {block.type === "tracks" && (
+                      <div className="mt-2 p-2">
+                        <MusicPlayer tracks={mockTracks} />
+                      </div>
+                    )}
+                  </CanvasBlock>
                   <Indicator index={i + 1} />
                 </div>
               ))}

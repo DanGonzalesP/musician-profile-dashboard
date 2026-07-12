@@ -15,6 +15,7 @@ type Props = {
   onMove: (dir: -1 | 1) => void
   onDragStart: () => void
   onDragEnd: () => void
+  children?: React.ReactNode
 }
 
 export function CanvasBlock({
@@ -27,6 +28,7 @@ export function CanvasBlock({
   onMove,
   onDragStart,
   onDragEnd,
+  children, // Recibimos el componente hijo aquí
 }: Props) {
   const label = BLOCK_LIBRARY.find((b) => b.type === block.type)?.label ?? block.type
 
@@ -95,6 +97,9 @@ export function CanvasBlock({
       <div className="pointer-events-none overflow-hidden rounded-xl">
         <BlockRenderer block={block} />
       </div>
+
+      {/* Renderiza los componentes inyectados (como el MusicPlayer) */}
+      {children}
     </div>
   )
 }
