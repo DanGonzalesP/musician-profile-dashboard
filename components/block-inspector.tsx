@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import type { Block, HeroData, TracksData, MerchData, ServiceData } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
-import { X, Trash2 } from "lucide-react"
+import { X, Trash2, Upload, Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 type Props = {
   block: Block | null
@@ -88,11 +90,71 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+// --- NUEVO COMPONENTE PARA SUBIR IMÁGENES AL STORAGE ---
+function ImageUploader({ onUploadComplete, currentImageUrl }: { onUploadComplete: (url: string) => void, currentImageUrl?: string }) {
+  const [uploading, setUploading] = useState(false)
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      if (!e.target.files || e.target.files.length === 0) return
+      setUploading(true)
+
+      const file = e.target.files[0]
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `uploads/${fileName}`
+
+      // Subida directa al bucket 'assets' que configuramos
+      const { error: uploadError } = await supabase.storage
+        .from('assets')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // Generar URL pública
+      const { data } = supabase.storage.from('assets').getPublicUrl(filePath)
+      
+      if (data?.publicUrl) {
+        onUploadComplete(data.publicUrl)
+      }
+    } catch (error: any) {
+      alert("Error subiendo la imagen: " + error.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {currentImageUrl && (
+        <div className="relative h-24 w-full overflow-hidden rounded-lg border border-sidebar-border bg-muted">
+          <img src={currentImageUrl} alt="Preview" className="h-full w-full object-cover" />
+        </div>
+      )}
+      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent">
+        {uploading ? (
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        ) : (
+          <Upload className="size-4 text-muted-foreground" />
+        )}
+        <span>{uploading ? "Subiendo..." : "Subir desde dispositivo"}</span>
+        <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="hidden" />
+      </label>
+    </div>
+  )
+}
+
 function HeroFields({ data, onChange }: { data: HeroData; onChange: (d: HeroData) => void }) {
   return (
     <>
       <Field label="Artist name">
         <TextInput value={data.name} onChange={(e) => onChange({ ...data, name: e.target.value })} />
+      </Field>
+      <Field label="Banner Image">
+        <ImageUploader 
+          currentImageUrl={(data as any).avatarUrl || (data as any).coverUrl} 
+          onUploadComplete={(url) => onChange({ ...data, [('avatarUrl' in data) ? 'avatarUrl' : 'coverUrl']: url })} 
+        />
       </Field>
       <Field label="Tagline">
         <textarea
@@ -141,7 +203,7 @@ function TracksFields({ data, onChange }: { data: TracksData; onChange: (d: Trac
 }
 
 function MerchFields({ data, onChange }: { data: MerchData; onChange: (d: MerchData) => void }) {
-  const setProduct = (i: number, key: "name" | "price" | "tag", value: string) => {
+  const setProduct = (i: number, key: "name" | "price" | "tag" | "image", value: string) => {
     const products = data.products.map((p, idx) => (idx === i ? { ...p, [key]: value } : p))
     onChange({ ...data, products })
   }
@@ -154,6 +216,12 @@ function MerchFields({ data, onChange }: { data: MerchData; onChange: (d: MerchD
       {data.products.map((product, i) => (
         <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3">
           <TextInput value={product.name} onChange={(e) => setProduct(i, "name", e.target.value)} />
+          <Field label="Product Image">
+            <ImageUploader 
+              currentImageUrl={(product as any).image} 
+              onUploadComplete={(url) => setProduct(i, "image", url)} 
+            />
+          </Field>
           <div className="flex gap-2">
             <TextInput value={product.price} onChange={(e) => setProduct(i, "price", e.target.value)} />
             <TextInput value={product.tag} onChange={(e) => setProduct(i, "tag", e.target.value)} />
