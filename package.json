@@ -35,5 +35,8 @@
     "overrides": {
       "hono": "4.12.25"
     }
+  },
+  "engines": {
+    "pnpm": "9.x"
   }
 }
