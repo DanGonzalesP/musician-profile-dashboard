@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { Block, HeroData, TracksData, MerchData, ServiceData } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
-import { X, Trash2, Upload, Loader2 } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 type Props = {
@@ -29,7 +29,7 @@ export function BlockInspector({ block, onChange, onClose, onDelete }: Props) {
   const update = (data: Block["data"]) => onChange(block.id, data)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-sidebar text-foreground">
       <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wide text-primary">Editing</p>
@@ -45,14 +45,14 @@ export function BlockInspector({ block, onChange, onClose, onDelete }: Props) {
         </button>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 space-y-6 overflow-y-auto p-4">
         {block.type === "hero" && <HeroFields data={block.data as HeroData} onChange={update} />}
         {block.type === "tracks" && <TracksFields data={block.data as TracksData} onChange={update} />}
         {block.type === "merch" && <MerchFields data={block.data as MerchData} onChange={update} />}
         {block.type === "service" && <ServiceFields data={block.data as ServiceData} onChange={update} />}
       </div>
 
-      <div className="border-t border-sidebar-border p-4">
+      <div className="border-t border-sidebar-border p-4 bg-sidebar">
         <button
           type="button"
           onClick={() => onDelete(block.id)}
@@ -68,10 +68,10 @@ export function BlockInspector({ block, onChange, onClose, onDelete }: Props) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
+    <div className="block space-y-1.5">
+      <span className="block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
-    </label>
+    </div>
   )
 }
 
@@ -84,13 +84,12 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="border-b border-sidebar-border pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <p className="border-b border-sidebar-border pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground pt-2">
       {children}
     </p>
   )
 }
 
-// --- NUEVO COMPONENTE PARA SUBIR IMÁGENES AL STORAGE ---
 function ImageUploader({ onUploadComplete, currentImageUrl }: { onUploadComplete: (url: string) => void, currentImageUrl?: string }) {
   const [uploading, setUploading] = useState(false)
 
@@ -104,14 +103,12 @@ function ImageUploader({ onUploadComplete, currentImageUrl }: { onUploadComplete
       const fileName = `${Math.random()}.${fileExt}`
       const filePath = `uploads/${fileName}`
 
-      // Subida directa al bucket 'assets' que configuramos
       const { error: uploadError } = await supabase.storage
         .from('assets')
         .upload(filePath, file)
 
       if (uploadError) throw uploadError
 
-      // Generar URL pública
       const { data } = supabase.storage.from('assets').getPublicUrl(filePath)
       
       if (data?.publicUrl) {
@@ -127,15 +124,15 @@ function ImageUploader({ onUploadComplete, currentImageUrl }: { onUploadComplete
   return (
     <div className="space-y-2">
       {currentImageUrl && (
-        <div className="relative h-24 w-full overflow-hidden rounded-lg border border-sidebar-border bg-muted">
+        <div className="relative h-20 w-full overflow-hidden rounded-lg border border-sidebar-border bg-muted">
           <img src={currentImageUrl} alt="Preview" className="h-full w-full object-cover" />
         </div>
       )}
-      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent">
+      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
         {uploading ? (
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
         ) : (
-          <Upload className="size-4 text-muted-foreground" />
+          <Upload className="size-3.5 text-muted-foreground" />
         )}
         <span>{uploading ? "Subiendo..." : "Subir desde dispositivo"}</span>
         <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="hidden" />
@@ -148,7 +145,7 @@ function HeroFields({ data, onChange }: { data: HeroData; onChange: (d: HeroData
   return (
     <>
       <Field label="Artist name">
-        <TextInput value={data.name} onChange={(e) => onChange({ ...data, name: e.target.value })} />
+        <TextInput value={data.name || ""} onChange={(e) => onChange({ ...data, name: e.target.value })} />
       </Field>
       <Field label="Banner Image">
         <ImageUploader 
@@ -158,14 +155,14 @@ function HeroFields({ data, onChange }: { data: HeroData; onChange: (d: HeroData
       </Field>
       <Field label="Tagline">
         <textarea
-          value={data.tagline}
+          value={data.tagline || ""}
           onChange={(e) => onChange({ ...data, tagline: e.target.value })}
           rows={3}
           className={inputClass}
         />
       </Field>
       <Field label="Location">
-        <TextInput value={data.location} onChange={(e) => onChange({ ...data, location: e.target.value })} />
+        <TextInput value={data.location || ""} onChange={(e) => onChange({ ...data, location: e.target.value })} />
       </Field>
     </>
   )
@@ -173,88 +170,149 @@ function HeroFields({ data, onChange }: { data: HeroData; onChange: (d: HeroData
 
 function TracksFields({ data, onChange }: { data: TracksData; onChange: (d: TracksData) => void }) {
   const setTrack = (i: number, key: "title" | "duration", value: string) => {
-    const tracks = data.tracks.map((t, idx) => (idx === i ? { ...t, [key]: value } : t))
+    const tracks = (data.tracks || []).map((t, idx) => (idx === i ? { ...t, [key]: value } : t))
     onChange({ ...data, tracks })
   }
+
+  const addTrack = () => {
+    const tracks = [...(data.tracks || []), { title: "New Track", duration: "3:30" }]
+    onChange({ ...data, tracks })
+  }
+
   return (
     <>
       <Field label="Section title">
-        <TextInput value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+        <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
-      <GroupLabel>Tracks</GroupLabel>
-      {data.tracks.map((track, i) => (
-        <div key={i} className="flex gap-2">
-          <input
-            type="text"
-            value={track.title}
-            onChange={(e) => setTrack(i, "title", e.target.value)}
-            className={`${inputClass} flex-1`}
-          />
-          <input
-            type="text"
-            value={track.duration}
-            onChange={(e) => setTrack(i, "duration", e.target.value)}
-            className={`${inputClass} w-16 text-center`}
-          />
-        </div>
-      ))}
+      <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tracks</p>
+        <button 
+          type="button" 
+          onClick={addTrack}
+          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <Plus className="size-3" /> Add Track
+        </button>
+      </div>
+      <div className="space-y-2">
+        {(data.tracks || []).map((track, i) => (
+          <div key={i} className="flex gap-2 items-center">
+            <span className="text-xs text-muted-foreground min-w-4">{i + 1}</span>
+            <input
+              type="text"
+              value={track.title || ""}
+              onChange={(e) => setTrack(i, "title", e.target.value)}
+              className={`${inputClass} flex-1`}
+              placeholder="Track title"
+            />
+            <input
+              type="text"
+              value={track.duration || ""}
+              onChange={(e) => setTrack(i, "duration", e.target.value)}
+              className={`${inputClass} w-16 text-center`}
+              placeholder="3:45"
+            />
+          </div>
+        ))}
+      </div>
     </>
   )
 }
 
 function MerchFields({ data, onChange }: { data: MerchData; onChange: (d: MerchData) => void }) {
   const setProduct = (i: number, key: "name" | "price" | "tag" | "image", value: string) => {
-    const products = data.products.map((p, idx) => (idx === i ? { ...p, [key]: value } : p))
+    const products = (data.products || []).map((p, idx) => (idx === i ? { ...p, [key]: value } : p))
     onChange({ ...data, products })
   }
+
+  const addProduct = () => {
+    const products = [...(data.products || []), { name: "New Product", price: "0.00", tag: "Available", image: "" }]
+    onChange({ ...data, products })
+  }
+
   return (
     <>
       <Field label="Section title">
-        <TextInput value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+        <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
-      <GroupLabel>Products</GroupLabel>
-      {data.products.map((product, i) => (
-        <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3">
-          <TextInput value={product.name} onChange={(e) => setProduct(i, "name", e.target.value)} />
-          <Field label="Product Image">
-            <ImageUploader 
-              currentImageUrl={(product as any).image} 
-              onUploadComplete={(url) => setProduct(i, "image", url)} 
-            />
-          </Field>
-          <div className="flex gap-2">
-            <TextInput value={product.price} onChange={(e) => setProduct(i, "price", e.target.value)} />
-            <TextInput value={product.tag} onChange={(e) => setProduct(i, "tag", e.target.value)} />
+      <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Products</p>
+        <button 
+          type="button" 
+          onClick={addProduct}
+          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <Plus className="size-3" /> Add Product
+        </button>
+      </div>
+      <div className="space-y-4">
+        {(data.products || []).map((product, i) => (
+          <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
+            <Field label={`Product #${i + 1} Name`}>
+              <TextInput value={product.name || ""} onChange={(e) => setProduct(i, "name", e.target.value)} placeholder="Product name" />
+            </Field>
+            <Field label="Product Image">
+              <ImageUploader 
+                currentImageUrl={product.image} 
+                onUploadComplete={(url) => setProduct(i, "image", url)} 
+              />
+            </Field>
+            <div className="flex gap-2">
+              <Field label="Price">
+                <TextInput value={product.price || ""} onChange={(e) => setProduct(i, "price", e.target.value)} placeholder="89.90" />
+              </Field>
+              <Field label="Tag / Status">
+                <TextInput value={product.tag || ""} onChange={(e) => setProduct(i, "tag", e.target.value)} placeholder="Limited" />
+              </Field>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </>
   )
 }
 
 function ServiceFields({ data, onChange }: { data: ServiceData; onChange: (d: ServiceData) => void }) {
   const setService = (i: number, key: "title" | "price" | "description", value: string) => {
-    const services = data.services.map((s, idx) => (idx === i ? { ...s, [key]: value } : s))
+    const services = (data.services || []).map((s, idx) => (idx === i ? { ...s, [key]: value } : s))
     onChange({ ...data, services })
   }
+
+  const addService = () => {
+    const services = [...(data.services || []), { title: "New Service", price: "0.00", description: "" }]
+    onChange({ ...data, services })
+  }
+
   return (
     <>
       <Field label="Section title">
-        <TextInput value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+        <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
-      <GroupLabel>Offers</GroupLabel>
-      {data.services.map((service, i) => (
-        <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3">
-          <TextInput value={service.title} onChange={(e) => setService(i, "title", e.target.value)} />
-          <TextInput value={service.price} onChange={(e) => setService(i, "price", e.target.value)} />
-          <textarea
-            value={service.description}
-            onChange={(e) => setService(i, "description", e.target.value)}
-            rows={2}
-            className={inputClass}
-          />
-        </div>
-      ))}
+      <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Offers</p>
+        <button 
+          type="button" 
+          onClick={addService}
+          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <Plus className="size-3" /> Add Offer
+        </button>
+      </div>
+      <div className="space-y-3">
+        {(data.services || []).map((service, i) => (
+          <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
+            <TextInput value={service.title || ""} onChange={(e) => setService(i, "title", e.target.value)} placeholder="Service title" />
+            <TextInput value={service.price || ""} onChange={(e) => setService(i, "price", e.target.value)} placeholder="Price" />
+            <textarea
+              value={service.description || ""}
+              onChange={(e) => setService(i, "description", e.target.value)}
+              rows={2}
+              className={inputClass}
+              placeholder="Description"
+            />
+          </div>
+        ))}
+      </div>
     </>
   )
 }
