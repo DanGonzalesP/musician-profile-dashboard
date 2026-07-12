@@ -36,7 +36,7 @@ export default function PerfilPublicoPage() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("user_id")
+          .select("id")
           .ilike("display_name", displayNameSlug)
           .maybeSingle();
 
@@ -56,7 +56,7 @@ export default function PerfilPublicoPage() {
         const { data: dbBlocks, error: blocksError } = await supabase
           .from("profile_blocks")
           .select("id, block_type, content, position_index")
-          .eq("profile_id", profile.user_id)
+          .eq("profile_id", profile.id)
           .eq("is_visible", true)
           .order("position_index", { ascending: true });
 

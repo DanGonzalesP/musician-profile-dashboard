@@ -3,6 +3,12 @@
 import { ShoppingBag } from "lucide-react"
 import type { MerchData } from "@/lib/blocks"
 
+function stockLabel(stock: number) {
+  if (stock <= 0) return "Agotado"
+  if (stock <= 5) return "¡Últimas unidades!"
+  return `${stock} disponibles`
+}
+
 export function MerchBlock({ data }: { data: MerchData }) {
   // Extraemos los productos directamente de la propiedad dinámica del editor
   const productos = data.products || []
@@ -25,11 +31,9 @@ export function MerchBlock({ data }: { data: MerchData }) {
                 alt={product.name}
                 className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
-              {product.tag && (
-                <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
-                  {product.tag}
-                </span>
-              )}
+              <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                {stockLabel(product.stock)}
+              </span>
             </div>
             <div className="flex flex-col gap-1 p-3">
               <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">{product.name || "Nuevo Producto"}</p>

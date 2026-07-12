@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
+import type { Block, HeroData, TracksData, MerchData, Product, ServiceData, DonationData } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { X, Trash2, Upload, Loader2, Plus, Music, Heart } from "lucide-react"
 
@@ -338,13 +338,13 @@ function MerchFields({
   onChange: (d: MerchData) => void
   blobRegistry: BlobRegistry
 }) {
-  const setProduct = (i: number, key: "name" | "price" | "tag" | "image", value: string) => {
-    const products = (data.products || []).map((p, idx) => (idx === i ? { ...p, [key]: value } : p))
+  const setProduct = (i: number, changes: Partial<Product>) => {
+    const products = (data.products || []).map((p, idx) => (idx === i ? { ...p, ...changes } : p))
     onChange({ ...data, products })
   }
 
   const addProduct = () => {
-    const products = [...(data.products || []), { name: "New Product", price: "0.00", tag: "Available", image: "" }]
+    const products = [...(data.products || []), { name: "New Product", price: "0.00", stock: 10, image: "" }]
     onChange({ ...data, products })
   }
 
@@ -384,14 +384,14 @@ function MerchFields({
             <Field label="Name">
               <TextInput
                 value={product.name || ""}
-                onChange={(e) => setProduct(i, "name", e.target.value)}
+                onChange={(e) => setProduct(i, { name: e.target.value })}
                 placeholder="Product name"
               />
             </Field>
             <Field label="Image">
               <ImageUploader
                 currentImageUrl={product.image}
-                onUploadReady={(url) => setProduct(i, "image", url)}
+                onUploadReady={(url) => setProduct(i, { image: url })}
                 blobRegistry={blobRegistry}
               />
             </Field>
@@ -399,15 +399,19 @@ function MerchFields({
               <Field label="Price">
                 <TextInput
                   value={product.price || ""}
-                  onChange={(e) => setProduct(i, "price", e.target.value)}
+                  onChange={(e) => setProduct(i, { price: e.target.value })}
                   placeholder="89.90"
                 />
               </Field>
-              <Field label="Tag / Status">
-                <TextInput
-                  value={product.tag || ""}
-                  onChange={(e) => setProduct(i, "tag", e.target.value)}
-                  placeholder="Limited"
+              <Field label="Stock">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={product.stock}
+                  onChange={(e) => setProduct(i, { stock: Math.max(0, Number(e.target.value) || 0) })}
+                  className={inputClass}
+                  aria-label={`Stock de ${product.name || `producto ${i + 1}`}`}
                 />
               </Field>
             </div>

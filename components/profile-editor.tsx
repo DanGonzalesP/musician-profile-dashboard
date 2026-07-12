@@ -203,28 +203,31 @@ export function ProfileEditor() {
 
       // 3. Upsert del perfil
       const profilePayload = {
-        id: PROFILE_ID,
         user_id: PROFILE_ID,
         display_name: "Nova Reyes",
         bio: "Artista Musical",
       }
 
-      const { error: profileError } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .upsert(profilePayload, { onConflict: "id" })
+        .upsert(profilePayload, { onConflict: "user_id" })
+        .select("id")
+        .single()
 
       if (profileError) throw profileError
+
+      const profileId = profile.id
 
       // 4. Eliminar bloques anteriores y reinsertar los actualizados
       const { error: deleteError } = await supabase
         .from("profile_blocks")
         .delete()
-        .eq("profile_id", PROFILE_ID)
+        .eq("profile_id", profileId)
 
       if (deleteError) throw deleteError
 
       const profileBlocksPayload = publishBlocks.map((b, index) => ({
-        profile_id: PROFILE_ID,
+        profile_id: profileId,
         block_type: b.type,
         position_index: index,
         content: b.data,

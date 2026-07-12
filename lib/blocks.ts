@@ -14,8 +14,10 @@ export type Track = {
 export type Product = {
   name: string
   price: string
-  tag: string
   image: string
+  stock: number
+  /** Compatibilidad con productos guardados antes de añadir stock. */
+  tag?: string
 }
 
 export type Service = {
@@ -161,6 +163,7 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
                 price: String(product.price ?? ""),
                 tag: String(product.tag ?? ""),
                 image: String(product.image ?? ""),
+                stock: normalizeStock(product.stock, product.tag),
               }
             })
           : [],
@@ -225,8 +228,8 @@ function defaultData(type: BlockType): BlockData {
       return {
         title: "Merch & Instruments",
         products: [
-          { name: "Digital Ethereal — Orange Vinyl", price: "$32", tag: "Limited", image: "/merch-vinyl.png" },
-          { name: "Signature Electric Guitar", price: "$1,240", tag: "1 of 12", image: "/merch-guitar.png" },
+          { name: "Digital Ethereal — Orange Vinyl", price: "$32", stock: 12, image: "/merch-vinyl.png" },
+          { name: "Signature Electric Guitar", price: "$1,240", stock: 1, image: "/merch-guitar.png" },
         ],
       }
     case "service":
@@ -248,4 +251,11 @@ function defaultData(type: BlockType): BlockData {
         currency: "USD",
       }
   }
+}
+
+function normalizeStock(rawStock: unknown, legacyTag: unknown): number {
+  const stock = Number(rawStock)
+  if (Number.isFinite(stock)) return Math.max(0, Math.floor(stock))
+
+  return typeof legacyTag === "string" && /agotado|sold\s*out/i.test(legacyTag) ? 0 : 10
 }
