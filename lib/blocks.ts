@@ -1,13 +1,14 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
-export type BlockType = "hero" | "tracks" | "merch" | "service"
+export type BlockType = "hero" | "tracks" | "merch" | "service" | "donation"
 
 export type Track = {
   title: string
   duration: string
+  audioUrl?: string
 }
 
 export type Product = {
@@ -46,7 +47,16 @@ export type ServiceData = {
   services: Service[]
 }
 
-export type BlockData = HeroData | TracksData | MerchData | ServiceData
+export type DonationData = {
+  title: string
+  description: string
+  buttonText: string
+  buttonUrl: string
+  goalAmount: string
+  currency: string
+}
+
+export type BlockData = HeroData | TracksData | MerchData | ServiceData | DonationData
 
 export type Block = {
   id: string
@@ -91,6 +101,13 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     icon: GraduationCap,
     category: "Commerce",
   },
+  {
+    type: "donation",
+    label: "Donation Panel",
+    description: "Let fans support you directly with a donation button.",
+    icon: Heart,
+    category: "Commerce",
+  },
 ]
 
 export function createBlock(type: BlockType): Block {
@@ -128,6 +145,7 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
               return {
                 title: String(track.title ?? ""),
                 duration: String(track.duration ?? ""),
+                audioUrl: track.audioUrl ? String(track.audioUrl) : undefined,
               }
             })
           : [],
@@ -160,6 +178,15 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
               }
             })
           : [],
+      }
+    case "donation":
+      return {
+        title: String(content.title ?? ""),
+        description: String(content.description ?? ""),
+        buttonText: String(content.buttonText ?? "Apoyar"),
+        buttonUrl: String(content.buttonUrl ?? ""),
+        goalAmount: String(content.goalAmount ?? ""),
+        currency: String(content.currency ?? "USD"),
       }
   }
 }
@@ -210,6 +237,15 @@ function defaultData(type: BlockType): BlockData {
           { title: "Mixing & Mastering", price: "$180 / track", description: "Studio-grade polish for your record." },
           { title: "Session Guitarist", price: "From $250", description: "Remote or in-studio recording." },
         ],
+      }
+    case "donation":
+      return {
+        title: "Support My Music",
+        description: "Every contribution helps me create more music, tour, and connect with fans like you.",
+        buttonText: "Support Now",
+        buttonUrl: "",
+        goalAmount: "",
+        currency: "USD",
       }
   }
 }

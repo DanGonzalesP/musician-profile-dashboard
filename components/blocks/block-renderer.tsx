@@ -1,10 +1,11 @@
 "use client"
 
-import type { Block, HeroData, TracksData, MerchData, ServiceData } from "@/lib/blocks"
+import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
 import { HeroBlock } from "./hero-block"
-import { TrackListBlock } from "./track-list-block" // Asegúrate de usar el nombre de archivo exacto
+import { TrackListBlock } from "./track-list-block"
 import { MerchBlock } from "./merch-block"
 import { ServiceBlock } from "./service-block"
+import { DonationBlock } from "./donation-block"
 
 export function BlockRenderer({ block }: { block: Block }) {
   switch (block.type) {
@@ -16,6 +17,8 @@ export function BlockRenderer({ block }: { block: Block }) {
       return <MerchBlock data={block.data as MerchData} />
     case "service":
       return <ServiceBlock data={block.data as ServiceData} />
+    case "donation":
+      return <DonationBlock data={block.data as DonationData} />
     default:
       return (
         <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
