@@ -148,9 +148,9 @@ function HeroFields({ data, onChange }: { data: HeroData; onChange: (d: HeroData
         <TextInput value={data.name || ""} onChange={(e) => onChange({ ...data, name: e.target.value })} />
       </Field>
       <Field label="Banner Image">
-        <ImageUploader 
-          currentImageUrl={(data as any).avatarUrl || (data as any).coverUrl} 
-          onUploadComplete={(url) => onChange({ ...data, [('avatarUrl' in data) ? 'avatarUrl' : 'coverUrl']: url })} 
+        <ImageUploader
+          currentImageUrl={data.image}
+          onUploadComplete={(url) => onChange({ ...data, image: url })}
         />
       </Field>
       <Field label="Tagline">
@@ -183,6 +183,12 @@ function TracksFields({ data, onChange }: { data: TracksData; onChange: (d: Trac
     <>
       <Field label="Section title">
         <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+      </Field>
+      <Field label="Album cover">
+        <ImageUploader
+          currentImageUrl={data.cover}
+          onUploadComplete={(url) => onChange({ ...data, cover: url })}
+        />
       </Field>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tracks</p>

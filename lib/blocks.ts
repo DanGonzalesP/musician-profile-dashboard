@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react"
 import { GalleryVerticalEnd, ListMusic, Store, GraduationCap } from "lucide-react"
 
+export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
+
 export type BlockType = "hero" | "tracks" | "merch" | "service"
 
 export type Track = {
@@ -96,6 +98,78 @@ export function createBlock(type: BlockType): Block {
     id: `${type}-${Math.random().toString(36).slice(2, 9)}`,
     type,
     data: defaultData(type),
+  }
+}
+
+type DbProfileBlock = {
+  id: number
+  block_type: string
+  content: unknown
+}
+
+export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
+  const content = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+
+  switch (type) {
+    case "hero":
+      return {
+        name: String(content.name ?? ""),
+        tagline: String(content.tagline ?? ""),
+        location: String(content.location ?? ""),
+        image: String(content.image ?? content.avatarUrl ?? content.coverUrl ?? "/hero-banner.png"),
+      }
+    case "tracks":
+      return {
+        title: String(content.title ?? ""),
+        cover: String(content.cover ?? "/album-1.png"),
+        tracks: Array.isArray(content.tracks)
+          ? content.tracks.map((t) => {
+              const track = (t && typeof t === "object" ? t : {}) as Record<string, unknown>
+              return {
+                title: String(track.title ?? ""),
+                duration: String(track.duration ?? ""),
+              }
+            })
+          : [],
+      }
+    case "merch":
+      return {
+        title: String(content.title ?? ""),
+        products: Array.isArray(content.products)
+          ? content.products.map((p) => {
+              const product = (p && typeof p === "object" ? p : {}) as Record<string, unknown>
+              return {
+                name: String(product.name ?? ""),
+                price: String(product.price ?? ""),
+                tag: String(product.tag ?? ""),
+                image: String(product.image ?? ""),
+              }
+            })
+          : [],
+      }
+    case "service":
+      return {
+        title: String(content.title ?? ""),
+        services: Array.isArray(content.services)
+          ? content.services.map((s) => {
+              const service = (s && typeof s === "object" ? s : {}) as Record<string, unknown>
+              return {
+                title: String(service.title ?? ""),
+                price: String(service.price ?? ""),
+                description: String(service.description ?? ""),
+              }
+            })
+          : [],
+      }
+  }
+}
+
+export function dbBlockToBlock(dbBlock: DbProfileBlock): Block {
+  const type = dbBlock.block_type as BlockType
+  return {
+    id: `${type}-${dbBlock.id}`,
+    type,
+    data: normalizeBlockData(type, dbBlock.content),
   }
 }
 

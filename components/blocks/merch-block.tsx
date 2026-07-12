@@ -34,7 +34,7 @@ export function MerchBlock({ data }: { data: MerchData }) {
             <div className="flex flex-col gap-1 p-3">
               <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">{product.name || "Nuevo Producto"}</p>
               <p className="text-sm font-semibold text-primary">
-                {product.price ? `$${product.price}` : "$0.00"}
+                {product.price || "$0.00"}
               </p>
             </div>
           </div>

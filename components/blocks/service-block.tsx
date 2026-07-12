@@ -27,7 +27,7 @@ export function ServiceBlock({ data }: { data: ServiceData }) {
               )}
             </div>
             <p className="mt-3 text-sm font-bold text-primary">
-              {service.price ? `$${service.price}` : "Consultar precio"}
+              {service.price || "Consultar precio"}
             </p>
           </div>
         ))}

@@ -4,7 +4,7 @@ import { MapPin } from "lucide-react"
 import type { HeroData } from "@/lib/blocks"
 
 export function HeroBlock({ data }: { data: HeroData }) {
-  const imagePreview = (data as any).avatarUrl || (data as any).coverUrl || "/placeholder.svg"
+  const imagePreview = data.image || "/placeholder.svg"
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card/20 p-6 text-center sm:p-8">

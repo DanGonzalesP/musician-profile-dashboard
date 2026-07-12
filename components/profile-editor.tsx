@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { type Block, type BlockType, createBlock } from "@/lib/blocks"
+import { type Block, type BlockType, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
@@ -16,50 +16,44 @@ export function ProfileEditor() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dragPayload, setDragPayload] = useState<DragPayload>(null)
   const [publishing, setPublishing] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const fakeUserId = "00000000-0000-0000-0000-000000000000";
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null
 
-  // Cargar bloques guardados inicialmente desde Supabase para evitar los predeterminados
   useEffect(() => {
     async function loadSavedBlocks() {
       try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", fakeUserId)
-          .single();
+        const { data: dbBlocks, error } = await supabase
+          .from("profile_blocks")
+          .select("id, block_type, content, position_index")
+          .eq("profile_id", PROFILE_ID)
+          .order("position_index", { ascending: true })
 
-        if (profile) {
-          const { data: dbBlocks } = await supabase
-            .from("profile_blocks")
-            .select("*")
-            .eq("profile_id", profile.id)
-            .order("position_index", { ascending: true });
+        if (error) throw error
 
-          if (dbBlocks && dbBlocks.length > 0) {
-            setBlocks(
-              dbBlocks.map((b) => ({
-                id: b.id.toString(),
-                type: b.block_type as BlockType,
-                data: b.content,
-              }))
-            );
-            return;
-          }
+        if (dbBlocks && dbBlocks.length > 0) {
+          setBlocks(dbBlocks.map(dbBlockToBlock))
+          return
         }
-        // Si no hay datos, inicializar por defecto
+
         setBlocks([
           createBlock("hero"),
           createBlock("tracks"),
           createBlock("merch"),
-        ]);
+        ])
       } catch (err) {
-        console.error("Error cargando bloques iniciales:", err);
+        console.error("Error cargando bloques iniciales:", err)
+        setBlocks([
+          createBlock("hero"),
+          createBlock("tracks"),
+          createBlock("merch"),
+        ])
+      } finally {
+        setLoading(false)
       }
     }
-    loadSavedBlocks();
-  }, []);
+    loadSavedBlocks()
+  }, [])
 
   // Función para generar imágenes con IA usando nuestro nuevo endpoint
   async function generarBannerConIA(promptTexto: string) {
@@ -85,35 +79,37 @@ export function ProfileEditor() {
   async function handlePublish() {
     setPublishing(true)
     try {
-      // 1. Asegurar o actualizar el perfil base
-      const { data: profile, error: profileError } = await supabase
+      const { error: profileError } = await supabase
         .from("profiles")
-        .upsert({ 
-          user_id: fakeUserId,
-          display_name: "Nova Reyes",
-          bio: "Artista Musical"
-        }, { onConflict: 'user_id' })
-        .select()
-        .single();
+        .upsert(
+          {
+            user_id: PROFILE_ID,
+            display_name: "Nova Reyes",
+            bio: "Artista Musical",
+          },
+          { onConflict: "user_id" }
+        )
 
-      if (profileError) throw profileError;
+      if (profileError) throw profileError
 
-      // 2. Limpiar bloques anteriores e insertar el nuevo orden reflejando los estados dinámicos
-      await supabase.from("profile_blocks").delete().eq("profile_id", profile.id);
-
-      const { error: blocksError } = await supabase
+      const { error: deleteError } = await supabase
         .from("profile_blocks")
-        .insert(
-          blocks.map((b, index) => ({
-            profile_id: profile.id,
-            block_type: b.type,
-            position_index: index,
-            content: b.data || {}, // Aquí se inyectan las canciones y productos nuevos de forma estricta
-            is_visible: true
-          }))
-        );
+        .delete()
+        .eq("profile_id", PROFILE_ID)
 
-      if (blocksError) throw blocksError;
+      if (deleteError) throw deleteError
+
+      const { error: blocksError } = await supabase.from("profile_blocks").insert(
+        blocks.map((b, index) => ({
+          profile_id: PROFILE_ID,
+          block_type: b.type,
+          position_index: index,
+          content: b.data,
+          is_visible: true,
+        }))
+      )
+
+      if (blocksError) throw blocksError
 
       alert("¡Cambios publicados con éxito en tu perfil dinámico!")
     } catch (err: any) {
@@ -173,6 +169,14 @@ export function ProfileEditor() {
     }
     navigator.vibrate?.(10)
     setDragPayload(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <p className="text-sm font-medium text-muted-foreground">Cargando editor...</p>
+      </div>
+    )
   }
 
   return (

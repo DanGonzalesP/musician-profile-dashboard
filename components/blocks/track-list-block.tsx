@@ -15,7 +15,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
       <div className="flex flex-col gap-5 sm:flex-row">
         <div className="flex flex-col items-center gap-4 sm:w-56 sm:shrink-0">
           <img
-            src={(data as any).cover || "/placeholder.svg"}
+            src={data.cover || "/placeholder.svg"}
             alt="Album cover"
             className="aspect-square w-full max-w-56 rounded-lg object-cover shadow-lg"
           />

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block } from "@/lib/blocks";
+import { type Block, dbBlockToBlock } from "@/lib/blocks";
 import { PreviewCanvas } from "@/components/preview-canvas";
 
 export default function PerfilPublicoPage() {
@@ -23,9 +23,8 @@ export default function PerfilPublicoPage() {
       // Aquí buscamos en la tabla 'profiles'
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("id")
-        // Cambiar por .eq("username", username) cuando añadas la columna. Por ahora dejamos la lógica estructurada:
-        .eq("display_name", username.replace("-", " ")) 
+        .select("user_id")
+        .eq("display_name", username.replace("-", " "))
         .maybeSingle();
 
       if (profileError || !profile) {
@@ -34,25 +33,17 @@ export default function PerfilPublicoPage() {
         return;
       }
 
-      // 2. Traemos los bloques asociados a ese perfil ordenados por su posición
       const { data: dbBlocks, error: blocksError } = await supabase
         .from("profile_blocks")
-        .select("*")
-        .eq("profile_id", profile.id)
+        .select("id, block_type, content, position_index")
+        .eq("profile_id", profile.user_id)
         .eq("is_visible", true)
         .order("position_index", { ascending: true });
 
       if (blocksError || !dbBlocks) {
         setError(true);
       } else {
-        // 3. Mapeamos el formato de la base de datos al formato del frontend (Block)
-        const mappedBlocks: Block[] = dbBlocks.map((b) => ({
-          id: b.id, // o genera uno si tu front requiere string uuid alternativo
-          type: b.block_type,
-          data: b.content || {},
-        }));
-        
-        setBlocks(mappedBlocks);
+        setBlocks(dbBlocks.map(dbBlockToBlock));
       }
       setLoading(false);
     }
