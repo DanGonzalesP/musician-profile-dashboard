@@ -23,9 +23,23 @@ function renderBlock(block: Block, index: number) {
   }
 }
 
-export function ProfilePage({ profile }: { profile: ArtistProfile }) {
-  const heroBlock = profile.blocks.find((b) => b.type === "hero")
-  const bodyBlocks = profile.blocks.filter((b) => b.type !== "hero")
+export function ProfilePage({ profile }: { profile?: ArtistProfile | null }) {
+  const blocks = profile?.blocks ?? []
+  const heroBlock = blocks.find((b) => b.type === "hero") ?? null
+  const bodyBlocks = blocks.filter((b) => b.type !== "hero")
+
+  if (!profile || blocks.length === 0) {
+    return (
+      <PlayerProvider>
+        <main className="min-h-screen pb-32">
+          <div className="mx-auto mt-20 flex max-w-5xl flex-col items-center justify-center px-4 text-center sm:px-6">
+            <p className="text-lg font-semibold text-foreground">No hay contenido disponible todavía.</p>
+            <p className="mt-2 text-sm text-muted-foreground">El perfil se llenará cuando haya datos en Supabase.</p>
+          </div>
+        </main>
+      </PlayerProvider>
+    )
+  }
 
   return (
     <PlayerProvider>
@@ -38,7 +52,7 @@ export function ProfilePage({ profile }: { profile: ArtistProfile }) {
 
         <footer className="mx-auto mt-20 max-w-5xl px-4 sm:px-6">
           <div className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-            <p>© {new Date().getFullYear()} Elena Vance. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} {profile.handle || "Perfil"}. All rights reserved.</p>
             <p className="mt-1">Powered by your music platform.</p>
           </div>
         </footer>

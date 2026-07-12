@@ -40,10 +40,11 @@ export default function PerfilPublicoPage() {
         .eq("is_visible", true)
         .order("position_index", { ascending: true });
 
-      if (blocksError || !dbBlocks) {
+      if (blocksError) {
         setError(true);
       } else {
-        setBlocks(dbBlocks.map(dbBlockToBlock));
+        setBlocks((dbBlocks ?? []).map(dbBlockToBlock));
+        setError(false);
       }
       setLoading(false);
     }
@@ -63,6 +64,17 @@ export default function PerfilPublicoPage() {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <p className="text-sm font-semibold text-destructive">Artista no encontrado.</p>
+      </div>
+    );
+  }
+
+  if (!loading && blocks.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <div className="text-center">
+          <p className="text-lg font-semibold text-foreground">No hay contenido disponible todavía.</p>
+          <p className="mt-2 text-sm text-muted-foreground">El perfil se llenará cuando haya datos en Supabase.</p>
+        </div>
       </div>
     );
   }
