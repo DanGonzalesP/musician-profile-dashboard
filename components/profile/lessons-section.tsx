@@ -29,8 +29,8 @@ function BookingDialog({ plan }: { plan: LessonPlan }) {
         Book {plan.title}
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
-        <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-2xl transition-all data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity opacity-0" />
+        <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-2xl transition-all scale-95 opacity-0">
           <Dialog.Close
             render={
               <button
@@ -138,7 +138,7 @@ function PlanCard({ plan }: { plan: LessonPlan }) {
       className={cn(
         "relative flex flex-col rounded-2xl border p-6",
         plan.highlighted
-          ? "border-primary/60 bg-primary/[0.06]"
+          ? "border-primary/60 bg-primary/10"
           : "border-border bg-card",
       )}
     >
@@ -193,7 +193,10 @@ export function LessonsSection({ block }: { block: LessonsBlock }) {
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-border bg-gradient-to-b from-card to-background p-5 sm:p-8">
+      <div
+        className="rounded-2xl border border-border bg-card p-5 sm:p-8"
+        style={{ backgroundImage: "linear-gradient(to bottom, hsl(var(--card)), hsl(var(--background)))" }}
+      >
         <p className="max-w-2xl text-pretty leading-relaxed text-muted-foreground">
           {block.intro}
         </p>
