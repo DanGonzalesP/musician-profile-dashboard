@@ -239,9 +239,21 @@ export function ProfileEditor() {
 
       alert("¡Cambios publicados con éxito en tu perfil!")
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error(err)
-      alert("Ocurrió un error al publicar: " + message)
+      // Los errores de Supabase son PostgrestError, no Error estándar de JS.
+      // String(postgrestError) devuelve "[object Object]" — usamos JSON.stringify.
+      let message: string
+      if (err instanceof Error) {
+        message = err.message
+      } else if (err && typeof err === "object" && "message" in err) {
+        const pgErr = err as { message: string; code?: string; details?: string; hint?: string }
+        message = pgErr.message
+        if (pgErr.code) message += ` (código: ${pgErr.code})`
+        if (pgErr.hint) message += ` — ${pgErr.hint}`
+      } else {
+        message = JSON.stringify(err)
+      }
+      console.error("[handlePublish] Error:", err)
+      alert("Ocurrido un error al publicar:\n" + message)
     } finally {
       setPublishing(false)
     }

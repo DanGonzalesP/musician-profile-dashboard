@@ -4,55 +4,94 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { type Block, dbBlockToBlock } from "@/lib/blocks";
-import { PreviewCanvas } from "@/components/preview-canvas";
+import { BlockRenderer } from "@/components/blocks/block-renderer";
+
+type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 
 export default function PerfilPublicoPage() {
   const params = useParams();
-  const username = params?.username as string;
+  const username = (params?.username as string)?.trim().toLowerCase();
 
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [state, setState] = useState<LoadingState>("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!username) {
+      setState("error");
+      setErrorMessage("Perfil no especificado");
+      return;
+    }
+
+    const controller = new AbortController();
+
     async function cargarPerfil() {
-      if (!username) return;
+      try {
+        setState("loading");
+        setErrorMessage(null);
 
-      // 1. Buscamos el perfil usando el username (asumiendo que Nova Reyes u otro tenga una columna username o display_name)
-      // Como tu editor usa un "fakeUserId" fijo, si aún no tienes columna 'username' en 'profiles', filtraremos temporalmente por display_name o el id si es necesario.
-      // Aquí buscamos en la tabla 'profiles'
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("display_name", username.replace("-", " "))
-        .maybeSingle();
+        // Convertir slug URL → formato de búsqueda
+        // "nova-reyes" → "nova reyes"
+        const displayNameSlug = username.replaceAll("-", " ");
 
-      if (profileError || !profile) {
-        setError(true);
-        setLoading(false);
-        return;
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .ilike("display_name", displayNameSlug)
+          .maybeSingle();
+
+        if (controller.signal.aborted) return;
+
+        if (profileError) {
+          throw new Error(`Error al buscar perfil: ${profileError.message}`);
+        }
+
+        if (!profile) {
+          setState("error");
+          setErrorMessage("Artista no encontrado");
+          return;
+        }
+
+        // Cargar bloques del perfil
+        const { data: dbBlocks, error: blocksError } = await supabase
+          .from("profile_blocks")
+          .select("id, block_type, content, position_index")
+          .eq("profile_id", profile.user_id)
+          .eq("is_visible", true)
+          .order("position_index", { ascending: true });
+
+        if (controller.signal.aborted) return;
+
+        if (blocksError) {
+          throw new Error(`Error al cargar bloques: ${blocksError.message}`);
+        }
+
+        const parsedBlocks = (dbBlocks ?? []).map(dbBlockToBlock);
+
+        if (parsedBlocks.length === 0) {
+          setState("empty");
+          setBlocks([]);
+        } else {
+          setState("success");
+          setBlocks(parsedBlocks);
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        const message =
+          err instanceof Error ? err.message : "Error desconocido al cargar el perfil";
+        setErrorMessage(message);
+        setState("error");
       }
-
-      const { data: dbBlocks, error: blocksError } = await supabase
-        .from("profile_blocks")
-        .select("id, block_type, content, position_index")
-        .eq("profile_id", profile.user_id)
-        .eq("is_visible", true)
-        .order("position_index", { ascending: true });
-
-      if (blocksError) {
-        setError(true);
-      } else {
-        setBlocks((dbBlocks ?? []).map(dbBlockToBlock));
-        setError(false);
-      }
-      setLoading(false);
     }
 
     cargarPerfil();
+
+    return () => controller.abort();
   }, [username]);
 
-  if (loading) {
+  // UI States
+  if (state === "loading") {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <p className="text-sm font-medium">Cargando portafolio...</p>
@@ -60,20 +99,28 @@ export default function PerfilPublicoPage() {
     );
   }
 
-  if (error) {
+  if (state === "error") {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
-        <p className="text-sm font-semibold text-destructive">Artista no encontrado.</p>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-destructive">
+            {errorMessage || "Artista no encontrado."}
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (!loading && blocks.length === 0) {
+  if (state === "empty") {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center">
-          <p className="text-lg font-semibold text-foreground">No hay contenido disponible todavía.</p>
-          <p className="mt-2 text-sm text-muted-foreground">El perfil se llenará cuando haya datos en Supabase.</p>
+          <p className="text-lg font-semibold text-foreground">
+            No hay contenido disponible todavía.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            El perfil se completará cuando haya datos en Supabase.
+          </p>
         </div>
       </div>
     );
@@ -81,18 +128,10 @@ export default function PerfilPublicoPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-      <main className="mx-auto max-w-2xl">
-        <PreviewCanvas
-          blocks={blocks}
-          selectedId={null}
-          isDragging={false}
-          onSelect={() => {}}
-          onDelete={() => {}}
-          onMove={() => {}}
-          onDropAt={() => {}}
-          onReorderStart={() => {}}
-          onDragEnd={() => {}}
-        />
+      <main className="mx-auto flex max-w-5xl flex-col gap-8">
+        {blocks.map((block) => (
+          <BlockRenderer key={block.id} block={block} />
+        ))}
       </main>
     </div>
   );
