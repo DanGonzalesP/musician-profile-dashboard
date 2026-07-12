@@ -5,6 +5,7 @@ import type { Block } from "@/lib/blocks"
 import { CanvasBlock } from "@/components/canvas-block"
 import { MousePointerClick } from "lucide-react"
 import { MusicPlayer } from "@/components/music-player"
+import { MerchGrid } from "@/components/merch-grid"
 
 type Props = {
   blocks: Block[]
@@ -48,6 +49,23 @@ export function PreviewCanvas({
       title: "Sample Song 2",
       audio_file_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
       duration_seconds: 423
+    }
+  ]
+
+  const mockProducts = [
+    {
+      id: "m1",
+      title: "Black Vinyl Edition",
+      price: 89.90,
+      currency: "PEN",
+      image_url: "https://images.unsplash.com/photo-1539628399283-a63150b6732b?w=400&q=80"
+    },
+    {
+      id: "m2",
+      title: "Official Tour Hoodie",
+      price: 120.00,
+      currency: "PEN",
+      image_url: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&q=80"
     }
   ]
 
@@ -142,6 +160,12 @@ export function PreviewCanvas({
                     {block.type === "tracks" && (
                       <div className="mt-2 p-2">
                         <MusicPlayer tracks={mockTracks} />
+                      </div>
+                    )}
+
+                    {block.type === "merch" && (
+                      <div className="mt-2">
+                        <MerchGrid products={mockProducts} />
                       </div>
                     )}
                   </CanvasBlock>
