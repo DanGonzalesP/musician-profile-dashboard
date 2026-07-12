@@ -25,24 +25,67 @@ export function ProfileEditor() {
 
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null
 
-  // Función para guardar los bloques en Supabase
+  // Función para generar imágenes con IA usando nuestro nuevo endpoint
+  async function generarBannerConIA(promptTexto: string) {
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt: promptTexto }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error en la IA");
+      return data.url; 
+    } catch (err: any) {
+      console.error(err);
+      alert("Error al generar la imagen con IA: " + err.message);
+      return null;
+    }
+  }
+
+  // Función para guardar los bloques en la base de datos estructurada
   async function handlePublish() {
     setPublishing(true)
     try {
-      // Intentamos actualizar los bloques del artista en la base de datos
-      const { error } = await supabase
-        .from("artist")
-        .update({ blocks: blocks })
-        .eq("username", "novareyes") // Filtra por el usuario correspondiente
+      // ID fijo temporal para el desarrollo del perfil del artista
+      const fakeUserId = "00000000-0000-0000-0000-000000000000";
 
-      if (error) {
-        alert("Error al publicar los cambios: " + error.message)
-      } else {
-        alert("¡Cambios publicados con éxito en tu perfil!")
-      }
-    } catch (err) {
+      // 1. Asegurar o actualizar el perfil base
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .upsert({ 
+          user_id: fakeUserId,
+          display_name: "Nova Reyes",
+          bio: "Artista Musical"
+        }, { onConflict: 'user_id' })
+        .select()
+        .single();
+
+      if (profileError) throw profileError;
+
+      // 2. Limpiar bloques anteriores e insertar el nuevo orden (Efecto IKEA)
+      await supabase.from("profile_blocks").delete().eq("profile_id", profile.id);
+
+      const { error: blocksError } = await supabase
+        .from("profile_blocks")
+        .insert(
+          blocks.map((b, index) => ({
+            profile_id: profile.id,
+            block_type: b.type,
+            position_index: index,
+            content: b.data || {},
+            is_visible: true
+          }))
+        );
+
+      if (blocksError) throw blocksError;
+
+      alert("¡Cambios publicados con éxito en tu perfil dinámico!")
+    } catch (err: any) {
       console.error(err)
-      alert("Ocurrió un error inesperado al conectar con Supabase.")
+      alert("Ocurrió un error al conectar con Supabase: " + err.message)
     } finally {
       setPublishing(false)
     }
@@ -95,12 +138,12 @@ export function ProfileEditor() {
         return next
       })
     }
+    navigator.vibrate?.(10)
     setDragPayload(null)
   }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Pasamos la función handlePublish y el estado publishing al Header */}
       <EditorHeader 
         blockCount={blocks.length} 
         onPublish={handlePublish} 
