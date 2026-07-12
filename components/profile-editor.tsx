@@ -79,35 +79,42 @@ export function ProfileEditor() {
   async function handlePublish() {
     setPublishing(true)
     try {
+      const profileId = PROFILE_ID
+      const profilePayload = {
+        id: profileId,
+        user_id: profileId,
+        display_name: "Nova Reyes",
+        bio: "Artista Musical",
+      }
+
+      console.log("[handlePublish] profile upsert payload", profilePayload)
+
       const { error: profileError } = await supabase
         .from("profiles")
-        .upsert(
-          {
-            user_id: PROFILE_ID,
-            display_name: "Nova Reyes",
-            bio: "Artista Musical",
-          },
-          { onConflict: "user_id" }
-        )
+        .upsert(profilePayload, { onConflict: "id" })
 
       if (profileError) throw profileError
 
       const { error: deleteError } = await supabase
         .from("profile_blocks")
         .delete()
-        .eq("profile_id", PROFILE_ID)
+        .eq("profile_id", profileId)
 
       if (deleteError) throw deleteError
 
-      const { error: blocksError } = await supabase.from("profile_blocks").insert(
-        blocks.map((b, index) => ({
-          profile_id: PROFILE_ID,
-          block_type: b.type,
-          position_index: index,
-          content: b.data,
-          is_visible: true,
-        }))
-      )
+      const profileBlocksPayload = blocks.map((b, index) => ({
+        profile_id: profileId,
+        block_type: b.type,
+        position_index: index,
+        content: b.data,
+        is_visible: true,
+      }))
+
+      console.log("[handlePublish] profile_blocks insert payload", profileBlocksPayload)
+
+      const { error: blocksError } = await supabase
+        .from("profile_blocks")
+        .insert(profileBlocksPayload)
 
       if (blocksError) throw blocksError
 
