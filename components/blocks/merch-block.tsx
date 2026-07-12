@@ -1,51 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { ShoppingBag } from "lucide-react"
 import type { MerchData } from "@/lib/blocks"
-import { supabase } from "@/lib/supabase"
-
-interface DbProduct {
-  id: number
-  name: string
-  price: number | string
-  image_url?: string
-  tag?: string
-}
 
 export function MerchBlock({ data }: { data: MerchData }) {
-  const [productos, setProductos] = useState<DbProduct[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function obtenerMerch() {
-      // 1. Obtener ID del artista Nova Reyes
-      const { data: artist } = await supabase
-        .from("artist")
-        .select("id")
-        .eq("username", "novareyes")
-        .single()
-
-      if (artist) {
-        // 2. Traer productos de la tabla merch vinculados al artista
-        const { data: merchData } = await supabase
-          .from("merch")
-          .select("id, name, price, image_url, tag")
-          .eq("artist_id", artist.id)
-
-        if (merchData) {
-          setProductos(merchData as DbProduct[])
-        }
-      }
-      setLoading(false)
-    }
-
-    obtenerMerch()
-  }, [])
-
-  if (loading) {
-    return <div className="p-4 text-xs text-center text-muted-foreground">Cargando tienda...</div>
-  }
+  // Extraemos los productos directamente de la propiedad dinámica del editor
+  const productos = data.products || []
 
   return (
     <div className="rounded-xl border border-border bg-card/40 p-5">
@@ -54,14 +14,14 @@ export function MerchBlock({ data }: { data: MerchData }) {
         {data.title || "Official Merch"}
       </h3>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {productos.map((product) => (
+        {productos.map((product, i) => (
           <div
-            key={product.id}
+            key={i}
             className="group overflow-hidden rounded-lg border border-border bg-background/40 transition-colors hover:border-primary/50"
           >
             <div className="relative aspect-square overflow-hidden">
               <img
-                src={product.image_url || "/placeholder.svg"}
+                src={product.image || "/placeholder.svg"}
                 alt={product.name}
                 className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
@@ -72,9 +32,9 @@ export function MerchBlock({ data }: { data: MerchData }) {
               )}
             </div>
             <div className="flex flex-col gap-1 p-3">
-              <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">{product.name}</p>
+              <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">{product.name || "Nuevo Producto"}</p>
               <p className="text-sm font-semibold text-primary">
-                {typeof product.price === "number" ? `$${product.price.toFixed(2)}` : product.price}
+                {product.price ? `$${product.price}` : "$0.00"}
               </p>
             </div>
           </div>
