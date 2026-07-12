@@ -10,24 +10,18 @@ export default function Page() {
       <header className="border-b border-border bg-card/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold">
-            A
+            D
           </div>
-          <span className="font-bold text-lg tracking-tight">Amplitude</span>
+          <span className="font-bold text-lg tracking-tight">Décima</span>
         </div>
         
         <div className="flex items-center gap-3">
-          <Link 
-            href="/dashboard" 
-            className="text-xs font-medium px-4 py-2 rounded-lg hover:bg-accent transition-colors"
-          >
-            Iniciar Sesión
-          </Link>
-          <Link 
-            href="/dashboard" 
-            className="text-xs font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shadow-md"
-          >
-            Registrarse
-          </Link>
+       <Link href="/login" className="text-xs font-medium px-4 py-2 rounded-lg hover:bg-accent transition-colors">
+  Iniciar Sesión
+</Link>
+<Link href="/login" className="text-xs font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shadow-md">
+  Registrarse
+</Link>
         </div>
       </header>
 
@@ -37,24 +31,21 @@ export default function Page() {
           <Sparkles className="size-3.5" /> El Hub definitivo para Músicos Independientes
         </div>
         
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
           Controla tu música, tu merch y tus derechos.
         </h1>
         
         <p className="text-sm text-muted-foreground max-w-xl mb-8 leading-relaxed">
-          Crea tu perfil profesional con IA, vende productos directamente a tus fans y protege tu propiedad intelectual con tecnología digital SHA-256. Todo en un solo lugar.
+          Crea tu perfil profesional con IA, vende productos directamente a tus fans y protege tu propiedad intelectual con tecnología digital SHA-256. Todo en un solo lugar con Décima.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4 mb-16">
-          <Link 
-            href="/dashboard" 
-            className="text-sm font-semibold bg-primary text-primary-foreground px-6 py-3 rounded-xl hover:scale-105 transition-transform shadow-lg"
-          >
-            Comenzar como Artista
-          </Link>
+          <Link href="/login" className="text-sm font-semibold bg-primary text-primary-foreground px-6 py-3 rounded-xl hover:scale-105 transition-transform shadow-lg">
+  Comenzar como Artista
+</Link>
         </div>
 
-        {/* Cuadrícula de Características (Los bloques que creamos) */}
+        {/* Cuadrícula de Características */}
         <div className="grid sm:grid-cols-3 gap-4 w-full max-w-2xl text-left">
           <div className="p-4 rounded-xl border border-border bg-card">
             <Music className="size-5 text-primary mb-2" />
