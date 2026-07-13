@@ -5,6 +5,14 @@ export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
 export type BlockType = "hero" | "tracks" | "merch" | "service" | "donation"
 
+export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
+
+export type SocialLink = {
+  platform: SocialPlatform
+  label: string
+  href: string
+}
+
 export type Track = {
   title: string
   duration: string
@@ -25,6 +33,9 @@ export type HeroData = {
   tagline: string
   location: string
   image: string
+  banner?: string
+  monthlyListeners?: string
+  socials?: SocialLink[]
 }
 
 export type TracksData = {
@@ -126,6 +137,9 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         tagline: String(content.tagline ?? ""),
         location: String(content.location ?? ""),
         image: String(content.image ?? content.avatarUrl ?? content.coverUrl ?? "/hero-banner.png"),
+        banner: content.banner ? String(content.banner) : "",
+        monthlyListeners: content.monthlyListeners ? String(content.monthlyListeners) : "",
+        socials: Array.isArray(content.socials) ? content.socials.map(normalizeSocialLink) : [],
       }
     case "tracks": {
       if (Array.isArray(content.albums)) {
@@ -163,6 +177,17 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         goalAmount: String(content.goalAmount ?? ""),
         currency: String(content.currency ?? "USD"),
       }
+  }
+}
+
+function normalizeSocialLink(raw: unknown): SocialLink {
+  const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  const validPlatforms: SocialPlatform[] = ["instagram", "youtube", "twitter", "spotify", "bandcamp"]
+  const platform = validPlatforms.includes(s.platform as SocialPlatform) ? (s.platform as SocialPlatform) : "instagram"
+  return {
+    platform,
+    label: String(s.label ?? ""),
+    href: String(s.href ?? ""),
   }
 }
 
@@ -204,6 +229,9 @@ function defaultData(type: BlockType): BlockData {
         tagline: "Analog dreamer making late-night synth pop.",
         location: "Lisbon, PT",
         image: "/hero-banner.png",
+        banner: "",
+        monthlyListeners: "",
+        socials: [],
       }
     case "tracks":
       return {

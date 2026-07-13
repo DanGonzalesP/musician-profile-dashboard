@@ -22,7 +22,7 @@ export function EditorHeader({
         <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
           Panel Admin
         </Link>
-        <Button variant="outline" size="sm" onClick={() => window.open('/', '_blank')}>
+        <Button variant="outline" size="sm" onClick={() => window.open('/perfil/preview', '_blank')}>
           Preview
         </Button>
         <Button 

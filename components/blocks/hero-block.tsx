@@ -1,36 +1,85 @@
 "use client"
 
-import { MapPin } from "lucide-react"
-import type { HeroData } from "@/lib/blocks"
+import { MapPin, Camera, Video, AtSign, Music2, Disc3 } from "lucide-react"
+import type { HeroData, SocialPlatform } from "@/lib/blocks"
+
+const socialIcons: Record<SocialPlatform, typeof Camera> = {
+  instagram: Camera,
+  youtube: Video,
+  twitter: AtSign,
+  spotify: Music2,
+  bandcamp: Disc3,
+}
 
 export function HeroBlock({ data }: { data: HeroData }) {
   const imagePreview = data.image || "/placeholder.svg"
+  const socials = data.socials || []
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card/20 p-6 text-center sm:p-8">
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative size-24 overflow-hidden rounded-full border-2 border-primary shadow-md sm:size-28">
-          <img
-            src={imagePreview}
-            alt={data.name || "Artist Name"}
-            className="size-full object-cover"
-          />
+    <div className="relative overflow-hidden rounded-2xl border border-border">
+      {/* Banner de fondo — si no hay imagen, se usa un degradado suave con el color de acento */}
+      <div className="relative h-36 w-full overflow-hidden sm:h-52">
+        {data.banner ? (
+          <img src={data.banner} alt="" className="size-full object-cover" />
+        ) : (
+          <div className="size-full bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_70%)]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-card from-20% via-card/60 to-transparent" />
+      </div>
+
+      <div className="relative -mt-12 px-6 pb-6 sm:-mt-16 sm:px-8 sm:pb-8">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+          <div className="relative size-24 shrink-0 overflow-hidden rounded-full border-4 border-card shadow-2xl shadow-black/40 sm:size-32">
+            <img src={imagePreview} alt={data.name || "Artist Name"} className="size-full object-cover" />
+          </div>
+          <div className="flex-1 pb-1 text-center sm:text-left">
+            <h2 className="text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl">
+              {data.name || "Nombre del Artista"}
+            </h2>
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground sm:justify-start">
+              {data.location && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-4 text-primary" />
+                  {data.location}
+                </span>
+              )}
+              {data.monthlyListeners && (
+                <>
+                  {data.location && <span aria-hidden="true">·</span>}
+                  <span>{data.monthlyListeners}</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            {data.name || "Nombre del Artista"}
-          </h2>
-          {data.location && (
-            <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="size-3.5 text-primary" />
-              {data.location}
-            </p>
-          )}
-        </div>
+
         {data.tagline && (
-          <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-5 max-w-2xl text-pretty text-center text-sm leading-relaxed text-muted-foreground sm:text-left sm:text-base">
             {data.tagline}
           </p>
+        )}
+
+        {socials.length > 0 && (
+          <nav
+            aria-label="Social links"
+            className="mt-5 flex flex-wrap items-center justify-center gap-2 sm:justify-start"
+          >
+            {socials.map((social, i) => {
+              const Icon = socialIcons[social.platform] ?? Music2
+              return (
+                <a
+                  key={i}
+                  href={social.href || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                >
+                  <Icon className="size-3.5" />
+                  {social.label || social.platform}
+                </a>
+              )
+            })}
+          </nav>
         )}
       </div>
     </div>

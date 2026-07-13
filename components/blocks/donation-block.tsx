@@ -8,14 +8,14 @@ export function DonationBlock({ data }: { data: DonationData }) {
   const currency = data.currency || "USD"
 
   return (
-    <div className="rounded-xl border border-border bg-gradient-to-br from-primary/5 via-card/60 to-card/40 p-6">
+    <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 via-card/60 to-card/40 p-6 sm:p-8">
       {/* Header */}
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Heart className="size-5" />
         </span>
         <div>
-          <h3 className="text-sm font-bold text-foreground">
+          <h3 className="text-xl font-semibold tracking-tight text-foreground">
             {data.title || "Support My Music"}
           </h3>
           {hasGoal && (

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track } from "@/lib/blocks"
+import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
 import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft } from "lucide-react"
@@ -247,6 +247,85 @@ function AudioUploader({
 
 // ─── HeroFields ───────────────────────────────────────────────────────────
 
+const SOCIAL_PLATFORMS: { value: SocialPlatform; label: string }[] = [
+  { value: "instagram", label: "Instagram" },
+  { value: "youtube", label: "YouTube" },
+  { value: "twitter", label: "Twitter / X" },
+  { value: "spotify", label: "Spotify" },
+  { value: "bandcamp", label: "Bandcamp" },
+]
+
+function SocialLinksFields({
+  socials,
+  onChange,
+}: {
+  socials: SocialLink[]
+  onChange: (socials: SocialLink[]) => void
+}) {
+  const addSocial = () => {
+    onChange([...socials, { platform: "instagram", label: "", href: "" }])
+  }
+
+  const setSocial = (index: number, changes: Partial<SocialLink>) => {
+    onChange(socials.map((s, i) => (i === index ? { ...s, ...changes } : s)))
+  }
+
+  const removeSocial = (index: number) => {
+    onChange(socials.filter((_, i) => i !== index))
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Redes sociales</p>
+        <button
+          type="button"
+          onClick={addSocial}
+          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <Plus className="size-3" /> Add Link
+        </button>
+      </div>
+
+      {socials.map((social, index) => (
+        <div key={index} className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-background/50">
+          <div className="flex items-center justify-between gap-2">
+            <select
+              value={social.platform}
+              onChange={(e) => setSocial(index, { platform: e.target.value as SocialPlatform })}
+              className={inputClass}
+            >
+              {SOCIAL_PLATFORMS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => removeSocial(index)}
+              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              title="Eliminar red social"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+          <TextInput
+            value={social.label}
+            onChange={(e) => setSocial(index, { label: e.target.value })}
+            placeholder="Texto a mostrar, ej. @novareyes"
+          />
+          <TextInput
+            value={social.href}
+            onChange={(e) => setSocial(index, { href: e.target.value })}
+            placeholder="https://..."
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function HeroFields({
   data,
   onChange,
@@ -261,10 +340,17 @@ function HeroFields({
       <Field label="Artist name">
         <TextInput value={data.name || ""} onChange={(e) => onChange({ ...data, name: e.target.value })} />
       </Field>
-      <Field label="Banner Image">
+      <Field label="Foto de perfil (avatar)">
         <ImageUploader
           currentImageUrl={data.image}
           onUploadReady={(url) => onChange({ ...data, image: url })}
+          blobRegistry={blobRegistry}
+        />
+      </Field>
+      <Field label="Banner de fondo">
+        <ImageUploader
+          currentImageUrl={data.banner}
+          onUploadReady={(url) => onChange({ ...data, banner: url })}
           blobRegistry={blobRegistry}
         />
       </Field>
@@ -279,6 +365,17 @@ function HeroFields({
       <Field label="Location">
         <TextInput value={data.location || ""} onChange={(e) => onChange({ ...data, location: e.target.value })} />
       </Field>
+      <Field label="Oyentes mensuales (opcional)">
+        <TextInput
+          value={data.monthlyListeners || ""}
+          onChange={(e) => onChange({ ...data, monthlyListeners: e.target.value })}
+          placeholder="Ej. 12,400 monthly listeners"
+        />
+      </Field>
+      <SocialLinksFields
+        socials={data.socials || []}
+        onChange={(socials) => onChange({ ...data, socials })}
+      />
     </>
   )
 }

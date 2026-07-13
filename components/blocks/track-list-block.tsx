@@ -224,8 +224,8 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   const cycleSeconds = Math.max(albums.length * 4, 8)
 
   return (
-    <div className="rounded-xl border border-border bg-card/40 p-5">
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
+      <div className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Discografía
       </div>
 
