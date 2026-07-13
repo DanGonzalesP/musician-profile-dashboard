@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { type Block, type BlockType, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks"
+import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog } from "@/lib/catalog"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
@@ -77,6 +78,8 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
 
 export function ProfileEditor() {
   const [blocks, setBlocks] = useState<Block[]>([])
+  const [products, setProducts] = useState<CatalogProduct[]>([])
+  const [services, setServices] = useState<CatalogService[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dragPayload, setDragPayload] = useState<DragPayload>(null)
   const [publishing, setPublishing] = useState(false)
@@ -94,24 +97,40 @@ export function ProfileEditor() {
   useEffect(() => {
     async function loadSavedBlocks() {
       try {
+        // profile_blocks/products/services están indexados por el id real de
+        // la fila `profiles`, no por PROFILE_ID (que es el user_id usado para
+        // encontrarla). Hay que resolverlo primero.
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", PROFILE_ID)
+          .maybeSingle()
+
+        if (profileError) throw profileError
+
+        const profileId = profile?.id ?? PROFILE_ID
+
         const { data: dbBlocks, error } = await supabase
           .from("profile_blocks")
           .select("id, block_type, content, position_index")
-          .eq("profile_id", PROFILE_ID)
+          .eq("profile_id", profileId)
           .order("position_index", { ascending: true })
 
         if (error) throw error
 
         if (dbBlocks && dbBlocks.length > 0) {
           setBlocks(dbBlocks.map(dbBlockToBlock))
-          return
+        } else {
+          setBlocks([
+            createBlock("hero"),
+            createBlock("tracks"),
+            createBlock("merch"),
+          ])
         }
 
-        setBlocks([
-          createBlock("hero"),
-          createBlock("tracks"),
-          createBlock("merch"),
-        ])
+        const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId)
+        setProducts(catalogProducts)
+        setServices(catalogServices)
       } catch (err) {
         console.error("Error cargando bloques iniciales:", err)
         setBlocks([
@@ -239,6 +258,9 @@ export function ProfileEditor() {
         .insert(profileBlocksPayload)
 
       if (blocksError) throw blocksError
+
+      // 5. Publicar catálogo de productos y servicios
+      await publishCatalog(profileId, products, services)
 
       alert("¡Cambios publicados con éxito en tu perfil!")
     } catch (err: unknown) {
@@ -368,6 +390,8 @@ export function ProfileEditor() {
             onDropAt={handleDropAt}
             onReorderStart={(index) => setDragPayload({ kind: "reorder", index })}
             onDragEnd={() => setDragPayload(null)}
+            products={products}
+            services={services}
           />
         </main>
 
@@ -386,6 +410,10 @@ export function ProfileEditor() {
                 onClose={() => setSelectedId(null)}
                 onDelete={deleteBlock}
                 blobRegistry={blobRegistryRef}
+                products={products}
+                onProductsChange={setProducts}
+                services={services}
+                onServicesChange={setServices}
               />
             </aside>
           </>

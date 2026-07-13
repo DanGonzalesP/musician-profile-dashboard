@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import type { Block } from "@/lib/blocks"
+import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { CanvasBlock } from "@/components/canvas-block"
 import { MousePointerClick } from "lucide-react"
 
@@ -15,6 +16,8 @@ type Props = {
   onDropAt: (index: number) => void
   onReorderStart: (index: number) => void
   onDragEnd: () => void
+  products?: CatalogProduct[]
+  services?: CatalogService[]
 }
 
 export function PreviewCanvas({
@@ -27,6 +30,8 @@ export function PreviewCanvas({
   onDropAt,
   onReorderStart,
   onDragEnd,
+  products,
+  services,
 }: Props) {
   const [dropIndex, setDropIndex] = useState<number | null>(null)
 
@@ -122,6 +127,8 @@ export function PreviewCanvas({
                     onMove={(dir) => onMove(block.id, dir)}
                     onDragStart={() => onReorderStart(i)}
                     onDragEnd={onDragEnd}
+                    products={products}
+                    services={services}
                   />
                   <Indicator index={i + 1} />
                 </div>

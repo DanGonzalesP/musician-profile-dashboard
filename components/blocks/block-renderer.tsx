@@ -1,22 +1,31 @@
 "use client"
 
 import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
+import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { HeroBlock } from "./hero-block"
 import { TrackListBlock } from "./track-list-block"
 import { MerchBlock } from "./merch-block"
 import { ServiceBlock } from "./service-block"
 import { DonationBlock } from "./donation-block"
 
-export function BlockRenderer({ block }: { block: Block }) {
+export function BlockRenderer({
+  block,
+  products = [],
+  services = [],
+}: {
+  block: Block
+  products?: CatalogProduct[]
+  services?: CatalogService[]
+}) {
   switch (block.type) {
     case "hero":
       return <HeroBlock data={block.data as HeroData} />
     case "tracks":
       return <TrackListBlock data={block.data as TracksData} />
     case "merch":
-      return <MerchBlock data={block.data as MerchData} />
+      return <MerchBlock data={block.data as MerchData} products={products} />
     case "service":
-      return <ServiceBlock data={block.data as ServiceData} />
+      return <ServiceBlock data={block.data as ServiceData} services={services} />
     case "donation":
       return <DonationBlock data={block.data as DonationData} />
     default:

@@ -11,21 +11,6 @@ export type Track = {
   audioUrl?: string
 }
 
-export type Product = {
-  name: string
-  price: string
-  image: string
-  stock: number
-  /** Compatibilidad con productos guardados antes de añadir stock. */
-  tag?: string
-}
-
-export type Service = {
-  title: string
-  price: string
-  description: string
-}
-
 export type HeroData = {
   name: string
   tagline: string
@@ -41,12 +26,10 @@ export type TracksData = {
 
 export type MerchData = {
   title: string
-  products: Product[]
 }
 
 export type ServiceData = {
   title: string
-  services: Service[]
 }
 
 export type DonationData = {
@@ -155,32 +138,10 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
     case "merch":
       return {
         title: String(content.title ?? ""),
-        products: Array.isArray(content.products)
-          ? content.products.map((p) => {
-              const product = (p && typeof p === "object" ? p : {}) as Record<string, unknown>
-              return {
-                name: String(product.name ?? ""),
-                price: String(product.price ?? ""),
-                tag: String(product.tag ?? ""),
-                image: String(product.image ?? ""),
-                stock: normalizeStock(product.stock, product.tag),
-              }
-            })
-          : [],
       }
     case "service":
       return {
         title: String(content.title ?? ""),
-        services: Array.isArray(content.services)
-          ? content.services.map((s) => {
-              const service = (s && typeof s === "object" ? s : {}) as Record<string, unknown>
-              return {
-                title: String(service.title ?? ""),
-                price: String(service.price ?? ""),
-                description: String(service.description ?? ""),
-              }
-            })
-          : [],
       }
     case "donation":
       return {
@@ -227,19 +188,10 @@ function defaultData(type: BlockType): BlockData {
     case "merch":
       return {
         title: "Merch & Instruments",
-        products: [
-          { name: "Digital Ethereal — Orange Vinyl", price: "$32", stock: 12, image: "/merch-vinyl.png" },
-          { name: "Signature Electric Guitar", price: "$1,240", stock: 1, image: "/merch-guitar.png" },
-        ],
       }
     case "service":
       return {
         title: "Lessons & Sessions",
-        services: [
-          { title: "1:1 Songwriting Lesson", price: "$60 / hr", description: "Live over video, all levels welcome." },
-          { title: "Mixing & Mastering", price: "$180 / track", description: "Studio-grade polish for your record." },
-          { title: "Session Guitarist", price: "From $250", description: "Remote or in-studio recording." },
-        ],
       }
     case "donation":
       return {
@@ -251,11 +203,4 @@ function defaultData(type: BlockType): BlockData {
         currency: "USD",
       }
   }
-}
-
-function normalizeStock(rawStock: unknown, legacyTag: unknown): number {
-  const stock = Number(rawStock)
-  if (Number.isFinite(stock)) return Math.max(0, Math.floor(stock))
-
-  return typeof legacyTag === "string" && /agotado|sold\s*out/i.test(legacyTag) ? 0 : 10
 }

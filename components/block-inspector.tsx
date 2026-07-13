@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import type { Block, HeroData, TracksData, MerchData, Product, ServiceData, DonationData } from "@/lib/blocks"
+import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
+import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
 import { X, Trash2, Upload, Loader2, Plus, Music, Heart } from "lucide-react"
 
 type BlobRegistry = React.MutableRefObject<Map<string, File>>
@@ -13,9 +14,23 @@ type Props = {
   onClose: () => void
   onDelete: (id: string) => void
   blobRegistry: BlobRegistry
+  products: CatalogProduct[]
+  onProductsChange: (products: CatalogProduct[]) => void
+  services: CatalogService[]
+  onServicesChange: (services: CatalogService[]) => void
 }
 
-export function BlockInspector({ block, onChange, onClose, onDelete, blobRegistry }: Props) {
+export function BlockInspector({
+  block,
+  onChange,
+  onClose,
+  onDelete,
+  blobRegistry,
+  products,
+  onProductsChange,
+  services,
+  onServicesChange,
+}: Props) {
   if (!block) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
@@ -55,10 +70,21 @@ export function BlockInspector({ block, onChange, onClose, onDelete, blobRegistr
           <TracksFields data={block.data as TracksData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "merch" && (
-          <MerchFields data={block.data as MerchData} onChange={update} blobRegistry={blobRegistry} />
+          <MerchFields
+            data={block.data as MerchData}
+            onChange={update}
+            blobRegistry={blobRegistry}
+            products={products}
+            onProductsChange={onProductsChange}
+          />
         )}
         {block.type === "service" && (
-          <ServiceFields data={block.data as ServiceData} onChange={update} />
+          <ServiceFields
+            data={block.data as ServiceData}
+            onChange={update}
+            services={services}
+            onServicesChange={onServicesChange}
+          />
         )}
         {block.type === "donation" && (
           <DonationFields data={block.data as DonationData} onChange={update} />
@@ -333,24 +359,25 @@ function MerchFields({
   data,
   onChange,
   blobRegistry,
+  products,
+  onProductsChange,
 }: {
   data: MerchData
   onChange: (d: MerchData) => void
   blobRegistry: BlobRegistry
+  products: CatalogProduct[]
+  onProductsChange: (products: CatalogProduct[]) => void
 }) {
-  const setProduct = (i: number, changes: Partial<Product>) => {
-    const products = (data.products || []).map((p, idx) => (idx === i ? { ...p, ...changes } : p))
-    onChange({ ...data, products })
+  const setProduct = (i: number, changes: Partial<CatalogProduct>) => {
+    onProductsChange(products.map((p, idx) => (idx === i ? { ...p, ...changes } : p)))
   }
 
   const addProduct = () => {
-    const products = [...(data.products || []), { name: "New Product", price: "0.00", stock: 10, image: "" }]
-    onChange({ ...data, products })
+    onProductsChange([...products, newProduct()])
   }
 
   const removeProduct = (i: number) => {
-    const products = (data.products || []).filter((_, idx) => idx !== i)
-    onChange({ ...data, products })
+    onProductsChange(products.filter((_, idx) => idx !== i))
   }
 
   return (
@@ -369,8 +396,8 @@ function MerchFields({
         </button>
       </div>
       <div className="space-y-4">
-        {(data.products || []).map((product, i) => (
-          <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
+        {products.map((product, i) => (
+          <div key={product.id} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-muted-foreground">Product #{i + 1}</span>
               <button
@@ -390,8 +417,8 @@ function MerchFields({
             </Field>
             <Field label="Image">
               <ImageUploader
-                currentImageUrl={product.image}
-                onUploadReady={(url) => setProduct(i, { image: url })}
+                currentImageUrl={product.imageUrl}
+                onUploadReady={(url) => setProduct(i, { imageUrl: url })}
                 blobRegistry={blobRegistry}
               />
             </Field>
@@ -427,23 +454,24 @@ function MerchFields({
 function ServiceFields({
   data,
   onChange,
+  services,
+  onServicesChange,
 }: {
   data: ServiceData
   onChange: (d: ServiceData) => void
+  services: CatalogService[]
+  onServicesChange: (services: CatalogService[]) => void
 }) {
   const setService = (i: number, key: "title" | "price" | "description", value: string) => {
-    const services = (data.services || []).map((s, idx) => (idx === i ? { ...s, [key]: value } : s))
-    onChange({ ...data, services })
+    onServicesChange(services.map((s, idx) => (idx === i ? { ...s, [key]: value } : s)))
   }
 
   const addService = () => {
-    const services = [...(data.services || []), { title: "New Service", price: "0.00", description: "" }]
-    onChange({ ...data, services })
+    onServicesChange([...services, newService()])
   }
 
   const removeService = (i: number) => {
-    const services = (data.services || []).filter((_, idx) => idx !== i)
-    onChange({ ...data, services })
+    onServicesChange(services.filter((_, idx) => idx !== i))
   }
 
   return (
@@ -462,8 +490,8 @@ function ServiceFields({
         </button>
       </div>
       <div className="space-y-3">
-        {(data.services || []).map((service, i) => (
-          <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
+        {services.map((service, i) => (
+          <div key={service.id} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-muted-foreground">Offer #{i + 1}</span>
               <button

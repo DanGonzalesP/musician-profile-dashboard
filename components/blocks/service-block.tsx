@@ -2,9 +2,10 @@
 
 import { Sparkles } from "lucide-react"
 import type { ServiceData } from "@/lib/blocks"
+import type { CatalogService } from "@/lib/catalog"
 
-export function ServiceBlock({ data }: { data: ServiceData }) {
-  const servicios = data.services || []
+export function ServiceBlock({ data, services }: { data: ServiceData; services: CatalogService[] }) {
+  const servicios = services || []
 
   return (
     <div className="rounded-xl border border-border bg-card/40 p-5">

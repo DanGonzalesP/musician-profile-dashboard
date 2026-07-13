@@ -1,6 +1,7 @@
 "use client"
 
 import type { Block } from "@/lib/blocks"
+import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { BlockRenderer } from "@/components/blocks/block-renderer"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { GripVertical, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react"
@@ -16,6 +17,8 @@ type Props = {
   onDragStart: () => void
   onDragEnd: () => void
   children?: React.ReactNode
+  products?: CatalogProduct[]
+  services?: CatalogService[]
 }
 
 export function CanvasBlock({
@@ -29,6 +32,8 @@ export function CanvasBlock({
   onDragStart,
   onDragEnd,
   children, // Recibimos el componente hijo aquí
+  products,
+  services,
 }: Props) {
   const label = BLOCK_LIBRARY.find((b) => b.type === block.type)?.label ?? block.type
 
@@ -95,7 +100,7 @@ export function CanvasBlock({
 
       {/* Live preview content (non-interactive selection surface) */}
       <div className="pointer-events-none overflow-hidden rounded-xl">
-        <BlockRenderer block={block} />
+        <BlockRenderer block={block} products={products} services={services} />
       </div>
 
       {/* Renderiza los componentes inyectados (como el MusicPlayer) */}

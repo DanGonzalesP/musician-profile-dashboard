@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { type Block, dbBlockToBlock } from "@/lib/blocks";
+import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
@@ -13,6 +14,8 @@ export default function PerfilPublicoPage() {
   const username = (params?.username as string)?.trim().toLowerCase();
 
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [services, setServices] = useState<CatalogService[]>([]);
   const [state, setState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -67,6 +70,13 @@ export default function PerfilPublicoPage() {
         }
 
         const parsedBlocks = (dbBlocks ?? []).map(dbBlockToBlock);
+
+        const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profile.id);
+
+        if (controller.signal.aborted) return;
+
+        setProducts(catalogProducts);
+        setServices(catalogServices);
 
         if (parsedBlocks.length === 0) {
           setState("empty");
@@ -130,7 +140,7 @@ export default function PerfilPublicoPage() {
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
       <main className="mx-auto flex max-w-5xl flex-col gap-8">
         {blocks.map((block) => (
-          <BlockRenderer key={block.id} block={block} />
+          <BlockRenderer key={block.id} block={block} products={products} services={services} />
         ))}
       </main>
     </div>
