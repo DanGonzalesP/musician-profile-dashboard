@@ -689,6 +689,16 @@ function TracksFields({
                       placeholder="Nombre de la canción"
                       aria-label="Nombre de la canción"
                     />
+                    <div>
+                      <p className="mb-1 text-[10px] text-muted-foreground">
+                        Imagen de la pista (opcional — si no subes una, se usa la portada del álbum)
+                      </p>
+                      <ImageUploader
+                        currentImageUrl={track.image}
+                        onUploadReady={(url) => setTrack(activeAlbumIndex, trackIndex, "image", url)}
+                        blobRegistry={blobRegistry}
+                      />
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"

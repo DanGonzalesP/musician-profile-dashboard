@@ -52,9 +52,8 @@ export default function VinylCover({
       {phase !== "idle" && (
         <div
           aria-hidden
-          className={`absolute -right-2 -top-4 h-24 w-16 origin-top-right transition-transform duration-500 ease-out ${
-            isPlaying ? "rotate-[18deg]" : "rotate-[38deg]"
-          }`}
+          className="absolute -right-2 -top-4 h-24 w-16 origin-top-right transition-transform duration-500 ease-out"
+          style={{ transform: isPlaying ? "rotate(18deg)" : "rotate(38deg)" }}
         >
           <div className="ml-auto h-full w-1.5 rounded-full bg-border" />
           <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-primary" />

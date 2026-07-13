@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block, dbBlockToBlock } from "@/lib/blocks";
+import { type Block, type TracksData, dbBlockToBlock } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 
@@ -18,6 +18,11 @@ export default function PerfilPublicoPage() {
   const [services, setServices] = useState<CatalogService[]>([]);
   const [state, setState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState("");
+
+  useEffect(() => {
+    setShareUrl(window.location.href);
+  }, []);
 
   useEffect(() => {
     if (!username) {
@@ -136,11 +141,22 @@ export default function PerfilPublicoPage() {
     );
   }
 
+  const albumCovers = (blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined)?.albums
+    .map((a) => a.cover)
+    .filter(Boolean) ?? [];
+
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
       <main className="mx-auto flex max-w-5xl flex-col gap-8">
         {blocks.map((block) => (
-          <BlockRenderer key={block.id} block={block} products={products} services={services} />
+          <BlockRenderer
+            key={block.id}
+            block={block}
+            products={products}
+            services={services}
+            shareUrl={shareUrl}
+            albumCovers={albumCovers}
+          />
         ))}
       </main>
     </div>

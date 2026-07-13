@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { type Block, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks";
+import { type Block, type TracksData, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ArrowLeft } from "lucide-react";
@@ -18,6 +18,7 @@ export default function PerfilPreviewPage() {
   const [services, setServices] = useState<CatalogService[]>([]);
   const [state, setState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState("");
 
   useEffect(() => {
     async function cargarBorrador() {
@@ -32,13 +33,21 @@ export default function PerfilPreviewPage() {
         // PROFILE_ID como respaldo si todavía no tiene fila propia.
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, display_name")
           .eq("user_id", user.id ?? PROFILE_ID)
           .maybeSingle();
 
         if (profileError) throw profileError;
 
         const profileId = profile?.id ?? PROFILE_ID;
+
+        // El link a compartir es el de la página pública real (por slug del
+        // nombre publicado), no esta URL de /perfil/preview — solo existe si
+        // el perfil ya tiene un nombre publicado.
+        if (profile?.display_name) {
+          const slug = profile.display_name.trim().toLowerCase().replaceAll(" ", "-");
+          setShareUrl(`${window.location.origin}/${slug}`);
+        }
 
         let draft: { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] } | null = null;
         if (profile) {
@@ -110,7 +119,18 @@ export default function PerfilPreviewPage() {
       </div>
       <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
         {blocks.map((block) => (
-          <BlockRenderer key={block.id} block={block} products={products} services={services} />
+          <BlockRenderer
+            key={block.id}
+            block={block}
+            products={products}
+            services={services}
+            shareUrl={shareUrl}
+            albumCovers={
+              (blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined)?.albums
+                .map((a) => a.cover)
+                .filter(Boolean) ?? []
+            }
+          />
         ))}
       </main>
     </div>

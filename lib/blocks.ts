@@ -18,6 +18,7 @@ export type Track = {
   duration: string
   audioUrl?: string
   description?: string
+  image?: string
 }
 
 export type Album = {
@@ -198,6 +199,7 @@ function normalizeTrack(raw: unknown): Track {
     duration: String(t.duration ?? ""),
     audioUrl: t.audioUrl ? String(t.audioUrl) : undefined,
     description: t.description ? String(t.description) : undefined,
+    image: t.image ? String(t.image) : undefined,
   }
 }
 

@@ -1,9 +1,11 @@
 "use client"
 
-import { MapPin, Camera, Video, AtSign, Music2, Disc3 } from "lucide-react"
+import { useState } from "react"
+import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2 } from "lucide-react"
 import type { HeroData, SocialPlatform } from "@/lib/blocks"
+import { ShareProfileDialog } from "./share-profile-dialog"
 
-const socialIcons: Record<SocialPlatform, typeof Camera> = {
+export const socialIcons: Record<SocialPlatform, typeof Camera> = {
   instagram: Camera,
   youtube: Video,
   twitter: AtSign,
@@ -11,9 +13,18 @@ const socialIcons: Record<SocialPlatform, typeof Camera> = {
   bandcamp: Disc3,
 }
 
-export function HeroBlock({ data }: { data: HeroData }) {
+export function HeroBlock({
+  data,
+  shareUrl,
+  albumCovers = [],
+}: {
+  data: HeroData
+  shareUrl?: string
+  albumCovers?: string[]
+}) {
   const imagePreview = data.image || "/placeholder.svg"
   const socials = data.socials || []
+  const [shareOpen, setShareOpen] = useState(false)
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border">
@@ -53,11 +64,23 @@ export function HeroBlock({ data }: { data: HeroData }) {
           </div>
         </div>
 
-        {data.tagline && (
-          <p className="mt-5 max-w-2xl text-pretty text-center text-sm leading-relaxed text-muted-foreground sm:text-left sm:text-base">
-            {data.tagline}
-          </p>
-        )}
+        <div className="mt-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
+          {data.tagline && (
+            <p className="max-w-2xl text-pretty text-center text-sm leading-relaxed text-muted-foreground sm:text-left sm:text-base">
+              {data.tagline}
+            </p>
+          )}
+          {shareUrl && (
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-accent"
+            >
+              <Share2 className="size-4" />
+              Compartir perfil
+            </button>
+          )}
+        </div>
 
         {socials.length > 0 && (
           <nav
@@ -82,6 +105,15 @@ export function HeroBlock({ data }: { data: HeroData }) {
           </nav>
         )}
       </div>
+
+      {shareOpen && shareUrl && (
+        <ShareProfileDialog
+          shareUrl={shareUrl}
+          data={data}
+          albumCovers={albumCovers}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }

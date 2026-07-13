@@ -313,6 +313,19 @@ export function TrackListBlock({ data }: { data: TracksData }) {
                           isPlaying ? "bg-primary/10" : hasAudio ? "hover:bg-accent/60" : "cursor-not-allowed opacity-60"
                         }`}
                       >
+                        <span className="size-9 shrink-0 overflow-hidden rounded-md bg-muted">
+                          {track.image || activeAlbum.cover ? (
+                            <img
+                              src={track.image || activeAlbum.cover}
+                              alt=""
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex size-full items-center justify-center">
+                              <Music className="size-4 text-muted-foreground/40" />
+                            </span>
+                          )}
+                        </span>
                         <span
                           className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
                             isPlaying

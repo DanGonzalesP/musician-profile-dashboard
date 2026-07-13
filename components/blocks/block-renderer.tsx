@@ -12,14 +12,18 @@ export function BlockRenderer({
   block,
   products = [],
   services = [],
+  shareUrl,
+  albumCovers = [],
 }: {
   block: Block
   products?: CatalogProduct[]
   services?: CatalogService[]
+  shareUrl?: string
+  albumCovers?: string[]
 }) {
   switch (block.type) {
     case "hero":
-      return <HeroBlock data={block.data as HeroData} />
+      return <HeroBlock data={block.data as HeroData} shareUrl={shareUrl} albumCovers={albumCovers} />
     case "tracks":
       return <TrackListBlock data={block.data as TracksData} />
     case "merch":
