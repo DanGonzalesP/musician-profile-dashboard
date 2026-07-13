@@ -10,7 +10,7 @@ import { BlockRenderer } from "@/components/blocks/block-renderer";
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 
 export default function PerfilPublicoPage() {
-  const params = useParams();
+  const params = useParams();2
   const username = (params?.username as string)?.trim().toLowerCase();
 
   const [blocks, setBlocks] = useState<Block[]>([]);

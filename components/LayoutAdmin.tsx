@@ -14,6 +14,7 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: "📊" },
     { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: "👕" },
     { name: "Gestionar Servicios", href: "/perfil/admin-servicios", icon: "💼" },
+    { name: "Feed de Música", href: "/perfil/admin-musica", icon: "🎵" },
     { name: "Configurar Perfil", href: "/perfil/config", icon: "⚙" },
   ];
 
