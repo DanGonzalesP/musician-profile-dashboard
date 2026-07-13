@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PROFILE_ID } from "@/lib/blocks";
+import Link from "next/link";
 import LayoutAdmin from "@/components/LayoutAdmin";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 
 interface OrderItemRow {
   quantity: number;
@@ -99,6 +100,12 @@ export default function DashboardPage() {
     <LayoutAdmin>
       <div className="p-8 max-w-5xl mx-auto space-y-8">
         <header className="border-b border-zinc-800 pb-4">
+          <Link
+            href="/dashboard"
+            className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-white"
+          >
+            <ArrowLeft className="size-3.5" /> Volver al Editor de Página
+          </Link>
           <h1 className="text-2xl font-bold text-white">Resumen del Negocio</h1>
           <p className="text-zinc-400 text-xs mt-1">Métricas clave de rendimiento y flujos de ingresos actuales.</p>
         </header>

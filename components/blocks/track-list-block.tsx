@@ -124,11 +124,17 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
     if (slideTimeoutRef.current) clearTimeout(slideTimeoutRef.current)
 
-    if (selectedAlbum === index && panelAlbumIndex === index) {
+    if (panelAlbumIndex === index) {
+      // Mismo álbum: el vinilo se guarda en su funda y el panel recién
+      // entonces se cierra por completo.
       stopAudio()
       setPlayingTrack(null)
-      setPanelAlbumIndex(null)
-      setSelectedAlbum(null)
+      setIsClosingPanel(true)
+      switchTimeoutRef.current = setTimeout(() => {
+        setIsClosingPanel(false)
+        setPanelAlbumIndex(null)
+        setSelectedAlbum(null)
+      }, 280)
       return
     }
 
@@ -136,15 +142,16 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     setPlayingTrack(null)
 
     if (panelAlbumIndex !== null) {
-      // 1. El vinilo actual se guarda por completo dentro de su portada.
+      // El panel (la caja completa) no se mueve ni desaparece — solo el
+      // vinilo: 1) se guarda en su funda, 2) el álbum nuevo se desliza a la
+      // primera posición, 3) recién ahí baja su propio vinilo.
       setIsClosingPanel(true)
       switchTimeoutRef.current = setTimeout(() => {
-        setIsClosingPanel(false)
-        setPanelAlbumIndex(null)
-        // 2. Recién ahí el álbum nuevo se desliza a la primera posición.
         setSelectedAlbum(index)
-        // 3. Y solo cuando termina de deslizarse, baja su propio vinilo.
-        slideTimeoutRef.current = setTimeout(() => dropVinylFor(index), 500)
+        slideTimeoutRef.current = setTimeout(() => {
+          setIsClosingPanel(false)
+          dropVinylFor(index)
+        }, 500)
       }, 280)
       return
     }
@@ -226,28 +233,31 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
       {/* Panel del álbum seleccionado — vinilo + pistas arriba, descripción abajo a todo el ancho */}
       {panelAlbumIndex !== null && activeAlbum && (
-        <div
-          className={`mt-4 rounded-lg border border-border bg-background/40 p-4 ${
-            isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
-          }`}
-        >
+        <div className="mt-4 rounded-lg border border-border bg-background/40 p-4">
           <div className="flex flex-col gap-4 sm:flex-row">
-            {/* El vinilo mide exactamente lo mismo que la portada en el carrusel (w-32 = 128px) */}
-            <div className="flex w-32 shrink-0 items-center justify-center">
+            {/* El vinilo mide exactamente lo mismo que la portada en el carrusel (w-32 = 128px):
+                solo él se desliza al abrir/cambiar de álbum, el panel no se mueve. */}
+            <div className="flex w-32 shrink-0 items-center justify-center overflow-hidden">
               <div
-                className={`relative aspect-square w-32 shrink-0 overflow-hidden rounded-full shadow-2xl ${
-                  playingTrack !== null ? "animate-spin" : ""
+                className={`aspect-square w-32 shrink-0 overflow-hidden rounded-full shadow-2xl ${
+                  isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
                 }`}
-                style={{
-                  animationDuration: "6s",
-                  background: "repeating-radial-gradient(circle, #111 0px, #111 6px, #262626 7px, #111 8px)",
-                }}
               >
-                <img
-                  src={activeAlbum.cover || "/album-1.png"}
-                  alt=""
-                  className="absolute inset-0 m-auto size-14 rounded-full border-2 border-black/70 object-cover"
-                />
+                <div
+                  className={`flex h-full w-full items-center justify-center ${
+                    playingTrack !== null && !isClosingPanel ? "animate-spin" : ""
+                  }`}
+                  style={{
+                    animationDuration: "6s",
+                    background: "repeating-radial-gradient(circle, #111 0px, #111 6px, #262626 7px, #111 8px)",
+                  }}
+                >
+                  <img
+                    src={activeAlbum.cover || "/album-1.png"}
+                    alt=""
+                    className="size-14 rounded-full border-2 border-black/70 object-cover"
+                  />
+                </div>
               </div>
             </div>
 
