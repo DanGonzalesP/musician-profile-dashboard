@@ -526,15 +526,15 @@ function TracksFields({
                       >
                         {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                       </button>
-                      <input
-                        type="text"
-                        value={track.duration || ""}
-                        readOnly
-                        title="Se calcula automáticamente al subir el audio"
-                        aria-label="Duración (automática)"
-                        className={`${inputClass} ml-auto w-14 shrink-0 text-center opacity-70`}
-                        placeholder="0:00"
-                      />
+                      {track.duration && (
+                        <span
+                          title="Calculado automáticamente al subir el audio"
+                          aria-label={`Duración: ${track.duration}`}
+                          className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
+                        >
+                          {track.duration}
+                        </span>
+                      )}
                     </div>
                     <AudioUploader
                       currentAudioUrl={track.audioUrl}

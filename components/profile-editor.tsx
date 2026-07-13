@@ -89,7 +89,13 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
       ? AUDIO_MIME_TYPES[ext] ?? "audio/mpeg"
       : IMAGE_MIME_TYPES[ext] ?? file.type ?? "image/png"
 
-  const { error: uploadError } = await supabase.storage.from("assets").upload(fileName, file, {
+  // El SDK de Supabase sube los File/Blob envueltos en FormData, donde el
+  // navegador usa el `.type` propio del objeto — la opción `contentType` del
+  // SDK se ignora en ese caso. Por eso reconstruimos el archivo con el tipo
+  // correcto ya asignado, en vez de confiar en esa opción.
+  const uploadBody = file.type === contentType ? file : new File([file], file.name, { type: contentType })
+
+  const { error: uploadError } = await supabase.storage.from("assets").upload(fileName, uploadBody, {
     upsert: false,
     contentType,
   })
