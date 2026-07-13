@@ -45,6 +45,27 @@ function AlbumCover({
 const ALBUM_ITEM_WIDTH = 128 // w-32
 const ALBUM_ITEM_GAP = 12 // gap-3
 
+function TypewriterText({ text }: { text: string }) {
+  const [visibleChars, setVisibleChars] = useState(0)
+
+  useEffect(() => {
+    setVisibleChars(0)
+    if (!text) return
+    const interval = setInterval(() => {
+      setVisibleChars((prev) => {
+        if (prev >= text.length) {
+          clearInterval(interval)
+          return prev
+        }
+        return prev + 1
+      })
+    }, 16)
+    return () => clearInterval(interval)
+  }, [text])
+
+  return <>{text.slice(0, visibleChars)}</>
+}
+
 export function TrackListBlock({ data }: { data: TracksData }) {
   const albums = data.albums || []
   // selectedAlbum: cuál álbum debe estar en la posición izquierda del carrusel.
@@ -191,10 +212,15 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     )
   }
 
-  // Se duplica la lista para lograr un loop continuo sin salto visible:
-  // al desplazar exactamente -50% del ancho total, la segunda copia calza
-  // en el lugar de la primera y el ciclo se reinicia sin corte.
-  const loopAlbums = albums.length > 1 ? [...albums, ...albums] : albums
+  // Con pocos álbumes, una sola copia puede ser más angosta que el
+  // contenedor: al desplazar -50% del ancho total, la ventana visible queda
+  // parcialmente fuera del track y se ve "vacío". Se repite la lista las
+  // veces necesarias para que un solo set siempre cubra un ancho generoso,
+  // y se traslada por -(100/repeticiones)% en vez de un -50% fijo.
+  const singleSetWidth = albums.length * (ALBUM_ITEM_WIDTH + ALBUM_ITEM_GAP)
+  const repeatCount = Math.max(2, Math.ceil(1600 / Math.max(singleSetWidth, 1)) + 1)
+  const loopAlbums = Array.from({ length: repeatCount }, () => albums).flat()
+  const marqueeShiftPercent = 100 / repeatCount
   const cycleSeconds = Math.max(albums.length * 4, 8)
 
   return (
@@ -213,7 +239,11 @@ export function TrackListBlock({ data }: { data: TracksData }) {
           className={`flex w-max gap-3 ${selectedAlbum === null ? "animate-marquee" : ""}`}
           style={
             selectedAlbum === null
-              ? { animationDuration: `${cycleSeconds}s`, animationPlayState: carouselPaused ? "paused" : "running" }
+              ? ({
+                  animationDuration: `${cycleSeconds}s`,
+                  animationPlayState: carouselPaused ? "paused" : "running",
+                  "--marquee-shift": `${marqueeShiftPercent}%`,
+                } as React.CSSProperties)
               : {
                   transform: `translateX(-${selectedAlbum * (ALBUM_ITEM_WIDTH + ALBUM_ITEM_GAP)}px)`,
                   transition: "transform 500ms ease",
@@ -311,7 +341,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
           {activeTrack?.description && (
             <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-              {activeTrack.description}
+              <TypewriterText key={`${panelAlbumIndex}-${playingTrack}`} text={activeTrack.description} />
             </p>
           )}
         </div>

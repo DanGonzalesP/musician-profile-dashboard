@@ -105,7 +105,7 @@
 
 @keyframes marquee-scroll {
   from {
-    transform: translate3d(-50%, 0, 0);
+    transform: translate3d(calc(-1 * var(--marquee-shift, 50%)), 0, 0);
   }
   to {
     transform: translate3d(0, 0, 0);
