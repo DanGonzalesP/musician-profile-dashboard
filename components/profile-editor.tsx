@@ -56,15 +56,21 @@ function setDeep(obj: Record<string, unknown>, path: string, value: string): Rec
 }
 
 // Algunos navegadores detectan mal el MIME type de ciertos archivos de audio
-// (ej. reportan .mp3 como "video/mpeg"), lo que el bucket de Supabase rechaza.
-// Forzamos el tipo correcto según la extensión en vez de confiar en el navegador.
-const MIME_TYPES_BY_EXT: Record<string, string> = {
+// (ej. reportan .mp3/.mpeg como "video/mpeg"), lo que el bucket de Supabase
+// rechaza. Para la carpeta "audio" NUNCA confiamos en la detección del
+// navegador (file.type): siempre se fuerza un tipo audio/* válido.
+const AUDIO_MIME_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
+  mpeg: "audio/mpeg",
+  mpg: "audio/mpeg",
   wav: "audio/wav",
   ogg: "audio/ogg",
   m4a: "audio/mp4",
   aac: "audio/aac",
   flac: "audio/flac",
+}
+
+const IMAGE_MIME_TYPES: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -78,7 +84,10 @@ const MIME_TYPES_BY_EXT: Record<string, string> = {
 async function uploadFileToStorage(file: File, folder: "images" | "audio"): Promise<string> {
   const ext = (file.name.split(".").pop() ?? "bin").toLowerCase()
   const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-  const contentType = MIME_TYPES_BY_EXT[ext] ?? file.type ?? "application/octet-stream"
+  const contentType =
+    folder === "audio"
+      ? AUDIO_MIME_TYPES[ext] ?? "audio/mpeg"
+      : IMAGE_MIME_TYPES[ext] ?? file.type ?? "image/png"
 
   const { error: uploadError } = await supabase.storage.from("assets").upload(fileName, file, {
     upsert: false,

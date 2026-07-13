@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
@@ -324,6 +324,53 @@ function TracksFields({
     updateAlbums(albums.filter((_, idx) => idx !== albumIndex))
   }
 
+  // Al abrir el editor, cualquier pista que ya tenga audio pero no tenga
+  // duración calculada (ej. las pistas de ejemplo, o datos cargados desde la
+  // base de datos) la calcula automáticamente leyendo la metadata real del
+  // audio. Así la duración nunca es un número inventado — solo aparece
+  // cuando realmente se puede leer del archivo.
+  useEffect(() => {
+    let cancelled = false
+
+    async function fillMissingDurations() {
+      const updates: { albumIndex: number; trackIndex: number; duration: string }[] = []
+
+      for (let aIdx = 0; aIdx < albums.length; aIdx++) {
+        const tracks = albums[aIdx].tracks
+        for (let tIdx = 0; tIdx < tracks.length; tIdx++) {
+          const track = tracks[tIdx]
+          if (track.audioUrl && !track.duration) {
+            try {
+              const seconds = await extractAudioDuration(track.audioUrl)
+              updates.push({ albumIndex: aIdx, trackIndex: tIdx, duration: formatDuration(seconds) })
+            } catch {
+              // Sin metadata legible: se deja vacío, el artista puede escribirla luego.
+            }
+          }
+        }
+      }
+
+      if (cancelled || updates.length === 0) return
+
+      updateAlbums(
+        albums.map((a, aIdx) => ({
+          ...a,
+          tracks: a.tracks.map((t, tIdx) => {
+            const match = updates.find((u) => u.albumIndex === aIdx && u.trackIndex === tIdx)
+            return match ? { ...t, duration: match.duration } : t
+          }),
+        }))
+      )
+    }
+
+    fillMissingDurations()
+    return () => {
+      cancelled = true
+    }
+    // Solo debe correr una vez, al abrir el editor de este bloque.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const setTrackFields = (albumIndex: number, trackIndex: number, changes: Partial<Track>) => {
     updateAlbums(
       albums.map((a, aIdx) =>
@@ -479,9 +526,6 @@ function TracksFields({
                       >
                         {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                       </button>
-                      <span className="text-xs text-muted-foreground">
-                        {track.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para escucharlo"}
-                      </span>
                       <input
                         type="text"
                         value={track.duration || ""}

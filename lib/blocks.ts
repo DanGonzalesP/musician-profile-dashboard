@@ -205,6 +205,8 @@ function defaultData(type: BlockType): BlockData {
       }
     case "tracks":
       return {
+        // Nota: las duraciones se dejan vacías a propósito — el editor las calcula
+        // solo, leyendo la metadata real del audio, nunca son números inventados.
         albums: [
           {
             id: "album-1",
@@ -213,21 +215,21 @@ function defaultData(type: BlockType): BlockData {
             tracks: [
               {
                 title: "Neon Horizon",
-                duration: "3:42",
+                duration: "",
                 audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
                 description:
                   "Ejemplo de descripción: cuenta aquí en qué te inspiraste para esta canción — un lugar, una persona, una noche en particular. Este texto aparece mientras el fan la está escuchando. Reemplázalo por la historia real de tu pista.",
               },
               {
                 title: "Silica Waves",
-                duration: "4:15",
+                duration: "",
                 audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
                 description:
                   "Otro ejemplo de descripción por pista: cada canción del álbum puede tener su propio texto, distinto al de las demás.",
               },
               {
                 title: "Fractal Dream",
-                duration: "3:58",
+                duration: "",
                 audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
                 description: "Descripción de ejemplo — bórrala y escribe la tuya desde el editor.",
               },
@@ -240,15 +242,59 @@ function defaultData(type: BlockType): BlockData {
             tracks: [
               {
                 title: "Velocity Zero",
-                duration: "5:10",
+                duration: "",
                 audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
                 description: "Este es un segundo álbum de ejemplo: el carrusel puede mostrar tantos álbumes como quieras.",
               },
               {
                 title: "Prism Shift",
-                duration: "2:45",
+                duration: "",
                 audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
                 description: "Sube tu propio audio en el editor y esta pista de muestra desaparecerá.",
+              },
+            ],
+          },
+          {
+            id: "album-3",
+            title: "Midnight Frequencies",
+            cover: "/album-1.png",
+            tracks: [
+              {
+                title: "Static Bloom",
+                duration: "",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+                description: "Un tercer álbum de ejemplo, para ver cómo se ve el carrusel con varias portadas.",
+              },
+              {
+                title: "Afterglow",
+                duration: "",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
+                description: "Cada álbum puede tener el número de canciones que quieras.",
+              },
+              {
+                title: "Low Tide",
+                duration: "",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+                description: "Descripción de ejemplo — reemplázala por la historia real de tu canción.",
+              },
+            ],
+          },
+          {
+            id: "album-4",
+            title: "Home Recordings",
+            cover: "/album-1.png",
+            tracks: [
+              {
+                title: "First Take",
+                duration: "",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
+                description: "Cuarto álbum de ejemplo. Borra los que no necesites desde el editor.",
+              },
+              {
+                title: "Rough Mix",
+                duration: "",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3",
+                description: "Sube tu propio audio y reemplaza esta pista de ejemplo.",
               },
             ],
           },
