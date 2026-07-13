@@ -148,3 +148,18 @@
 .animate-vinyl-retract {
   animation: vinyl-retract 0.28s ease-in forwards;
 }
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.35s ease-out;
+}

@@ -10,6 +10,7 @@ import { BlockInspector } from "@/components/block-inspector"
 import { Layers } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import imageCompression from "browser-image-compression"
+import { ProfileSkeleton } from "@/components/blocks/skeletons"
 
 type DragPayload = { kind: "new"; type: BlockType } | { kind: "reorder"; index: number } | null
 
@@ -481,8 +482,29 @@ export function ProfileEditor() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-foreground">
-        <p className="text-sm font-medium text-muted-foreground">Cargando editor...</p>
+      <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+        <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-3">
+          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+          <div className="flex gap-2">
+            <div className="h-8 w-24 animate-pulse rounded-md bg-muted" />
+            <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
+            <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
+          </div>
+        </header>
+        <div className="flex flex-1 overflow-hidden">
+          <aside className="hidden w-64 shrink-0 flex-col gap-2 border-r border-sidebar-border bg-sidebar p-3 sm:flex sm:w-72 lg:w-80">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </aside>
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <ProfileSkeleton />
+          </main>
+          <aside className="hidden w-72 shrink-0 border-l border-sidebar-border bg-sidebar p-4 lg:block">
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+            <div className="mt-4 h-20 animate-pulse rounded-lg bg-muted" />
+          </aside>
+        </div>
       </div>
     )
   }

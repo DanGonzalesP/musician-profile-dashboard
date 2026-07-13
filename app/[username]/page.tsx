@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { type Block, type TracksData, dbBlockToBlock } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
+import { ProfileSkeleton } from "@/components/blocks/skeletons";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 
@@ -108,8 +109,10 @@ export default function PerfilPublicoPage() {
   // UI States
   if (state === "loading") {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-foreground">
-        <p className="text-sm font-medium">Cargando portafolio...</p>
+      <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
+        <main className="mx-auto max-w-5xl">
+          <ProfileSkeleton />
+        </main>
       </div>
     );
   }
@@ -147,7 +150,7 @@ export default function PerfilPublicoPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-      <main className="mx-auto flex max-w-5xl flex-col gap-8">
+      <main className="mx-auto flex max-w-5xl flex-col gap-8 animate-fade-in">
         {blocks.map((block) => (
           <BlockRenderer
             key={block.id}

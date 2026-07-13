@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { type Block, type TracksData, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
+import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { ArrowLeft } from "lucide-react";
 
 type LoadingState = "loading" | "error" | "success";
@@ -95,8 +96,16 @@ export default function PerfilPreviewPage() {
 
   if (state === "loading") {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-foreground">
-        <p className="text-sm font-medium">Cargando vista previa...</p>
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-amber-500/10 px-4 py-2 backdrop-blur">
+          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300">
+            <ArrowLeft className="size-3.5" /> Volver al editor
+          </Link>
+          <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
+        </div>
+        <main className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
+          <ProfileSkeleton />
+        </main>
       </div>
     );
   }
@@ -117,7 +126,7 @@ export default function PerfilPreviewPage() {
         </Link>
         <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
       </div>
-      <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
+      <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8 animate-fade-in">
         {blocks.map((block) => (
           <BlockRenderer
             key={block.id}
