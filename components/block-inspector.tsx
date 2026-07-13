@@ -206,11 +206,23 @@ function AudioUploader({
   blobRegistry: BlobRegistry
 }) {
   const [fileName, setFileName] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
 
+    // Solo aceptamos .mp3: formatos pesados como .wav/.flac saturarían el
+    // almacenamiento, así que se rechazan aquí mismo, antes de registrar
+    // el archivo o generar ningún blob URL.
+    const ext = file.name.split(".").pop()?.toLowerCase()
+    if (ext !== "mp3") {
+      setError("Solo se aceptan archivos .mp3. Sube un audio optimizado para la web.")
+      e.target.value = ""
+      return
+    }
+
+    setError(null)
     const blobUrl = URL.createObjectURL(file)
     blobRegistry.current.set(blobUrl, file)
 
@@ -230,6 +242,7 @@ function AudioUploader({
           <span className="truncate">{displayName}</span>
         </p>
       )}
+      {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
       <label
         className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-xs font-medium transition-colors ${
           hasAudio
@@ -238,8 +251,8 @@ function AudioUploader({
         }`}
       >
         <Music className="size-3.5 text-muted-foreground" />
-        <span>{hasAudio ? "Cambiar audio" : "Subir audio (MP3/WAV)"}</span>
-        <input type="file" accept="audio/*" onChange={handleFileChange} className="hidden" />
+        <span>{hasAudio ? "Cambiar audio" : "Subir audio (.mp3)"}</span>
+        <input type="file" accept=".mp3,audio/mpeg" onChange={handleFileChange} className="hidden" />
       </label>
     </div>
   )

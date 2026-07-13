@@ -9,6 +9,7 @@ import { PreviewCanvas } from "@/components/preview-canvas"
 import { BlockInspector } from "@/components/block-inspector"
 import { Layers } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import imageCompression from "browser-image-compression"
 
 type DragPayload = { kind: "new"; type: BlockType } | { kind: "reorder"; index: number } | null
 
@@ -79,21 +80,47 @@ const IMAGE_MIME_TYPES: Record<string, string> = {
 }
 
 /**
+ * Comprime y convierte una imagen a WebP (<500KB) antes de subirla. Esto
+ * corre siempre en uploadFileToStorage, invisible para el usuario — no hace
+ * falta tocar nada en los uploaders individuales (avatar, banner, portadas,
+ * pistas, merch, etc).
+ */
+async function compressImage(file: File): Promise<File> {
+  try {
+    const compressed = await imageCompression(file, {
+      maxSizeMB: 0.5,
+      maxWidthOrHeight: 2000,
+      useWebWorker: true,
+      fileType: "image/webp",
+      initialQuality: 0.82,
+    })
+    return new File([compressed], file.name.replace(/\.\w+$/, ".webp"), { type: "image/webp" })
+  } catch (err) {
+    // Si la compresión falla (ej. formato no soportado por el navegador),
+    // se sube el archivo original en vez de bloquear la publicación.
+    console.error("[compressImage] Error comprimiendo imagen, se sube el original:", err)
+    return file
+  }
+}
+
+/**
  * Sube un File a Supabase Storage y devuelve la URL pública permanente.
  */
 async function uploadFileToStorage(file: File, folder: "images" | "audio"): Promise<string> {
-  const ext = (file.name.split(".").pop() ?? "bin").toLowerCase()
+  const uploadFile = folder === "images" ? await compressImage(file) : file
+  const ext = (uploadFile.name.split(".").pop() ?? "bin").toLowerCase()
   const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
   const contentType =
     folder === "audio"
       ? AUDIO_MIME_TYPES[ext] ?? "audio/mpeg"
-      : IMAGE_MIME_TYPES[ext] ?? file.type ?? "image/png"
+      : IMAGE_MIME_TYPES[ext] ?? uploadFile.type ?? "image/webp"
 
   // El SDK de Supabase sube los File/Blob envueltos en FormData, donde el
   // navegador usa el `.type` propio del objeto — la opción `contentType` del
   // SDK se ignora en ese caso. Por eso reconstruimos el archivo con el tipo
   // correcto ya asignado, en vez de confiar en esa opción.
-  const uploadBody = file.type === contentType ? file : new File([file], file.name, { type: contentType })
+  const uploadBody =
+    uploadFile.type === contentType ? uploadFile : new File([uploadFile], uploadFile.name, { type: contentType })
 
   const { error: uploadError } = await supabase.storage.from("assets").upload(fileName, uploadBody, {
     upsert: false,
