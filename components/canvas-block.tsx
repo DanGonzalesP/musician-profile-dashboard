@@ -99,7 +99,7 @@ export function CanvasBlock({
       </div>
 
       {/* Live preview content (non-interactive selection surface) */}
-      <div className="pointer-events-none overflow-hidden rounded-xl">
+      <div className={`overflow-hidden rounded-xl ${block.type === "tracks" ? "" : "pointer-events-none"}`}>
         <BlockRenderer block={block} products={products} services={services} />
       </div>
 

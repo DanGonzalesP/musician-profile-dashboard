@@ -17,6 +17,7 @@ export type Album = {
   title: string
   cover: string
   tracks: Track[]
+  isExample?: boolean
 }
 
 export type HeroData = {
@@ -182,6 +183,7 @@ function normalizeAlbum(raw: unknown, index: number): Album {
     title: String(a.title ?? ""),
     cover: String(a.cover ?? "/album-1.png"),
     tracks: Array.isArray(a.tracks) ? a.tracks.map(normalizeTrack) : [],
+    isExample: Boolean(a.isExample),
   }
 }
 
@@ -212,6 +214,7 @@ function defaultData(type: BlockType): BlockData {
             id: "album-1",
             title: "Digital Ethereal",
             cover: "/album-1.png",
+            isExample: true,
             tracks: [
               {
                 title: "Neon Horizon",
@@ -239,6 +242,7 @@ function defaultData(type: BlockType): BlockData {
             id: "album-2",
             title: "Analog Sessions",
             cover: "/album-1.png",
+            isExample: true,
             tracks: [
               {
                 title: "Velocity Zero",
@@ -258,6 +262,7 @@ function defaultData(type: BlockType): BlockData {
             id: "album-3",
             title: "Midnight Frequencies",
             cover: "/album-1.png",
+            isExample: true,
             tracks: [
               {
                 title: "Static Bloom",
@@ -276,25 +281,6 @@ function defaultData(type: BlockType): BlockData {
                 duration: "",
                 audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
                 description: "Descripción de ejemplo — reemplázala por la historia real de tu canción.",
-              },
-            ],
-          },
-          {
-            id: "album-4",
-            title: "Home Recordings",
-            cover: "/album-1.png",
-            tracks: [
-              {
-                title: "First Take",
-                duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
-                description: "Cuarto álbum de ejemplo. Borra los que no necesites desde el editor.",
-              },
-              {
-                title: "Rough Mix",
-                duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3",
-                description: "Sube tu propio audio y reemplaza esta pista de ejemplo.",
               },
             ],
           },

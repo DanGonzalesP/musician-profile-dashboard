@@ -412,7 +412,19 @@ function TracksFields({
       // Si el navegador no puede leer la metadata, se deja la duración vacía
       // y el artista puede escribirla manualmente.
     }
-    setTrackFields(albumIndex, trackIndex, { audioUrl: url, duration })
+    // Esta es música real del artista: el álbum deja de ser "Ejemplo" y los
+    // demás álbumes de ejemplo se retiran automáticamente.
+    const targetId = albums[albumIndex]?.id
+    const updated = albums.map((a, aIdx) =>
+      aIdx === albumIndex
+        ? {
+            ...a,
+            isExample: false,
+            tracks: a.tracks.map((t, tIdx) => (tIdx === trackIndex ? { ...t, audioUrl: url, duration } : t)),
+          }
+        : a
+    )
+    updateAlbums(updated.filter((a) => a.id === targetId || !a.isExample))
   }
 
   const togglePreview = (key: string, url?: string) => {
@@ -451,6 +463,11 @@ function TracksFields({
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
                 <Disc3 className="size-3.5" /> Album #{albumIndex + 1}
+                {album.isExample && (
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+                    Ejemplo
+                  </span>
+                )}
               </span>
               <button
                 type="button"

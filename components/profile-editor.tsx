@@ -125,6 +125,13 @@ export function ProfileEditor() {
    * la registran aquí. handlePublish lo consulta al guardar.
    */
   const blobRegistryRef = useRef<Map<string, File>>(new Map())
+  // Id de perfil resuelto en la carga — el autoguardado de borrador lo reutiliza
+  // para no repetir la consulta de auth en cada cambio.
+  const profileIdRef = useRef<string | null>(null)
+  // Evita que el autoguardado de borrador (is_visible:false) sobrescriba,
+  // en el ciclo inmediatamente siguiente, las filas que Publish acaba de
+  // marcar como is_visible:true.
+  const skipNextAutosaveRef = useRef(false)
 
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null
 
@@ -132,39 +139,55 @@ export function ProfileEditor() {
     async function loadSavedBlocks() {
       try {
         // profile_blocks/products/services están indexados por el id real de
-        // la fila `profiles`, no por PROFILE_ID (que es el user_id usado para
-        // encontrarla). Hay que resolverlo primero.
+        // la fila `profiles`. Se busca primero por el usuario autenticado y,
+        // si no tiene perfil propio todavía, se usa el perfil semilla
+        // PROFILE_ID como fallback — así cada cuenta guarda y recupera lo suyo.
+        const { data: { user } } = await supabase.auth.getUser()
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id")
-          .eq("user_id", PROFILE_ID)
+          .select("id, draft_content")
+          .eq("user_id", user?.id ?? PROFILE_ID)
           .maybeSingle()
 
         if (profileError) throw profileError
 
         const profileId = profile?.id ?? PROFILE_ID
+        profileIdRef.current = profileId
 
-        const { data: dbBlocks, error } = await supabase
-          .from("profile_blocks")
-          .select("id, block_type, content, position_index")
-          .eq("profile_id", profileId)
-          .order("position_index", { ascending: true })
+        // Un borrador guardado (is_visible del perfil publicado no se toca)
+        // tiene prioridad: es el trabajo más reciente sin publicar todavía.
+        const draft = profile?.draft_content as
+          | { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] }
+          | null
+          | undefined
 
-        if (error) throw error
-
-        if (dbBlocks && dbBlocks.length > 0) {
-          setBlocks(dbBlocks.map(dbBlockToBlock))
+        if (draft) {
+          setBlocks(draft.blocks ?? [])
+          setProducts(draft.products ?? [])
+          setServices(draft.services ?? [])
         } else {
-          setBlocks([
-            createBlock("hero"),
-            createBlock("tracks"),
-            createBlock("merch"),
-          ])
-        }
+          const { data: dbBlocks, error } = await supabase
+            .from("profile_blocks")
+            .select("id, block_type, content, position_index")
+            .eq("profile_id", profileId)
+            .order("position_index", { ascending: true })
 
-        const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId)
-        setProducts(catalogProducts)
-        setServices(catalogServices)
+          if (error) throw error
+
+          if (dbBlocks && dbBlocks.length > 0) {
+            setBlocks(dbBlocks.map(dbBlockToBlock))
+          } else {
+            setBlocks([
+              createBlock("hero"),
+              createBlock("tracks"),
+              createBlock("merch"),
+            ])
+          }
+
+          const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId)
+          setProducts(catalogProducts)
+          setServices(catalogServices)
+        }
       } catch (err) {
         console.error("Error cargando bloques iniciales:", err)
         setBlocks([
@@ -178,6 +201,30 @@ export function ProfileEditor() {
     }
     loadSavedBlocks()
   }, [])
+
+  // Autoguardado de borrador: cada cambio se sube a profiles.draft_content
+  // (columna aparte, nunca leída por el perfil público). No toca
+  // profile_blocks/products/services — esas tablas son lo que ya está
+  // publicado y solo cambian cuando se presiona Publish.
+  useEffect(() => {
+    if (loading || publishing) return
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false
+      return
+    }
+    const profileId = profileIdRef.current
+    if (!profileId) return
+
+    const timeout = setTimeout(async () => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ draft_content: { blocks, products, services } })
+        .eq("id", profileId)
+      if (error) console.error("[autosave] Error guardando borrador:", error)
+    }, 1500)
+
+    return () => clearTimeout(timeout)
+  }, [blocks, products, services, loading, publishing])
 
   // ── Generación de banner con IA ──────────────────────────────────────
   async function generarBannerConIA(promptTexto: string) {
@@ -254,11 +301,26 @@ export function ProfileEditor() {
         })
       )
 
-      // 3. Upsert del perfil
+      // 3. Upsert del perfil — atado al usuario autenticado, con PROFILE_ID
+      // como fallback, para que cada cuenta publique y recupere lo suyo.
+      const { data: { user } } = await supabase.auth.getUser()
+
+      // No pisar el nombre/bio reales: si el perfil ya existe, se conservan
+      // tal cual. Solo en la primera publicación (perfil nuevo) se usa un
+      // valor derivado de la cuenta autenticada, nunca uno inventado.
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("display_name, bio")
+        .eq("user_id", user?.id ?? PROFILE_ID)
+        .maybeSingle()
+
+      const fallbackName =
+        user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || ""
+
       const profilePayload = {
-        user_id: PROFILE_ID,
-        display_name: "Nova Reyes",
-        bio: "Artista Musical",
+        user_id: user?.id ?? PROFILE_ID,
+        display_name: existingProfile?.display_name || fallbackName,
+        bio: existingProfile?.bio || "",
       }
 
       const { data: profile, error: profileError } = await supabase
@@ -295,6 +357,15 @@ export function ProfileEditor() {
 
       // 5. Publicar catálogo de productos y servicios
       await publishCatalog(profileId, products, services)
+
+      // Ya está publicado: se limpia el borrador para no recargarlo la
+      // próxima vez que se abra el editor.
+      skipNextAutosaveRef.current = true
+      const { error: clearDraftError } = await supabase
+        .from("profiles")
+        .update({ draft_content: null })
+        .eq("id", profileId)
+      if (clearDraftError) console.error("[handlePublish] Error limpiando borrador:", clearDraftError)
 
       alert("¡Cambios publicados con éxito en tu perfil!")
     } catch (err: unknown) {

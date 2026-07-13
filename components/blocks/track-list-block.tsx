@@ -34,6 +34,11 @@ function AlbumCover({
             <Disc3 className="size-6 animate-spin text-white" style={{ animationDuration: "3s" }} />
           </span>
         )}
+        {album.isExample && (
+          <span className="absolute left-1 top-1 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white">
+            Ejemplo
+          </span>
+        )}
       </div>
       <p className={`w-full truncate text-center text-xs font-medium ${active ? "text-primary" : "text-foreground"}`}>
         {album.title || "Untitled Album"}
