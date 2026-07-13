@@ -145,7 +145,7 @@ export function ProfileEditor() {
         const { data: { user } } = await supabase.auth.getUser()
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id, draft_content")
+          .select("id")
           .eq("user_id", user?.id ?? PROFILE_ID)
           .maybeSingle()
 
@@ -154,12 +154,22 @@ export function ProfileEditor() {
         const profileId = profile?.id ?? PROFILE_ID
         profileIdRef.current = profileId
 
-        // Un borrador guardado (is_visible del perfil publicado no se toca)
-        // tiene prioridad: es el trabajo más reciente sin publicar todavía.
-        const draft = profile?.draft_content as
-          | { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] }
-          | null
-          | undefined
+        // El borrador se consulta en una llamada aparte: si falla (ej. la
+        // migración de draft_content todavía no corrió en Supabase) no debe
+        // tumbar la carga de lo ya publicado — solo se ignora el borrador.
+        let draft: { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] } | null = null
+        if (profile) {
+          const { data: draftRow, error: draftError } = await supabase
+            .from("profiles")
+            .select("draft_content")
+            .eq("id", profileId)
+            .maybeSingle()
+          if (draftError) {
+            console.error("No se pudo leer el borrador (¿falta la migración draft_content?):", draftError)
+          } else {
+            draft = draftRow?.draft_content ?? null
+          }
+        }
 
         if (draft) {
           setBlocks(draft.blocks ?? [])

@@ -47,13 +47,18 @@ const ALBUM_ITEM_GAP = 12 // gap-3
 
 export function TrackListBlock({ data }: { data: TracksData }) {
   const albums = data.albums || []
+  // selectedAlbum: cuál álbum debe estar en la posición izquierda del carrusel.
+  // panelAlbumIndex: cuál álbum tiene su panel/vinilo realmente desplegado.
+  // Van desfasados a propósito para poder secuenciar: retraer → deslizar → desplegar.
   const [selectedAlbum, setSelectedAlbum] = useState<number | null>(null)
+  const [panelAlbumIndex, setPanelAlbumIndex] = useState<number | null>(null)
   const [playingTrack, setPlayingTrack] = useState<number | null>(null)
   const [carouselPaused, setCarouselPaused] = useState(false)
   const [isClosingPanel, setIsClosingPanel] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const switchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const slideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function stopAudio() {
     const audio = audioRef.current
@@ -104,8 +109,8 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     })
   }
 
-  function openAlbum(index: number) {
-    setSelectedAlbum(index)
+  function dropVinylFor(index: number) {
+    setPanelAlbumIndex(index)
     const firstPlayable = albums[index]?.tracks.findIndex((t) => Boolean(t.audioUrl)) ?? -1
     setPlayingTrack(null)
     if (firstPlayable >= 0) {
@@ -116,34 +121,41 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   function handleSelectAlbum(index: number) {
     pauseCarouselBriefly()
 
-    if (selectedAlbum === index) {
+    if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
+    if (slideTimeoutRef.current) clearTimeout(slideTimeoutRef.current)
+
+    if (selectedAlbum === index && panelAlbumIndex === index) {
       stopAudio()
-      setSelectedAlbum(null)
       setPlayingTrack(null)
+      setPanelAlbumIndex(null)
+      setSelectedAlbum(null)
       return
     }
 
     stopAudio()
     setPlayingTrack(null)
 
-    if (selectedAlbum !== null) {
-      // Ya hay un vinilo puesto: primero se guarda en su funda (sale hacia
-      // arriba) y solo entonces baja el del álbum nuevo.
+    if (panelAlbumIndex !== null) {
+      // 1. El vinilo actual se guarda por completo dentro de su portada.
       setIsClosingPanel(true)
-      if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
       switchTimeoutRef.current = setTimeout(() => {
         setIsClosingPanel(false)
-        openAlbum(index)
+        setPanelAlbumIndex(null)
+        // 2. Recién ahí el álbum nuevo se desliza a la primera posición.
+        setSelectedAlbum(index)
+        // 3. Y solo cuando termina de deslizarse, baja su propio vinilo.
+        slideTimeoutRef.current = setTimeout(() => dropVinylFor(index), 500)
       }, 280)
       return
     }
 
-    openAlbum(index)
+    setSelectedAlbum(index)
+    slideTimeoutRef.current = setTimeout(() => dropVinylFor(index), 500)
   }
 
   function handleTrackClick(albumIndex: number, trackIndex: number) {
     pauseCarouselBriefly()
-    if (selectedAlbum === albumIndex && playingTrack === trackIndex) {
+    if (panelAlbumIndex === albumIndex && playingTrack === trackIndex) {
       stopAudio()
       setPlayingTrack(null)
       return
@@ -156,11 +168,12 @@ export function TrackListBlock({ data }: { data: TracksData }) {
       stopAudio()
       if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current)
       if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
+      if (slideTimeoutRef.current) clearTimeout(slideTimeoutRef.current)
     },
     []
   )
 
-  const activeAlbum = selectedAlbum !== null ? albums[selectedAlbum] : null
+  const activeAlbum = panelAlbumIndex !== null ? albums[panelAlbumIndex] : null
   const activeTrack = activeAlbum && playingTrack !== null ? activeAlbum.tracks[playingTrack] : null
 
   if (albums.length === 0) {
@@ -211,83 +224,86 @@ export function TrackListBlock({ data }: { data: TracksData }) {
         </div>
       </div>
 
-      {/* Panel del álbum seleccionado — vinilo fijo a la izquierda, pistas a la derecha */}
-      {selectedAlbum !== null && activeAlbum && (
+      {/* Panel del álbum seleccionado — vinilo + pistas arriba, descripción abajo a todo el ancho */}
+      {panelAlbumIndex !== null && activeAlbum && (
         <div
-          className={`mt-4 flex flex-col gap-4 rounded-lg border border-border bg-background/40 p-4 sm:flex-row ${
+          className={`mt-4 rounded-lg border border-border bg-background/40 p-4 ${
             isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
           }`}
         >
-          <div className="flex shrink-0 items-center justify-center sm:w-40">
-            <div
-              className={`relative aspect-square w-32 shrink-0 overflow-hidden rounded-full shadow-2xl sm:w-36 ${
-                playingTrack !== null ? "animate-spin" : ""
-              }`}
-              style={{
-                animationDuration: "6s",
-                background: "repeating-radial-gradient(circle, #111 0px, #111 6px, #262626 7px, #111 8px)",
-              }}
-            >
-              <img
-                src={activeAlbum.cover || "/album-1.png"}
-                alt=""
-                className="absolute inset-0 m-auto size-14 rounded-full border-2 border-black/70 object-cover sm:size-16"
-              />
-            </div>
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <span>{activeAlbum.title || "Untitled Album"}</span>
-              <span>
-                {activeAlbum.tracks.length} {activeAlbum.tracks.length === 1 ? "canción" : "canciones"}
-              </span>
+          <div className="flex flex-col gap-4 sm:flex-row">
+            {/* El vinilo mide exactamente lo mismo que la portada en el carrusel (w-32 = 128px) */}
+            <div className="flex w-32 shrink-0 items-center justify-center">
+              <div
+                className={`relative aspect-square w-32 shrink-0 overflow-hidden rounded-full shadow-2xl ${
+                  playingTrack !== null ? "animate-spin" : ""
+                }`}
+                style={{
+                  animationDuration: "6s",
+                  background: "repeating-radial-gradient(circle, #111 0px, #111 6px, #262626 7px, #111 8px)",
+                }}
+              >
+                <img
+                  src={activeAlbum.cover || "/album-1.png"}
+                  alt=""
+                  className="absolute inset-0 m-auto size-14 rounded-full border-2 border-black/70 object-cover"
+                />
+              </div>
             </div>
 
-            <ul className="flex flex-col">
-              {activeAlbum.tracks.map((track, i) => {
-                const isPlaying = playingTrack === i
-                const hasAudio = Boolean(track.audioUrl)
-                return (
-                  <li key={i}>
-                    <button
-                      type="button"
-                      onClick={() => handleTrackClick(selectedAlbum, i)}
-                      disabled={!hasAudio}
-                      className={`group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
-                        isPlaying ? "bg-primary/10" : hasAudio ? "hover:bg-accent/60" : "cursor-not-allowed opacity-60"
-                      }`}
-                    >
-                      <span
-                        className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                          isPlaying
-                            ? "border-primary bg-primary/10 text-primary"
-                            : hasAudio
-                              ? "border-border text-muted-foreground group-hover:border-primary group-hover:text-primary"
-                              : "border-border/50 text-muted-foreground/40"
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <span>{activeAlbum.title || "Untitled Album"}</span>
+                <span>
+                  {activeAlbum.tracks.length} {activeAlbum.tracks.length === 1 ? "canción" : "canciones"}
+                </span>
+              </div>
+
+              <ul className="flex flex-col">
+                {activeAlbum.tracks.map((track, i) => {
+                  const isPlaying = playingTrack === i
+                  const hasAudio = Boolean(track.audioUrl)
+                  return (
+                    <li key={i}>
+                      <button
+                        type="button"
+                        onClick={() => handleTrackClick(panelAlbumIndex, i)}
+                        disabled={!hasAudio}
+                        className={`group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
+                          isPlaying ? "bg-primary/10" : hasAudio ? "hover:bg-accent/60" : "cursor-not-allowed opacity-60"
                         }`}
                       >
-                        {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-                      </span>
-                      <span className={`flex-1 truncate text-sm ${isPlaying ? "font-medium text-primary" : "text-foreground"}`}>
-                        {track.title || "Nueva Pista"}
-                      </span>
-                      {!hasAudio && <span className="text-[10px] italic text-muted-foreground/50">sin audio</span>}
-                      <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
-                        {track.duration || "—"}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-
-            {activeTrack?.description && (
-              <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-                {activeTrack.description}
-              </p>
-            )}
+                        <span
+                          className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                            isPlaying
+                              ? "border-primary bg-primary/10 text-primary"
+                              : hasAudio
+                                ? "border-border text-muted-foreground group-hover:border-primary group-hover:text-primary"
+                                : "border-border/50 text-muted-foreground/40"
+                          }`}
+                        >
+                          {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                        </span>
+                        <span className={`flex-1 truncate text-sm ${isPlaying ? "font-medium text-primary" : "text-foreground"}`}>
+                          {track.title || "Nueva Pista"}
+                        </span>
+                        {!hasAudio && <span className="text-[10px] italic text-muted-foreground/50">sin audio</span>}
+                        <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+                          {track.duration || "—"}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
           </div>
+
+          {activeTrack?.description && (
+            <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+              {activeTrack.description}
+            </p>
+          )}
         </div>
       )}
     </div>

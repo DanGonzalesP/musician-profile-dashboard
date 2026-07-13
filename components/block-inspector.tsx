@@ -1,10 +1,22 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import Link from "next/link"
 import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3 } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft } from "lucide-react"
+
+function BackToPanelLink() {
+  return (
+    <Link
+      href="/perfil/dashboard"
+      className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+    >
+      <ArrowLeft className="size-3" /> Volver al Panel
+    </Link>
+  )
+}
 
 type BlobRegistry = React.MutableRefObject<Map<string, File>>
 
@@ -33,11 +45,16 @@ export function BlockInspector({
 }: Props) {
   if (!block) {
     return (
-      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <p className="text-sm font-medium text-foreground">Nothing selected</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Select a block on the canvas to edit its content here.
-        </p>
+      <div className="flex h-full flex-col">
+        <div className="border-b border-sidebar-border px-4 py-3">
+          <BackToPanelLink />
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+          <p className="text-sm font-medium text-foreground">Nothing selected</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Select a block on the canvas to edit its content here.
+          </p>
+        </div>
       </div>
     )
   }
@@ -49,7 +66,8 @@ export function BlockInspector({
     <div className="flex h-full flex-col bg-sidebar text-foreground">
       <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-primary">Editing</p>
+          <BackToPanelLink />
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary">Editing</p>
           <p className="text-sm font-semibold text-foreground">{def?.label}</p>
         </div>
         <button
