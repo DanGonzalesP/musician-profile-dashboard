@@ -29,6 +29,7 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
   }, []);
 
   const enlaces = [
+    { name: "Editor de Página", href: "/dashboard", icon: "🎨" },
     { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: "🌐" },
     { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: "📈" },
     { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: "📊" },

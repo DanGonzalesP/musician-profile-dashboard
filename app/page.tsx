@@ -1,9 +1,31 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Music, Shield, ShoppingBag, Sparkles } from "lucide-react"
+import { Music, Loader2 } from "lucide-react"
+import { type FeedTrack, fetchAllPublicFeed } from "@/lib/musicFeed"
+import MusicFeedPlayer from "@/components/music-feed-player"
 
 export default function Page() {
+  const [tracks, setTracks] = useState<FeedTrack[]>([])
+  const [loading, setLoading] = useState(true)
+  const [errorMensaje, setErrorMensaje] = useState("")
+
+  useEffect(() => {
+    async function cargarFeed() {
+      try {
+        const data = await fetchAllPublicFeed()
+        setTracks(data)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "No se pudo cargar el feed."
+        setErrorMensaje(message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    cargarFeed()
+  }, [])
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Barra de Navegación Superior */}
@@ -14,55 +36,40 @@ export default function Page() {
           </div>
           <span className="font-bold text-lg tracking-tight">Décima</span>
         </div>
-        
+
         <div className="flex items-center gap-3">
-       <Link href="/login" className="text-xs font-medium px-4 py-2 rounded-lg hover:bg-accent transition-colors">
-  Iniciar Sesión
-</Link>
-<Link href="/login" className="text-xs font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shadow-md">
-  Registrarse
-</Link>
+          <Link href="/login" className="text-xs font-medium px-4 py-2 rounded-lg hover:bg-accent transition-colors">
+            Iniciar Sesión
+          </Link>
+          <Link href="/login?modo=registro" className="text-xs font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shadow-md">
+            Registrarse
+          </Link>
         </div>
       </header>
 
-      {/* Sección Hero Principal */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-6 border border-primary/20">
-          <Sparkles className="size-3.5" /> El Hub definitivo para Músicos Independientes
-        </div>
-        
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
-          Controla tu música, tu merch y tus derechos.
-        </h1>
-        
-        <p className="text-sm text-muted-foreground max-w-xl mb-8 leading-relaxed">
-          Crea tu perfil profesional con IA, vende productos directamente a tus fans y protege tu propiedad intelectual con tecnología digital SHA-256. Todo en un solo lugar con Décima.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-4 mb-16">
-          <Link href="/login" className="text-sm font-semibold bg-primary text-primary-foreground px-6 py-3 rounded-xl hover:scale-105 transition-transform shadow-lg">
-  Comenzar como Artista
-</Link>
+      {/* Feed público de música */}
+      <main className="flex-1 px-4 py-10 max-w-2xl w-full mx-auto">
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-4 border border-primary/20">
+            <Music className="size-3.5" /> Feed de Música
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
+            Descubre música de artistas independientes
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+            Últimas canciones publicadas por artistas en Décima.
+          </p>
         </div>
 
-        {/* Cuadrícula de Características */}
-        <div className="grid sm:grid-cols-3 gap-4 w-full max-w-2xl text-left">
-          <div className="p-4 rounded-xl border border-border bg-card">
-            <Music className="size-5 text-primary mb-2" />
-            <h3 className="text-xs font-semibold mb-1">Catálogo e IA</h3>
-            <p className="text-[11px] text-muted-foreground">Genera banners con IA y reproduce tus tracks nativamente.</p>
+        {loading ? (
+          <div className="flex items-center justify-center p-12 text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin" />
           </div>
-          <div className="p-4 rounded-xl border border-border bg-card">
-            <ShoppingBag className="size-5 text-primary mb-2" />
-            <h3 className="text-xs font-semibold mb-1">Tienda Integrada</h3>
-            <p className="text-[11px] text-muted-foreground">Vende vinilos, ropa o servicios directamente sin intermediarios.</p>
-          </div>
-          <div className="p-4 rounded-xl border border-border bg-card">
-            <Shield className="size-5 text-primary mb-2" />
-            <h3 className="text-xs font-semibold mb-1">Protección Legal</h3>
-            <p className="text-[11px] text-muted-foreground">Registra autorías SHA-256 y emite licencias de uso firmadas.</p>
-          </div>
-        </div>
+        ) : errorMensaje ? (
+          <p className="text-center text-sm text-destructive">{errorMensaje}</p>
+        ) : (
+          <MusicFeedPlayer tracks={tracks} />
+        )}
       </main>
     </div>
   )

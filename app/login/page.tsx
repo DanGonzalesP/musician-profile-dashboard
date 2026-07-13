@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
   const [exitoMensaje, setExitoMensaje] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
+  const searchParams = useSearchParams();
+  const [isRegistering, setIsRegistering] = useState(searchParams.get("modo") === "registro");
   const router = useRouter();
 
   const handleAuth = async (e: React.FormEvent) => {
