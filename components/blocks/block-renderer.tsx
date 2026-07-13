@@ -16,6 +16,7 @@ export function BlockRenderer({
   shareUrl,
   albumCovers = [],
   songOptions = [],
+  profileId,
 }: {
   block: Block
   products?: CatalogProduct[]
@@ -23,6 +24,7 @@ export function BlockRenderer({
   shareUrl?: string
   albumCovers?: string[]
   songOptions?: LicenseSongOption[]
+  profileId?: string
 }) {
   switch (block.type) {
     case "hero":
@@ -36,7 +38,7 @@ export function BlockRenderer({
     case "donation":
       return <DonationBlock data={block.data as DonationData} />
     case "license":
-      return <LicenseBlock data={block.data as LicenseData} songOptions={songOptions} />
+      return <LicenseBlock data={block.data as LicenseData} songOptions={songOptions} profileId={profileId} />
     default:
       return (
         <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">

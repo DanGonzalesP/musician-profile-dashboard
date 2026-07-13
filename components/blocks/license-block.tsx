@@ -7,9 +7,11 @@ import type { LicenseData, LicenseSongOption } from "@/lib/blocks"
 export function LicenseBlock({
   data,
   songOptions = [],
+  profileId,
 }: {
   data: LicenseData
   songOptions?: LicenseSongOption[]
+  profileId?: string
 }) {
   const [organizerName, setOrganizerName] = useState("")
   const [eventDate, setEventDate] = useState("")
@@ -62,6 +64,25 @@ export function LicenseBlock({
         eventEndDate,
         songs,
       })
+
+      // El historial es un registro "best effort": si falla, no le quitamos
+      // al usuario el PDF que ya descargó, solo lo dejamos sin registrar.
+      if (profileId) {
+        try {
+          const { recordLicense } = await import("@/lib/licenses")
+          await recordLicense(profileId, {
+            artistName,
+            artistLegalName: data.artistLegalName,
+            artistDni: data.artistDni,
+            organizerName: organizerName.trim(),
+            eventDate,
+            eventEndDate,
+            songs,
+          })
+        } catch (err) {
+          console.error("[LicenseBlock] No se pudo guardar el historial:", err)
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo generar el PDF.")
     } finally {

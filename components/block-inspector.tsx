@@ -5,7 +5,8 @@ import Link from "next/link"
 import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, LicenseData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft, FileCheck2 } from "lucide-react"
+import type { LicenseHistoryEntry } from "@/lib/licenses"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft, FileCheck2, History, Download } from "lucide-react"
 
 function BackToPanelLink() {
   return (
@@ -30,6 +31,7 @@ type Props = {
   onProductsChange: (products: CatalogProduct[]) => void
   services: CatalogService[]
   onServicesChange: (services: CatalogService[]) => void
+  profileId?: string
 }
 
 export function BlockInspector({
@@ -42,6 +44,7 @@ export function BlockInspector({
   onProductsChange,
   services,
   onServicesChange,
+  profileId,
 }: Props) {
   if (!block) {
     return (
@@ -108,7 +111,7 @@ export function BlockInspector({
           <DonationFields data={block.data as DonationData} onChange={update} />
         )}
         {block.type === "license" && (
-          <LicenseFields data={block.data as LicenseData} onChange={update} />
+          <LicenseFields data={block.data as LicenseData} onChange={update} profileId={profileId} />
         )}
       </div>
 
@@ -1015,9 +1018,11 @@ function DonationFields({
 function LicenseFields({
   data,
   onChange,
+  profileId,
 }: {
   data: LicenseData
   onChange: (d: LicenseData) => void
+  profileId?: string
 }) {
   return (
     <>
@@ -1057,6 +1062,84 @@ function LicenseFields({
         Estos datos se usan como "Licenciante" en cada licencia generada. El organizador, la fecha y las
         canciones se completan directamente en el bloque, en cada uso.
       </p>
+      <LicenseHistoryPanel profileId={profileId} />
     </>
+  )
+}
+
+// ─── LicenseHistoryPanel — historial de licencias emitidas ────────────────
+
+function LicenseHistoryPanel({ profileId }: { profileId?: string }) {
+  const [entries, setEntries] = useState<LicenseHistoryEntry[]>([])
+  const [status, setStatus] = useState<"idle" | "loading" | "error" | "ready">("idle")
+
+  useEffect(() => {
+    if (!profileId) return
+    let cancelled = false
+    setStatus("loading")
+    import("@/lib/licenses").then(({ fetchLicenseHistory }) => {
+      fetchLicenseHistory(profileId)
+        .then((data) => {
+          if (cancelled) return
+          setEntries(data)
+          setStatus("ready")
+        })
+        .catch(() => {
+          if (!cancelled) setStatus("error")
+        })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [profileId])
+
+  async function handleRedownload(entry: LicenseHistoryEntry) {
+    const { generateLicensePdf } = await import("@/lib/generate-license-pdf")
+    generateLicensePdf({
+      artistName: entry.artistName,
+      artistLegalName: entry.artistLegalName || "",
+      artistDni: entry.artistDni || "",
+      organizerName: entry.organizerName,
+      eventDate: entry.eventDate,
+      eventEndDate: entry.eventEndDate || undefined,
+      songs: entry.songs,
+    })
+  }
+
+  if (!profileId) return null
+
+  return (
+    <div className="space-y-2 border-t border-sidebar-border pt-4">
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <History className="size-3.5" /> Historial de licencias emitidas
+      </p>
+      {status === "loading" && <p className="text-xs text-muted-foreground">Cargando...</p>}
+      {status === "error" && <p className="text-xs text-destructive">No se pudo cargar el historial.</p>}
+      {status === "ready" && entries.length === 0 && (
+        <p className="text-xs italic text-muted-foreground">Todavía no se ha generado ninguna licencia.</p>
+      )}
+      {status === "ready" && entries.length > 0 && (
+        <ul className="space-y-2">
+          {entries.map((entry) => (
+            <li key={entry.id} className="rounded-lg border border-sidebar-border bg-background/40 p-2.5">
+              <p className="truncate text-xs font-medium text-foreground">{entry.organizerName}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {entry.eventDate}
+                {entry.eventEndDate && entry.eventEndDate !== entry.eventDate ? ` – ${entry.eventEndDate}` : ""}
+                {" · "}
+                {entry.songs.length} {entry.songs.length === 1 ? "canción" : "canciones"}
+              </p>
+              <button
+                type="button"
+                onClick={() => handleRedownload(entry)}
+                className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+              >
+                <Download className="size-3" /> Volver a descargar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

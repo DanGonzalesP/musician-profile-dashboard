@@ -20,6 +20,7 @@ export default function PerfilPublicoPage() {
   const [state, setState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState("");
+  const [profileId, setProfileId] = useState("");
 
   useEffect(() => {
     setShareUrl(window.location.href);
@@ -60,6 +61,8 @@ export default function PerfilPublicoPage() {
           setErrorMessage("Artista no encontrado");
           return;
         }
+
+        setProfileId(profile.id);
 
         // Cargar bloques del perfil
         const { data: dbBlocks, error: blocksError } = await supabase
@@ -160,6 +163,7 @@ export default function PerfilPublicoPage() {
             shareUrl={shareUrl}
             albumCovers={albumCovers}
             songOptions={songOptions}
+            profileId={profileId}
           />
         ))}
       </main>

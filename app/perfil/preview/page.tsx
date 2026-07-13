@@ -20,6 +20,7 @@ export default function PerfilPreviewPage() {
   const [state, setState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState("");
+  const [profileId, setProfileId] = useState("");
 
   useEffect(() => {
     async function cargarBorrador() {
@@ -41,6 +42,7 @@ export default function PerfilPreviewPage() {
         if (profileError) throw profileError;
 
         const profileId = profile?.id ?? PROFILE_ID;
+        setProfileId(profileId);
 
         // El link a compartir es el de la página pública real (por slug del
         // nombre publicado), no esta URL de /perfil/preview — solo existe si
@@ -138,6 +140,7 @@ export default function PerfilPreviewPage() {
               shareUrl={shareUrl}
               albumCovers={tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? []}
               songOptions={getSongOptions(tracksData)}
+              profileId={profileId}
             />
           );
         })}
