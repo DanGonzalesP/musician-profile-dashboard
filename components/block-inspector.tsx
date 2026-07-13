@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
+import { useState, useRef } from "react"
+import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3 } from "lucide-react"
 
 type BlobRegistry = React.MutableRefObject<Map<string, File>>
 
@@ -265,7 +265,24 @@ function HeroFields({
   )
 }
 
-// ─── TracksFields ─────────────────────────────────────────────────────────
+// ─── TracksFields — gestión de álbumes y pistas ────────────────────────────
+
+function extractAudioDuration(url: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio()
+    audio.preload = "metadata"
+    audio.onloadedmetadata = () => resolve(audio.duration)
+    audio.onerror = () => reject(new Error("No se pudo leer la duración del audio"))
+    audio.src = url
+  })
+}
+
+function formatDuration(seconds: number): string {
+  if (!isFinite(seconds) || isNaN(seconds)) return ""
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, "0")}`
+}
 
 function TracksFields({
   data,
@@ -276,78 +293,199 @@ function TracksFields({
   onChange: (d: TracksData) => void
   blobRegistry: BlobRegistry
 }) {
-  const setTrack = (i: number, key: "title" | "duration" | "audioUrl", value: string) => {
-    const tracks = (data.tracks || []).map((t, idx) => (idx === i ? { ...t, [key]: value } : t))
-    onChange({ ...data, tracks })
+  const albums = data.albums || []
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [previewingKey, setPreviewingKey] = useState<string | null>(null)
+
+  const updateAlbums = (next: Album[]) => onChange({ albums: next })
+
+  const setAlbum = (albumIndex: number, changes: Partial<Album>) => {
+    updateAlbums(albums.map((a, idx) => (idx === albumIndex ? { ...a, ...changes } : a)))
   }
 
-  const addTrack = () => {
-    const tracks = [...(data.tracks || []), { title: "New Track", duration: "3:30" }]
-    onChange({ ...data, tracks })
+  const addAlbum = () => {
+    updateAlbums([...albums, { id: `album-${Date.now()}`, title: "New Album", cover: "", tracks: [] }])
   }
 
-  const removeTrack = (i: number) => {
-    const tracks = (data.tracks || []).filter((_, idx) => idx !== i)
-    onChange({ ...data, tracks })
+  const removeAlbum = (albumIndex: number) => {
+    updateAlbums(albums.filter((_, idx) => idx !== albumIndex))
+  }
+
+  const setTrack = (albumIndex: number, trackIndex: number, key: keyof Track, value: string) => {
+    updateAlbums(
+      albums.map((a, aIdx) =>
+        aIdx === albumIndex
+          ? { ...a, tracks: a.tracks.map((t, tIdx) => (tIdx === trackIndex ? { ...t, [key]: value } : t)) }
+          : a
+      )
+    )
+  }
+
+  const addTrack = (albumIndex: number) => {
+    updateAlbums(
+      albums.map((a, idx) =>
+        idx === albumIndex ? { ...a, tracks: [...a.tracks, { title: "New Track", duration: "" }] } : a
+      )
+    )
+  }
+
+  const removeTrack = (albumIndex: number, trackIndex: number) => {
+    updateAlbums(
+      albums.map((a, idx) =>
+        idx === albumIndex ? { ...a, tracks: a.tracks.filter((_, tIdx) => tIdx !== trackIndex) } : a
+      )
+    )
+  }
+
+  const handleAudioUploaded = async (albumIndex: number, trackIndex: number, url: string) => {
+    setTrack(albumIndex, trackIndex, "audioUrl", url)
+    try {
+      const seconds = await extractAudioDuration(url)
+      setTrack(albumIndex, trackIndex, "duration", formatDuration(seconds))
+    } catch {
+      // Si el navegador no puede leer la metadata, se deja la duración como esté;
+      // el artista puede escribirla manualmente.
+    }
+  }
+
+  const togglePreview = (key: string, url?: string) => {
+    if (!url) return
+    if (previewingKey === key) {
+      previewAudioRef.current?.pause()
+      previewAudioRef.current = null
+      setPreviewingKey(null)
+      return
+    }
+    previewAudioRef.current?.pause()
+    const audio = new Audio(url)
+    previewAudioRef.current = audio
+    setPreviewingKey(key)
+    audio.onended = () => setPreviewingKey(null)
+    audio.onerror = () => setPreviewingKey(null)
+    audio.play().catch(() => setPreviewingKey(null))
   }
 
   return (
     <>
-      <Field label="Section title">
-        <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
-      </Field>
-      <Field label="Album cover">
-        <ImageUploader
-          currentImageUrl={data.cover}
-          onUploadReady={(url) => onChange({ ...data, cover: url })}
-          blobRegistry={blobRegistry}
-        />
-      </Field>
-      <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tracks</p>
+      <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Álbumes</p>
         <button
           type="button"
-          onClick={addTrack}
+          onClick={addAlbum}
           className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
         >
-          <Plus className="size-3" /> Add Track
+          <Plus className="size-3" /> Add Album
         </button>
       </div>
-      <div className="space-y-3">
-        {(data.tracks || []).map((track, i) => (
-          <div key={i} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
-            <div className="flex gap-2 items-center">
-              <span className="text-xs text-muted-foreground min-w-4">{i + 1}</span>
-              <input
-                type="text"
-                value={track.title || ""}
-                onChange={(e) => setTrack(i, "title", e.target.value)}
-                className={`${inputClass} flex-1`}
-                placeholder="Track title"
-              />
-              <input
-                type="text"
-                value={track.duration || ""}
-                onChange={(e) => setTrack(i, "duration", e.target.value)}
-                className={`${inputClass} w-16 text-center`}
-                placeholder="3:45"
-              />
+
+      <div className="space-y-4">
+        {albums.map((album, albumIndex) => (
+          <div key={album.id} className="space-y-3 rounded-lg border border-sidebar-border p-3 bg-background/50">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+                <Disc3 className="size-3.5" /> Album #{albumIndex + 1}
+              </span>
               <button
                 type="button"
-                onClick={() => removeTrack(i)}
-                className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                title="Eliminar pista"
+                onClick={() => removeAlbum(albumIndex)}
+                className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                title="Eliminar álbum"
               >
                 <Trash2 className="size-3.5" />
               </button>
             </div>
-            <AudioUploader
-              currentAudioUrl={track.audioUrl}
-              onUploadReady={(url) => setTrack(i, "audioUrl", url)}
-              blobRegistry={blobRegistry}
-            />
+
+            <Field label="Album title">
+              <TextInput
+                value={album.title || ""}
+                onChange={(e) => setAlbum(albumIndex, { title: e.target.value })}
+                placeholder="Ej. Digital Ethereal"
+              />
+            </Field>
+            <Field label="Album cover">
+              <ImageUploader
+                currentImageUrl={album.cover}
+                onUploadReady={(url) => setAlbum(albumIndex, { cover: url })}
+                blobRegistry={blobRegistry}
+              />
+            </Field>
+
+            <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tracks</p>
+              <button
+                type="button"
+                onClick={() => addTrack(albumIndex)}
+                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+              >
+                <Plus className="size-3" /> Add Track
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {album.tracks.map((track, trackIndex) => {
+                const key = `${albumIndex}-${trackIndex}`
+                const isPreviewing = previewingKey === key
+                return (
+                  <div key={trackIndex} className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-sidebar/40">
+                    <div className="flex gap-2 items-center">
+                      <span className="text-xs text-muted-foreground min-w-4">{trackIndex + 1}</span>
+                      <input
+                        type="text"
+                        value={track.title || ""}
+                        onChange={(e) => setTrack(albumIndex, trackIndex, "title", e.target.value)}
+                        className={`${inputClass} flex-1`}
+                        placeholder="Track title"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => togglePreview(key, track.audioUrl)}
+                        disabled={!track.audioUrl}
+                        title={track.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
+                        className="flex size-7 shrink-0 items-center justify-center rounded-full border border-input text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                      </button>
+                      <input
+                        type="text"
+                        value={track.duration || ""}
+                        readOnly
+                        title="Se calcula automáticamente al subir el audio"
+                        className={`${inputClass} w-16 text-center opacity-70`}
+                        placeholder="0:00"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeTrack(albumIndex, trackIndex)}
+                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        title="Eliminar pista"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                    <AudioUploader
+                      currentAudioUrl={track.audioUrl}
+                      onUploadReady={(url) => handleAudioUploaded(albumIndex, trackIndex, url)}
+                      blobRegistry={blobRegistry}
+                    />
+                    <textarea
+                      value={track.description || ""}
+                      onChange={(e) => setTrack(albumIndex, trackIndex, "description", e.target.value)}
+                      rows={2}
+                      className={inputClass}
+                      placeholder="Descripción (opcional): en qué te inspiraste, qué significa esta canción..."
+                    />
+                  </div>
+                )
+              })}
+              {album.tracks.length === 0 && (
+                <p className="text-[11px] italic text-muted-foreground">Este álbum no tiene pistas todavía.</p>
+              )}
+            </div>
           </div>
         ))}
+        {albums.length === 0 && (
+          <p className="text-[11px] italic text-muted-foreground">Añade tu primer álbum para empezar.</p>
+        )}
       </div>
     </>
   )

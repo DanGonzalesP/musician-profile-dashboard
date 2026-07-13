@@ -14,15 +14,27 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
   useEffect(() => {
     async function cargarPerfil() {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id ?? PROFILE_ID;
 
       const { data: profile } = await supabase
         .from("profiles")
         .select("display_name")
-        .eq("user_id", userId)
+        .eq("user_id", user?.id ?? PROFILE_ID)
         .maybeSingle();
 
-      const name = profile?.display_name || "";
+      let name = profile?.display_name || "";
+
+      // Si el usuario logueado todavía no tiene su propia fila en `profiles`
+      // (el editor visual sigue publicando bajo el perfil semilla PROFILE_ID),
+      // usamos ese perfil semilla como respaldo para no dejar el enlace roto.
+      if (!name && user) {
+        const { data: seedProfile } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("user_id", PROFILE_ID)
+          .maybeSingle();
+        name = seedProfile?.display_name || "";
+      }
+
       setPublicSlug(name.trim().toLowerCase().replace(/\s+/g, "-"));
     }
     cargarPerfil();

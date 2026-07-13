@@ -9,6 +9,14 @@ export type Track = {
   title: string
   duration: string
   audioUrl?: string
+  description?: string
+}
+
+export type Album = {
+  id: string
+  title: string
+  cover: string
+  tracks: Track[]
 }
 
 export type HeroData = {
@@ -19,9 +27,7 @@ export type HeroData = {
 }
 
 export type TracksData = {
-  title: string
-  cover: string
-  tracks: Track[]
+  albums: Album[]
 }
 
 export type MerchData = {
@@ -120,21 +126,25 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         location: String(content.location ?? ""),
         image: String(content.image ?? content.avatarUrl ?? content.coverUrl ?? "/hero-banner.png"),
       }
-    case "tracks":
-      return {
-        title: String(content.title ?? ""),
-        cover: String(content.cover ?? "/album-1.png"),
-        tracks: Array.isArray(content.tracks)
-          ? content.tracks.map((t) => {
-              const track = (t && typeof t === "object" ? t : {}) as Record<string, unknown>
-              return {
-                title: String(track.title ?? ""),
-                duration: String(track.duration ?? ""),
-                audioUrl: track.audioUrl ? String(track.audioUrl) : undefined,
-              }
-            })
-          : [],
+    case "tracks": {
+      if (Array.isArray(content.albums)) {
+        return { albums: content.albums.map((a, i) => normalizeAlbum(a, i)) }
       }
+      // Retrocompatibilidad: bloques guardados antes de que existieran múltiples
+      // álbumes (una sola portada + lista plana de tracks) se envuelven en un
+      // único álbum para no perder el contenido ya publicado.
+      if (Array.isArray(content.tracks) || content.cover || content.title) {
+        return {
+          albums: [
+            normalizeAlbum(
+              { id: "album-1", title: content.title, cover: content.cover, tracks: content.tracks },
+              0
+            ),
+          ],
+        }
+      }
+      return { albums: [] }
+    }
     case "merch":
       return {
         title: String(content.title ?? ""),
@@ -152,6 +162,26 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         goalAmount: String(content.goalAmount ?? ""),
         currency: String(content.currency ?? "USD"),
       }
+  }
+}
+
+function normalizeTrack(raw: unknown): Track {
+  const t = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    title: String(t.title ?? ""),
+    duration: String(t.duration ?? ""),
+    audioUrl: t.audioUrl ? String(t.audioUrl) : undefined,
+    description: t.description ? String(t.description) : undefined,
+  }
+}
+
+function normalizeAlbum(raw: unknown, index: number): Album {
+  const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(a.id ?? `album-${index + 1}`),
+    title: String(a.title ?? ""),
+    cover: String(a.cover ?? "/album-1.png"),
+    tracks: Array.isArray(a.tracks) ? a.tracks.map(normalizeTrack) : [],
   }
 }
 
@@ -175,14 +205,53 @@ function defaultData(type: BlockType): BlockData {
       }
     case "tracks":
       return {
-        title: "Latest Release — Digital Ethereal",
-        cover: "/album-1.png",
-        tracks: [
-          { title: "Neon Horizon", duration: "3:42" },
-          { title: "Silica Waves", duration: "4:15" },
-          { title: "Fractal Dream", duration: "3:58" },
-          { title: "Velocity Zero", duration: "5:10" },
-          { title: "Prism Shift", duration: "2:45" },
+        albums: [
+          {
+            id: "album-1",
+            title: "Digital Ethereal",
+            cover: "/album-1.png",
+            tracks: [
+              {
+                title: "Neon Horizon",
+                duration: "3:42",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+                description:
+                  "Ejemplo de descripción: cuenta aquí en qué te inspiraste para esta canción — un lugar, una persona, una noche en particular. Este texto aparece mientras el fan la está escuchando. Reemplázalo por la historia real de tu pista.",
+              },
+              {
+                title: "Silica Waves",
+                duration: "4:15",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+                description:
+                  "Otro ejemplo de descripción por pista: cada canción del álbum puede tener su propio texto, distinto al de las demás.",
+              },
+              {
+                title: "Fractal Dream",
+                duration: "3:58",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+                description: "Descripción de ejemplo — bórrala y escribe la tuya desde el editor.",
+              },
+            ],
+          },
+          {
+            id: "album-2",
+            title: "Analog Sessions",
+            cover: "/album-1.png",
+            tracks: [
+              {
+                title: "Velocity Zero",
+                duration: "5:10",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+                description: "Este es un segundo álbum de ejemplo: el carrusel puede mostrar tantos álbumes como quieras.",
+              },
+              {
+                title: "Prism Shift",
+                duration: "2:45",
+                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+                description: "Sube tu propio audio en el editor y esta pista de muestra desaparecerá.",
+              },
+            ],
+          },
         ],
       }
     case "merch":
