@@ -271,7 +271,20 @@ function extractAudioDuration(url: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const audio = new Audio()
     audio.preload = "metadata"
-    audio.onloadedmetadata = () => resolve(audio.duration)
+    audio.onloadedmetadata = () => {
+      if (isFinite(audio.duration)) {
+        resolve(audio.duration)
+        return
+      }
+      // Bug conocido de Chrome al leer blob URLs: la duración llega como
+      // Infinity hasta que se fuerza una búsqueda (seek) dentro del archivo.
+      audio.currentTime = 1e101
+      audio.ontimeupdate = () => {
+        audio.ontimeupdate = null
+        audio.currentTime = 0
+        resolve(audio.duration)
+      }
+    }
     audio.onerror = () => reject(new Error("No se pudo leer la duración del audio"))
     audio.src = url
   })
@@ -447,15 +460,15 @@ function TracksFields({
                         <Trash2 className="size-3.5" />
                       </button>
                     </div>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={track.title || ""}
-                        onChange={(e) => setTrack(albumIndex, trackIndex, "title", e.target.value)}
-                        className={`${inputClass} flex-1`}
-                        placeholder="Nombre de la canción"
-                        aria-label="Nombre de la canción"
-                      />
+                    <input
+                      type="text"
+                      value={track.title || ""}
+                      onChange={(e) => setTrack(albumIndex, trackIndex, "title", e.target.value)}
+                      className={`${inputClass} w-full`}
+                      placeholder="Nombre de la canción"
+                      aria-label="Nombre de la canción"
+                    />
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => togglePreview(key, track.audioUrl)}
@@ -466,13 +479,16 @@ function TracksFields({
                       >
                         {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                       </button>
+                      <span className="text-xs text-muted-foreground">
+                        {track.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para escucharlo"}
+                      </span>
                       <input
                         type="text"
                         value={track.duration || ""}
                         readOnly
                         title="Se calcula automáticamente al subir el audio"
                         aria-label="Duración (automática)"
-                        className={`${inputClass} w-14 shrink-0 text-center opacity-70`}
+                        className={`${inputClass} ml-auto w-14 shrink-0 text-center opacity-70`}
                         placeholder="0:00"
                       />
                     </div>

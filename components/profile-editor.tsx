@@ -55,15 +55,34 @@ function setDeep(obj: Record<string, unknown>, path: string, value: string): Rec
   return clone
 }
 
+// Algunos navegadores detectan mal el MIME type de ciertos archivos de audio
+// (ej. reportan .mp3 como "video/mpeg"), lo que el bucket de Supabase rechaza.
+// Forzamos el tipo correcto según la extensión en vez de confiar en el navegador.
+const MIME_TYPES_BY_EXT: Record<string, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  flac: "audio/flac",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+}
+
 /**
  * Sube un File a Supabase Storage y devuelve la URL pública permanente.
  */
 async function uploadFileToStorage(file: File, folder: "images" | "audio"): Promise<string> {
-  const ext = file.name.split(".").pop() ?? "bin"
+  const ext = (file.name.split(".").pop() ?? "bin").toLowerCase()
   const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const contentType = MIME_TYPES_BY_EXT[ext] ?? file.type ?? "application/octet-stream"
 
   const { error: uploadError } = await supabase.storage.from("assets").upload(fileName, file, {
     upsert: false,
+    contentType,
   })
 
   if (uploadError) throw uploadError
