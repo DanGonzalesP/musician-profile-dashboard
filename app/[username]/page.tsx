@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block, type TracksData, dbBlockToBlock } from "@/lib/blocks";
+import { type Block, type TracksData, dbBlockToBlock, getSongOptions } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
@@ -144,9 +144,9 @@ export default function PerfilPublicoPage() {
     );
   }
 
-  const albumCovers = (blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined)?.albums
-    .map((a) => a.cover)
-    .filter(Boolean) ?? [];
+  const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
+  const albumCovers = tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? [];
+  const songOptions = getSongOptions(tracksData);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
@@ -159,6 +159,7 @@ export default function PerfilPublicoPage() {
             services={services}
             shareUrl={shareUrl}
             albumCovers={albumCovers}
+            songOptions={songOptions}
           />
         ))}
       </main>

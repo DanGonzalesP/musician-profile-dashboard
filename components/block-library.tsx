@@ -4,7 +4,7 @@ import { useState } from "react"
 import { BLOCK_LIBRARY, type BlockType } from "@/lib/blocks"
 import { ChevronDown, Plus, GripVertical } from "lucide-react"
 
-const CATEGORIES = ["Layout", "Music", "Commerce"] as const
+const CATEGORIES = ["Layout", "Music", "Commerce", "Legal"] as const
 
 type Props = {
   onAdd: (type: BlockType) => void
@@ -17,6 +17,7 @@ export function BlockLibrary({ onAdd, onDragStart, onDragEnd }: Props) {
     Layout: true,
     Music: true,
     Commerce: true,
+    Legal: true,
   })
 
   return (

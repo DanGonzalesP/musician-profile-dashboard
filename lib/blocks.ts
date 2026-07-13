@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, FileCheck2 } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
-export type BlockType = "hero" | "tracks" | "merch" | "service" | "donation"
+export type BlockType = "hero" | "tracks" | "merch" | "service" | "donation" | "license"
 
 export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
 
@@ -60,7 +60,31 @@ export type DonationData = {
   currency: string
 }
 
-export type BlockData = HeroData | TracksData | MerchData | ServiceData | DonationData
+export type LicenseData = {
+  title: string
+  artistLegalName: string
+  artistStageName: string
+  artistDni: string
+}
+
+export type LicenseSongOption = { id: string; label: string }
+
+/**
+ * Aplana los álbumes/pistas del bloque "tracks" en opciones seleccionables
+ * para el formulario de licencias — se recalcula desde los bloques actuales,
+ * nunca se guarda una copia aparte.
+ */
+export function getSongOptions(tracksData: TracksData | undefined): LicenseSongOption[] {
+  if (!tracksData) return []
+  return tracksData.albums.flatMap((album) =>
+    album.tracks.map((track, i) => ({
+      id: `${album.id}-${i}`,
+      label: track.title ? `${album.title || "Sin título"} — ${track.title}` : `${album.title || "Sin título"} — Pista ${i + 1}`,
+    }))
+  )
+}
+
+export type BlockData = HeroData | TracksData | MerchData | ServiceData | DonationData | LicenseData
 
 export type Block = {
   id: string
@@ -73,7 +97,7 @@ export type BlockDefinition = {
   label: string
   description: string
   icon: LucideIcon
-  category: "Layout" | "Music" | "Commerce"
+  category: "Layout" | "Music" | "Commerce" | "Legal"
 }
 
 export const BLOCK_LIBRARY: BlockDefinition[] = [
@@ -111,6 +135,13 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     description: "Let fans support you directly with a donation button.",
     icon: Heart,
     category: "Commerce",
+  },
+  {
+    type: "license",
+    label: "Licencia Express",
+    description: "Genera licencias de uso directo en PDF para eventos en vivo, sin pasar por APDAYC.",
+    icon: FileCheck2,
+    category: "Legal",
   },
 ]
 
@@ -177,6 +208,13 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         buttonUrl: String(content.buttonUrl ?? ""),
         goalAmount: String(content.goalAmount ?? ""),
         currency: String(content.currency ?? "USD"),
+      }
+    case "license":
+      return {
+        title: String(content.title ?? "Generador de Licencias Express"),
+        artistLegalName: String(content.artistLegalName ?? ""),
+        artistStageName: String(content.artistStageName ?? ""),
+        artistDni: String(content.artistDni ?? ""),
       }
   }
 }
@@ -332,6 +370,13 @@ function defaultData(type: BlockType): BlockData {
         buttonUrl: "",
         goalAmount: "",
         currency: "USD",
+      }
+    case "license":
+      return {
+        title: "Generador de Licencias Express",
+        artistLegalName: "",
+        artistStageName: "",
+        artistDni: "",
       }
   }
 }

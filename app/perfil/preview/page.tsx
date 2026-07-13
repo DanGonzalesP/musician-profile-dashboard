@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { type Block, type TracksData, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks";
+import { type Block, type TracksData, createBlock, dbBlockToBlock, getSongOptions, PROFILE_ID } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
@@ -127,20 +127,20 @@ export default function PerfilPreviewPage() {
         <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
       </div>
       <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8 animate-fade-in">
-        {blocks.map((block) => (
-          <BlockRenderer
-            key={block.id}
-            block={block}
-            products={products}
-            services={services}
-            shareUrl={shareUrl}
-            albumCovers={
-              (blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined)?.albums
-                .map((a) => a.cover)
-                .filter(Boolean) ?? []
-            }
-          />
-        ))}
+        {blocks.map((block) => {
+          const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
+          return (
+            <BlockRenderer
+              key={block.id}
+              block={block}
+              products={products}
+              services={services}
+              shareUrl={shareUrl}
+              albumCovers={tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? []}
+              songOptions={getSongOptions(tracksData)}
+            />
+          );
+        })}
       </main>
     </div>
   );

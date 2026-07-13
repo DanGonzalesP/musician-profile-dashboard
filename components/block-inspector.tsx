@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, LicenseData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft, FileCheck2 } from "lucide-react"
 
 function BackToPanelLink() {
   return (
@@ -106,6 +106,9 @@ export function BlockInspector({
         )}
         {block.type === "donation" && (
           <DonationFields data={block.data as DonationData} onChange={update} />
+        )}
+        {block.type === "license" && (
+          <LicenseFields data={block.data as LicenseData} onChange={update} />
         )}
       </div>
 
@@ -1003,6 +1006,57 @@ function DonationFields({
           placeholder="https://ko-fi.com/tu-usuario"
         />
       </Field>
+    </>
+  )
+}
+
+// ─── LicenseFields ──────────────────────────────────────────────────────────
+
+function LicenseFields({
+  data,
+  onChange,
+}: {
+  data: LicenseData
+  onChange: (d: LicenseData) => void
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2 rounded-lg bg-primary/8 px-3 py-2 text-xs text-primary">
+        <FileCheck2 className="size-3.5 shrink-0" />
+        <span>Licencia Express — estos datos identifican al artista en cada PDF generado</span>
+      </div>
+      <Field label="Título del bloque">
+        <TextInput
+          value={data.title || ""}
+          onChange={(e) => onChange({ ...data, title: e.target.value })}
+          placeholder="Generador de Licencias Express"
+        />
+      </Field>
+      <Field label="Nombre artístico">
+        <TextInput
+          value={data.artistStageName || ""}
+          onChange={(e) => onChange({ ...data, artistStageName: e.target.value })}
+          placeholder="Nombre con el que te presentas"
+        />
+      </Field>
+      <Field label="Nombre real (legal)">
+        <TextInput
+          value={data.artistLegalName || ""}
+          onChange={(e) => onChange({ ...data, artistLegalName: e.target.value })}
+          placeholder="Nombre completo según DNI"
+        />
+      </Field>
+      <Field label="DNI">
+        <TextInput
+          value={data.artistDni || ""}
+          onChange={(e) => onChange({ ...data, artistDni: e.target.value })}
+          placeholder="12345678"
+        />
+      </Field>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Estos datos se usan como "Licenciante" en cada licencia generada. El organizador, la fecha y las
+        canciones se completan directamente en el bloque, en cada uso.
+      </p>
     </>
   )
 }
