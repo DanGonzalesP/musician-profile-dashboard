@@ -309,6 +309,8 @@ function TracksFields({
   const albums = data.albums || []
   const previewAudioRef = useRef<HTMLAudioElement | null>(null)
   const [previewingKey, setPreviewingKey] = useState<string | null>(null)
+  // Solo un álbum se edita a la vez — evita el scroll largo de mostrarlos todos juntos.
+  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(albums[0]?.id ?? null)
 
   const updateAlbums = (next: Album[]) => onChange({ albums: next })
 
@@ -317,11 +319,18 @@ function TracksFields({
   }
 
   const addAlbum = () => {
-    updateAlbums([...albums, { id: `album-${Date.now()}`, title: "New Album", cover: "", tracks: [] }])
+    const newAlbum: Album = { id: `album-${Date.now()}`, title: "New Album", cover: "", tracks: [] }
+    updateAlbums([...albums, newAlbum])
+    setActiveAlbumId(newAlbum.id)
   }
 
   const removeAlbum = (albumIndex: number) => {
-    updateAlbums(albums.filter((_, idx) => idx !== albumIndex))
+    const removedId = albums[albumIndex]?.id
+    const next = albums.filter((_, idx) => idx !== albumIndex)
+    updateAlbums(next)
+    if (removedId === activeAlbumId) {
+      setActiveAlbumId(next[0]?.id ?? null)
+    }
   }
 
   // Al abrir el editor, cualquier pista que ya tenga audio pero no tenga
@@ -444,6 +453,12 @@ function TracksFields({
     audio.play().catch(() => setPreviewingKey(null))
   }
 
+  const activeAlbumIndex = Math.max(
+    0,
+    albums.findIndex((a) => a.id === activeAlbumId)
+  )
+  const activeAlbum = albums[activeAlbumIndex] ?? null
+
   return (
     <>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5">
@@ -457,13 +472,40 @@ function TracksFields({
         </button>
       </div>
 
+      {/* Carrusel compacto para elegir qué álbum editar */}
+      {albums.length > 0 && (
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          {albums.map((album) => (
+            <button
+              key={album.id}
+              type="button"
+              onClick={() => setActiveAlbumId(album.id)}
+              className={`flex w-16 shrink-0 flex-col items-center gap-1 rounded-md p-1 transition-colors ${
+                album.id === activeAlbum?.id ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-accent/50"
+              }`}
+            >
+              <span className="flex size-10 w-full items-center justify-center overflow-hidden rounded bg-muted">
+                {album.cover ? (
+                  <img src={album.cover} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <Disc3 className="size-4 text-muted-foreground/40" />
+                )}
+              </span>
+              <span className="w-full truncate text-center text-[9px] text-muted-foreground">
+                {album.title || "Sin título"}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-4">
-        {albums.map((album, albumIndex) => (
-          <div key={album.id} className="space-y-3 rounded-lg border border-sidebar-border p-3 bg-background/50">
+        {activeAlbum && (
+          <div key={activeAlbum.id} className="space-y-3 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-                <Disc3 className="size-3.5" /> Album #{albumIndex + 1}
-                {album.isExample && (
+                <Disc3 className="size-3.5" /> Album #{activeAlbumIndex + 1}
+                {activeAlbum.isExample && (
                   <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600">
                     Ejemplo
                   </span>
@@ -471,7 +513,7 @@ function TracksFields({
               </span>
               <button
                 type="button"
-                onClick={() => removeAlbum(albumIndex)}
+                onClick={() => removeAlbum(activeAlbumIndex)}
                 className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 title="Eliminar álbum"
               >
@@ -481,15 +523,15 @@ function TracksFields({
 
             <Field label="Album title">
               <TextInput
-                value={album.title || ""}
-                onChange={(e) => setAlbum(albumIndex, { title: e.target.value })}
+                value={activeAlbum.title || ""}
+                onChange={(e) => setAlbum(activeAlbumIndex, { title: e.target.value })}
                 placeholder="Ej. Digital Ethereal"
               />
             </Field>
             <Field label="Album cover">
               <ImageUploader
-                currentImageUrl={album.cover}
-                onUploadReady={(url) => setAlbum(albumIndex, { cover: url })}
+                currentImageUrl={activeAlbum.cover}
+                onUploadReady={(url) => setAlbum(activeAlbumIndex, { cover: url })}
                 blobRegistry={blobRegistry}
               />
             </Field>
@@ -498,7 +540,7 @@ function TracksFields({
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tracks</p>
               <button
                 type="button"
-                onClick={() => addTrack(albumIndex)}
+                onClick={() => addTrack(activeAlbumIndex)}
                 className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
               >
                 <Plus className="size-3" /> Add Track
@@ -506,8 +548,8 @@ function TracksFields({
             </div>
 
             <div className="space-y-2">
-              {album.tracks.map((track, trackIndex) => {
-                const key = `${albumIndex}-${trackIndex}`
+              {activeAlbum.tracks.map((track, trackIndex) => {
+                const key = `${activeAlbumIndex}-${trackIndex}`
                 const isPreviewing = previewingKey === key
                 return (
                   <div key={trackIndex} className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-sidebar/40">
@@ -517,7 +559,7 @@ function TracksFields({
                       </span>
                       <button
                         type="button"
-                        onClick={() => removeTrack(albumIndex, trackIndex)}
+                        onClick={() => removeTrack(activeAlbumIndex, trackIndex)}
                         className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         title="Eliminar pista"
                       >
@@ -527,7 +569,7 @@ function TracksFields({
                     <input
                       type="text"
                       value={track.title || ""}
-                      onChange={(e) => setTrack(albumIndex, trackIndex, "title", e.target.value)}
+                      onChange={(e) => setTrack(activeAlbumIndex, trackIndex, "title", e.target.value)}
                       className={`${inputClass} w-full`}
                       placeholder="Nombre de la canción"
                       aria-label="Nombre de la canción"
@@ -555,12 +597,12 @@ function TracksFields({
                     </div>
                     <AudioUploader
                       currentAudioUrl={track.audioUrl}
-                      onUploadReady={(url) => handleAudioUploaded(albumIndex, trackIndex, url)}
+                      onUploadReady={(url) => handleAudioUploaded(activeAlbumIndex, trackIndex, url)}
                       blobRegistry={blobRegistry}
                     />
                     <textarea
                       value={track.description || ""}
-                      onChange={(e) => setTrack(albumIndex, trackIndex, "description", e.target.value)}
+                      onChange={(e) => setTrack(activeAlbumIndex, trackIndex, "description", e.target.value)}
                       rows={2}
                       className={inputClass}
                       placeholder="Descripción (opcional): en qué te inspiraste, qué significa esta canción..."
@@ -568,12 +610,12 @@ function TracksFields({
                   </div>
                 )
               })}
-              {album.tracks.length === 0 && (
+              {activeAlbum.tracks.length === 0 && (
                 <p className="text-[11px] italic text-muted-foreground">Este álbum no tiene pistas todavía.</p>
               )}
             </div>
           </div>
-        ))}
+        )}
         {albums.length === 0 && (
           <p className="text-[11px] italic text-muted-foreground">Añade tu primer álbum para empezar.</p>
         )}

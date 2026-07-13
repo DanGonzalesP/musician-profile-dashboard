@@ -42,13 +42,18 @@ function AlbumCover({
   )
 }
 
+const ALBUM_ITEM_WIDTH = 128 // w-32
+const ALBUM_ITEM_GAP = 12 // gap-3
+
 export function TrackListBlock({ data }: { data: TracksData }) {
   const albums = data.albums || []
   const [selectedAlbum, setSelectedAlbum] = useState<number | null>(null)
   const [playingTrack, setPlayingTrack] = useState<number | null>(null)
   const [carouselPaused, setCarouselPaused] = useState(false)
+  const [isClosingPanel, setIsClosingPanel] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const switchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function stopAudio() {
     const audio = audioRef.current
@@ -99,21 +104,41 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     })
   }
 
-  function handleSelectAlbum(index: number) {
-    pauseCarouselBriefly()
-    if (selectedAlbum === index) {
-      stopAudio()
-      setSelectedAlbum(null)
-      setPlayingTrack(null)
-      return
-    }
-    stopAudio()
+  function openAlbum(index: number) {
     setSelectedAlbum(index)
     const firstPlayable = albums[index]?.tracks.findIndex((t) => Boolean(t.audioUrl)) ?? -1
     setPlayingTrack(null)
     if (firstPlayable >= 0) {
       playTrackAt(index, firstPlayable)
     }
+  }
+
+  function handleSelectAlbum(index: number) {
+    pauseCarouselBriefly()
+
+    if (selectedAlbum === index) {
+      stopAudio()
+      setSelectedAlbum(null)
+      setPlayingTrack(null)
+      return
+    }
+
+    stopAudio()
+    setPlayingTrack(null)
+
+    if (selectedAlbum !== null) {
+      // Ya hay un vinilo puesto: primero se guarda en su funda (sale hacia
+      // arriba) y solo entonces baja el del álbum nuevo.
+      setIsClosingPanel(true)
+      if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
+      switchTimeoutRef.current = setTimeout(() => {
+        setIsClosingPanel(false)
+        openAlbum(index)
+      }, 280)
+      return
+    }
+
+    openAlbum(index)
   }
 
   function handleTrackClick(albumIndex: number, trackIndex: number) {
@@ -130,6 +155,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     () => () => {
       stopAudio()
       if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current)
+      if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
     },
     []
   )
@@ -164,11 +190,15 @@ export function TrackListBlock({ data }: { data: TracksData }) {
         onMouseLeave={() => setCarouselPaused(false)}
       >
         <div
-          className="flex w-max gap-3 animate-marquee"
-          style={{
-            animationDuration: `${cycleSeconds}s`,
-            animationPlayState: carouselPaused ? "paused" : "running",
-          }}
+          className={`flex w-max gap-3 ${selectedAlbum === null ? "animate-marquee" : ""}`}
+          style={
+            selectedAlbum === null
+              ? { animationDuration: `${cycleSeconds}s`, animationPlayState: carouselPaused ? "paused" : "running" }
+              : {
+                  transform: `translateX(-${selectedAlbum * (ALBUM_ITEM_WIDTH + ALBUM_ITEM_GAP)}px)`,
+                  transition: "transform 500ms ease",
+                }
+          }
         >
           {loopAlbums.map((album, i) => (
             <AlbumCover
@@ -183,12 +213,18 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
       {/* Panel del álbum seleccionado — vinilo fijo a la izquierda, pistas a la derecha */}
       {selectedAlbum !== null && activeAlbum && (
-        <div className="animate-vinyl-drop mt-4 flex flex-col gap-4 rounded-lg border border-border bg-background/40 p-4 sm:flex-row">
+        <div
+          className={`mt-4 flex flex-col gap-4 rounded-lg border border-border bg-background/40 p-4 sm:flex-row ${
+            isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
+          }`}
+        >
           <div className="flex shrink-0 items-center justify-center sm:w-40">
             <div
-              className="relative aspect-square w-32 shrink-0 animate-spin overflow-hidden rounded-full shadow-2xl sm:w-36"
+              className={`relative aspect-square w-32 shrink-0 overflow-hidden rounded-full shadow-2xl sm:w-36 ${
+                playingTrack !== null ? "animate-spin" : ""
+              }`}
               style={{
-                animationDuration: "3s",
+                animationDuration: "6s",
                 background: "repeating-radial-gradient(circle, #111 0px, #111 6px, #262626 7px, #111 8px)",
               }}
             >

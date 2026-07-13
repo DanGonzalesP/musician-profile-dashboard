@@ -105,10 +105,10 @@
 
 @keyframes marquee-scroll {
   from {
-    transform: translateX(0);
+    transform: translate3d(-50%, 0, 0);
   }
   to {
-    transform: translateX(-50%);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -123,12 +123,28 @@
   }
 }
 
+@keyframes vinyl-retract {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.92);
+  }
+}
+
 .animate-marquee {
   animation-name: marquee-scroll;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+  will-change: transform;
 }
 
 .animate-vinyl-drop {
   animation: vinyl-drop 0.35s ease-out;
+}
+
+.animate-vinyl-retract {
+  animation: vinyl-retract 0.28s ease-in forwards;
 }
