@@ -311,15 +311,18 @@ function TracksFields({
     updateAlbums(albums.filter((_, idx) => idx !== albumIndex))
   }
 
-  const setTrack = (albumIndex: number, trackIndex: number, key: keyof Track, value: string) => {
+  const setTrackFields = (albumIndex: number, trackIndex: number, changes: Partial<Track>) => {
     updateAlbums(
       albums.map((a, aIdx) =>
         aIdx === albumIndex
-          ? { ...a, tracks: a.tracks.map((t, tIdx) => (tIdx === trackIndex ? { ...t, [key]: value } : t)) }
+          ? { ...a, tracks: a.tracks.map((t, tIdx) => (tIdx === trackIndex ? { ...t, ...changes } : t)) }
           : a
       )
     )
   }
+
+  const setTrack = (albumIndex: number, trackIndex: number, key: keyof Track, value: string) =>
+    setTrackFields(albumIndex, trackIndex, { [key]: value })
 
   const addTrack = (albumIndex: number) => {
     updateAlbums(
@@ -338,14 +341,18 @@ function TracksFields({
   }
 
   const handleAudioUploaded = async (albumIndex: number, trackIndex: number, url: string) => {
-    setTrack(albumIndex, trackIndex, "audioUrl", url)
+    // Ambos campos se guardan juntos en una sola actualización. Si se guardaran
+    // por separado (audioUrl primero, duration después de esperar la metadata),
+    // el segundo guardado usaría una copia vieja del estado y borraría la URL
+    // recién guardada — eso causaba que el audio "desapareciera" tras subirlo.
+    let duration = ""
     try {
-      const seconds = await extractAudioDuration(url)
-      setTrack(albumIndex, trackIndex, "duration", formatDuration(seconds))
+      duration = formatDuration(await extractAudioDuration(url))
     } catch {
-      // Si el navegador no puede leer la metadata, se deja la duración como esté;
-      // el artista puede escribirla manualmente.
+      // Si el navegador no puede leer la metadata, se deja la duración vacía
+      // y el artista puede escribirla manualmente.
     }
+    setTrackFields(albumIndex, trackIndex, { audioUrl: url, duration })
   }
 
   const togglePreview = (key: string, url?: string) => {
@@ -427,21 +434,35 @@ function TracksFields({
                 const isPreviewing = previewingKey === key
                 return (
                   <div key={trackIndex} className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-sidebar/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Pista {trackIndex + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeTrack(albumIndex, trackIndex)}
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        title="Eliminar pista"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                     <div className="flex gap-2 items-center">
-                      <span className="text-xs text-muted-foreground min-w-4">{trackIndex + 1}</span>
                       <input
                         type="text"
                         value={track.title || ""}
                         onChange={(e) => setTrack(albumIndex, trackIndex, "title", e.target.value)}
                         className={`${inputClass} flex-1`}
-                        placeholder="Track title"
+                        placeholder="Nombre de la canción"
+                        aria-label="Nombre de la canción"
                       />
                       <button
                         type="button"
                         onClick={() => togglePreview(key, track.audioUrl)}
                         disabled={!track.audioUrl}
                         title={track.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
-                        className="flex size-7 shrink-0 items-center justify-center rounded-full border border-input text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
                       >
                         {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                       </button>
@@ -450,17 +471,10 @@ function TracksFields({
                         value={track.duration || ""}
                         readOnly
                         title="Se calcula automáticamente al subir el audio"
-                        className={`${inputClass} w-16 text-center opacity-70`}
+                        aria-label="Duración (automática)"
+                        className={`${inputClass} w-14 shrink-0 text-center opacity-70`}
                         placeholder="0:00"
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeTrack(albumIndex, trackIndex)}
-                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        title="Eliminar pista"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
                     </div>
                     <AudioUploader
                       currentAudioUrl={track.audioUrl}
