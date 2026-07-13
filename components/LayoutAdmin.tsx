@@ -1,15 +1,35 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { PROFILE_ID } from "@/lib/blocks";
 
 export default function LayoutAdmin({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [publicSlug, setPublicSlug] = useState("");
+
+  useEffect(() => {
+    async function cargarPerfil() {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id ?? PROFILE_ID;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const name = profile?.display_name || "";
+      setPublicSlug(name.trim().toLowerCase().replace(/\s+/g, "-"));
+    }
+    cargarPerfil();
+  }, []);
 
   const enlaces = [
-    { name: "Ver Portal Público", href: "/perfil/donaciones", icon: "🌐" },
+    { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: "🌐" },
     { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: "📈" },
     { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: "📊" },
     { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: "👕" },
@@ -29,7 +49,7 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
         <div className="space-y-6">
           <div>
             <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Panel Artista</h2>
-            <p className="text-lg font-semibold text-white mt-1">@novareyes</p>
+            <p className="text-lg font-semibold text-white mt-1">@{publicSlug || "artista"}</p>
           </div>
           <nav className="space-y-1">
             {enlaces.map((enlace) => {

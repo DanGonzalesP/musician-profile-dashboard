@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { 
+import { PROFILE_ID } from "@/lib/blocks";
+import {
   FeedTrack, 
   fetchMusicFeed, 
   addTrackToFeed, 
@@ -43,12 +44,12 @@ export default function MusicFeedForm() {
           .maybeSingle();
 
         if (profileError) throw profileError;
-        if (!profile) throw new Error("Perfil no encontrado.");
 
-        setProfileId(profile.id);
-        setDisplayName(profile.display_name);
+        const resolvedProfileId = profile?.id ?? PROFILE_ID;
+        setProfileId(resolvedProfileId);
+        setDisplayName(profile?.display_name ?? "");
 
-        const loadedTracks = await fetchMusicFeed(profile.id);
+        const loadedTracks = await fetchMusicFeed(resolvedProfileId);
         setTracks(loadedTracks);
       } catch (err) {
         handleError(err);
