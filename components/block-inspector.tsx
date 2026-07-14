@@ -2,11 +2,10 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, LicenseData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import type { LicenseHistoryEntry } from "@/lib/licenses"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft, FileCheck2, History, Download, ShieldCheck } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft } from "lucide-react"
 
 function BackToPanelLink() {
   return (
@@ -31,8 +30,6 @@ type Props = {
   onProductsChange: (products: CatalogProduct[]) => void
   services: CatalogService[]
   onServicesChange: (services: CatalogService[]) => void
-  profileId?: string
-  artistName?: string
 }
 
 export function BlockInspector({
@@ -45,8 +42,6 @@ export function BlockInspector({
   onProductsChange,
   services,
   onServicesChange,
-  profileId,
-  artistName,
 }: Props) {
   if (!block) {
     return (
@@ -90,13 +85,7 @@ export function BlockInspector({
           <HeroFields data={block.data as HeroData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "tracks" && (
-          <TracksFields
-            data={block.data as TracksData}
-            onChange={update}
-            blobRegistry={blobRegistry}
-            profileId={profileId}
-            artistName={artistName}
-          />
+          <TracksFields data={block.data as TracksData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "merch" && (
           <MerchFields
@@ -117,9 +106,6 @@ export function BlockInspector({
         )}
         {block.type === "donation" && (
           <DonationFields data={block.data as DonationData} onChange={update} />
-        )}
-        {block.type === "license" && (
-          <LicenseFields data={block.data as LicenseData} onChange={update} profileId={profileId} />
         )}
       </div>
 
@@ -459,14 +445,10 @@ function TracksFields({
   data,
   onChange,
   blobRegistry,
-  profileId,
-  artistName,
 }: {
   data: TracksData
   onChange: (d: TracksData) => void
   blobRegistry: BlobRegistry
-  profileId?: string
-  artistName?: string
 }) {
   const albums = data.albums || []
   const previewAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -774,12 +756,6 @@ function TracksFields({
                       onUploadReady={(url, hash) => handleAudioUploaded(activeAlbumIndex, trackIndex, url, hash)}
                       blobRegistry={blobRegistry}
                     />
-                    <CertificateButton
-                      profileId={profileId}
-                      artistName={artistName}
-                      songTitle={track.title}
-                      fileHash={track.fileHash}
-                    />
                     <textarea
                       value={track.description || ""}
                       onChange={(e) => setTrack(activeAlbumIndex, trackIndex, "description", e.target.value)}
@@ -801,71 +777,6 @@ function TracksFields({
         )}
       </div>
     </>
-  )
-}
-
-// ─── CertificateButton — certificado de autoría (marcado de tiempo) ───────
-
-function CertificateButton({
-  profileId,
-  artistName,
-  songTitle,
-  fileHash,
-}: {
-  profileId?: string
-  artistName?: string
-  songTitle: string
-  fileHash?: string
-}) {
-  const [status, setStatus] = useState<"idle" | "loading" | "not-registered" | "error">("idle")
-
-  if (!fileHash) return null
-
-  async function handleClick() {
-    if (!profileId) {
-      setStatus("not-registered")
-      return
-    }
-    setStatus("loading")
-    try {
-      const { fetchCertificateByHash } = await import("@/lib/author-certificates")
-      const cert = await fetchCertificateByHash(profileId, fileHash as string)
-      if (!cert) {
-        setStatus("not-registered")
-        return
-      }
-      const { generateAuthorshipCertificatePdf } = await import("@/lib/generate-authorship-certificate-pdf")
-      generateAuthorshipCertificatePdf({
-        artistName: artistName || "—",
-        songTitle: songTitle || cert.songTitle,
-        fileHash: cert.fileHash,
-        registeredAt: cert.createdAt,
-      })
-      setStatus("idle")
-    } catch (err) {
-      console.error("[CertificateButton] Error obteniendo el certificado:", err)
-      setStatus("error")
-    }
-  }
-
-  return (
-    <div className="space-y-1">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={status === "loading"}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-600 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <ShieldCheck className="size-3.5" />
-        {status === "loading" ? "Buscando registro..." : "Descargar Certificado de Autoría"}
-      </button>
-      {status === "not-registered" && (
-        <p className="text-[10px] italic text-muted-foreground">
-          Todavía no está registrado — publica tu perfil para fijar la fecha oficial del certificado.
-        </p>
-      )}
-      {status === "error" && <p className="text-[10px] text-destructive">No se pudo obtener el certificado.</p>}
-    </div>
   )
 }
 
@@ -1114,133 +1025,3 @@ function DonationFields({
   )
 }
 
-// ─── LicenseFields ──────────────────────────────────────────────────────────
-
-function LicenseFields({
-  data,
-  onChange,
-  profileId,
-}: {
-  data: LicenseData
-  onChange: (d: LicenseData) => void
-  profileId?: string
-}) {
-  return (
-    <>
-      <div className="flex items-center gap-2 rounded-lg bg-primary/8 px-3 py-2 text-xs text-primary">
-        <FileCheck2 className="size-3.5 shrink-0" />
-        <span>Licencia Express — estos datos identifican al artista en cada PDF generado</span>
-      </div>
-      <Field label="Título del bloque">
-        <TextInput
-          value={data.title || ""}
-          onChange={(e) => onChange({ ...data, title: e.target.value })}
-          placeholder="Generador de Licencias Express"
-        />
-      </Field>
-      <Field label="Nombre artístico">
-        <TextInput
-          value={data.artistStageName || ""}
-          onChange={(e) => onChange({ ...data, artistStageName: e.target.value })}
-          placeholder="Nombre con el que te presentas"
-        />
-      </Field>
-      <Field label="Nombre real (legal)">
-        <TextInput
-          value={data.artistLegalName || ""}
-          onChange={(e) => onChange({ ...data, artistLegalName: e.target.value })}
-          placeholder="Nombre completo según DNI"
-        />
-      </Field>
-      <Field label="DNI">
-        <TextInput
-          value={data.artistDni || ""}
-          onChange={(e) => onChange({ ...data, artistDni: e.target.value })}
-          placeholder="12345678"
-        />
-      </Field>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Estos datos se usan como "Licenciante" en cada licencia generada. El organizador, la fecha y las
-        canciones se completan directamente en el bloque, en cada uso.
-      </p>
-      <LicenseHistoryPanel profileId={profileId} />
-    </>
-  )
-}
-
-// ─── LicenseHistoryPanel — historial de licencias emitidas ────────────────
-
-function LicenseHistoryPanel({ profileId }: { profileId?: string }) {
-  const [entries, setEntries] = useState<LicenseHistoryEntry[]>([])
-  const [status, setStatus] = useState<"idle" | "loading" | "error" | "ready">("idle")
-
-  useEffect(() => {
-    if (!profileId) return
-    let cancelled = false
-    setStatus("loading")
-    import("@/lib/licenses").then(({ fetchLicenseHistory }) => {
-      fetchLicenseHistory(profileId)
-        .then((data) => {
-          if (cancelled) return
-          setEntries(data)
-          setStatus("ready")
-        })
-        .catch(() => {
-          if (!cancelled) setStatus("error")
-        })
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [profileId])
-
-  async function handleRedownload(entry: LicenseHistoryEntry) {
-    const { generateLicensePdf } = await import("@/lib/generate-license-pdf")
-    generateLicensePdf({
-      artistName: entry.artistName,
-      artistLegalName: entry.artistLegalName || "",
-      artistDni: entry.artistDni || "",
-      organizerName: entry.organizerName,
-      eventDate: entry.eventDate,
-      eventEndDate: entry.eventEndDate || undefined,
-      songs: entry.songs,
-    })
-  }
-
-  if (!profileId) return null
-
-  return (
-    <div className="space-y-2 border-t border-sidebar-border pt-4">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        <History className="size-3.5" /> Historial de licencias emitidas
-      </p>
-      {status === "loading" && <p className="text-xs text-muted-foreground">Cargando...</p>}
-      {status === "error" && <p className="text-xs text-destructive">No se pudo cargar el historial.</p>}
-      {status === "ready" && entries.length === 0 && (
-        <p className="text-xs italic text-muted-foreground">Todavía no se ha generado ninguna licencia.</p>
-      )}
-      {status === "ready" && entries.length > 0 && (
-        <ul className="space-y-2">
-          {entries.map((entry) => (
-            <li key={entry.id} className="rounded-lg border border-sidebar-border bg-background/40 p-2.5">
-              <p className="truncate text-xs font-medium text-foreground">{entry.organizerName}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {entry.eventDate}
-                {entry.eventEndDate && entry.eventEndDate !== entry.eventDate ? ` – ${entry.eventEndDate}` : ""}
-                {" · "}
-                {entry.songs.length} {entry.songs.length === 1 ? "canción" : "canciones"}
-              </p>
-              <button
-                type="button"
-                onClick={() => handleRedownload(entry)}
-                className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
-              >
-                <Download className="size-3" /> Volver a descargar
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}

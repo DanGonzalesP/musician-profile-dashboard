@@ -48,6 +48,7 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: "👕" },
     { name: "Gestionar Servicios", href: "/perfil/admin-servicios", icon: "💼" },
     { name: "Feed de Música", href: "/perfil/admin-musica", icon: "🎵" },
+    { name: "Herramientas Legales", href: "/perfil/legal", icon: "⚖️" },
     { name: "Configurar Perfil", href: "/perfil/config", icon: "⚙" },
   ];
 

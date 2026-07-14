@@ -7,9 +7,11 @@ import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
 import { BlockInspector } from "@/components/block-inspector"
+import { ShareProfileDialog } from "@/components/blocks/share-profile-dialog"
 import { Layers } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import imageCompression from "browser-image-compression"
+import { logSupabaseError } from "@/lib/log-supabase-error"
 import { ProfileSkeleton } from "@/components/blocks/skeletons"
 
 type DragPayload = { kind: "new"; type: BlockType } | { kind: "reorder"; index: number } | null
@@ -55,6 +57,22 @@ function setDeep(obj: Record<string, unknown>, path: string, value: string): Rec
   }
   current[parts[parts.length - 1]] = value
   return clone
+}
+
+/**
+ * Una blob URL solo vive en el documento que la creó — no sobrevive a un
+ * recargo de página ni a una nueva pestaña. Guardarlas en draft_content hace
+ * que, al volver a cargar el editor, el navegador intente pedir un recurso
+ * que ya no existe ("Not allowed to load local resource: blob:..."). Antes
+ * de persistir o de hidratar el borrador, se limpian a "" para no arrastrar
+ * referencias muertas.
+ */
+function stripDeadBlobUrls<T extends Record<string, unknown>>(data: T): T {
+  let result: Record<string, unknown> = data
+  for (const { path } of collectBlobPaths(data)) {
+    result = setDeep(result, path, "")
+  }
+  return result as T
 }
 
 // Algunos navegadores detectan mal el MIME type de ciertos archivos de audio
@@ -146,6 +164,10 @@ export function ProfileEditor() {
   const [dragPayload, setDragPayload] = useState<DragPayload>(null)
   const [publishing, setPublishing] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Slug de la página pública ya publicada (deriva de profiles.display_name)
+  // — solo existe una vez que el artista publicó al menos una vez.
+  const [publicSlug, setPublicSlug] = useState("")
+  const [shareOpen, setShareOpen] = useState(false)
 
   /**
    * Registro de blob URLs → File real.
@@ -173,7 +195,7 @@ export function ProfileEditor() {
         const { data: { user } } = await supabase.auth.getUser()
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, display_name")
           .eq("user_id", user?.id ?? PROFILE_ID)
           .maybeSingle()
 
@@ -181,6 +203,13 @@ export function ProfileEditor() {
 
         const profileId = profile?.id ?? PROFILE_ID
         profileIdRef.current = profileId
+
+        // El link a compartir es el de la página pública real, no algo que
+        // se pueda armar en el borrador — solo existe si el perfil ya tiene
+        // un nombre publicado.
+        if (profile?.display_name) {
+          setPublicSlug(profile.display_name.trim().toLowerCase().replaceAll(" ", "-"))
+        }
 
         // El borrador se consulta en una llamada aparte: si falla (ej. la
         // migración de draft_content todavía no corrió en Supabase) no debe
@@ -200,9 +229,13 @@ export function ProfileEditor() {
         }
 
         if (draft) {
-          setBlocks(draft.blocks ?? [])
-          setProducts(draft.products ?? [])
-          setServices(draft.services ?? [])
+          const cleanBlocks = (draft.blocks ?? []).map((b) => ({
+            ...b,
+            data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"],
+          }))
+          setBlocks(cleanBlocks)
+          setProducts((draft.products ?? []).map((p) => stripDeadBlobUrls(p as unknown as Record<string, unknown>) as unknown as CatalogProduct))
+          setServices((draft.services ?? []).map((s) => stripDeadBlobUrls(s as unknown as Record<string, unknown>) as unknown as CatalogService))
         } else {
           const { data: dbBlocks, error } = await supabase
             .from("profile_blocks")
@@ -254,9 +287,23 @@ export function ProfileEditor() {
     if (!profileId) return
 
     const timeout = setTimeout(async () => {
+      // Se guardan las blob URLs vigentes tal cual (siguen siendo válidas en
+      // esta misma pestaña, así la vista previa no parpadea), pero se limpian
+      // antes de escribir a Supabase para no persistir referencias que
+      // morirán en cuanto se cierre o recargue esta pestaña.
+      const sanitizedBlocks = blocks.map((b) => ({
+        ...b,
+        data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"],
+      }))
+      const sanitizedProducts = products.map(
+        (p) => stripDeadBlobUrls(p as unknown as Record<string, unknown>) as unknown as CatalogProduct
+      )
+      const sanitizedServices = services.map(
+        (s) => stripDeadBlobUrls(s as unknown as Record<string, unknown>) as unknown as CatalogService
+      )
       const { error } = await supabase
         .from("profiles")
-        .update({ draft_content: { blocks, products, services } })
+        .update({ draft_content: { blocks: sanitizedBlocks, products: sanitizedProducts, services: sanitizedServices } })
         .eq("id", profileId)
       if (error) console.error("[autosave] Error guardando borrador:", error)
     }, 1500)
@@ -412,7 +459,7 @@ export function ProfileEditor() {
                   fileHash: track.fileHash,
                 })
               } catch (err) {
-                console.error("[handlePublish] No se pudo registrar el certificado de autoría:", err)
+                logSupabaseError("handlePublish: no se pudo registrar el certificado de autoría", err)
               }
             }
           }
@@ -541,6 +588,8 @@ export function ProfileEditor() {
         blockCount={blocks.length}
         onPublish={handlePublish}
         isPublishing={publishing}
+        onShare={() => setShareOpen(true)}
+        shareDisabled={!publicSlug}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -604,13 +653,24 @@ export function ProfileEditor() {
                 onProductsChange={setProducts}
                 services={services}
                 onServicesChange={setServices}
-                profileId={profileIdRef.current ?? undefined}
-                artistName={(blocks.find((b) => b.type === "hero")?.data as HeroData | undefined)?.name}
               />
             </aside>
           </>
         )}
       </div>
+
+      {shareOpen && publicSlug && (
+        <ShareProfileDialog
+          shareUrl={`${window.location.origin}/${publicSlug}`}
+          data={(blocks.find((b) => b.type === "hero")?.data as HeroData) ?? { name: "", tagline: "", location: "", image: "" }}
+          albumCovers={
+            (blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined)?.albums
+              .map((a) => a.cover)
+              .filter(Boolean) ?? []
+          }
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }

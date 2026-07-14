@@ -2,14 +2,16 @@
 
 import { useState } from "react"
 import { FileCheck2, Loader2, ShieldCheck } from "lucide-react"
-import type { LicenseData, LicenseSongOption } from "@/lib/blocks"
+import type { LicenseSongOption } from "@/lib/blocks"
+import type { LegalSettings } from "@/lib/legal-settings"
+import { logSupabaseError } from "@/lib/log-supabase-error"
 
-export function LicenseBlock({
+export function LicenseTool({
   data,
   songOptions = [],
   profileId,
 }: {
-  data: LicenseData
+  data: LegalSettings
   songOptions?: LicenseSongOption[]
   profileId?: string
 }) {
@@ -34,7 +36,7 @@ export function LicenseBlock({
 
   async function handleGenerate() {
     if (!hasArtistData) {
-      setError("Completa tu nombre y DNI en el editor de este bloque antes de generar licencias.")
+      setError("Completa tu nombre y DNI arriba antes de generar licencias.")
       return
     }
     if (!organizerName.trim()) {
@@ -80,7 +82,7 @@ export function LicenseBlock({
             songs,
           })
         } catch (err) {
-          console.error("[LicenseBlock] No se pudo guardar el historial:", err)
+          logSupabaseError("LicenseTool: no se pudo guardar el historial", err)
         }
       }
     } catch (err) {
@@ -94,7 +96,7 @@ export function LicenseBlock({
     <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
       <h3 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
         <FileCheck2 className="size-5 text-primary" />
-        {data.title || "Generador de Licencias Express"}
+        Generador de Licencias Express
       </h3>
       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
         Genera en segundos una licencia de uso directo para un evento en vivo, autorizada por el propio
@@ -103,8 +105,7 @@ export function LicenseBlock({
 
       {!hasArtistData && (
         <p className="mt-4 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
-          El artista todavía no completó su nombre y DNI en el editor de este bloque — hazlo antes de generar
-          licencias.
+          Completa tu nombre y DNI arriba antes de generar licencias.
         </p>
       )}
 
@@ -143,7 +144,7 @@ export function LicenseBlock({
         <p className="mb-2 text-xs font-medium text-muted-foreground">Canciones a licenciar</p>
         {songOptions.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs italic text-muted-foreground">
-            Agrega canciones en el bloque de música para poder seleccionarlas aquí.
+            Publica tu perfil con al menos una canción para poder seleccionarlas aquí.
           </p>
         ) : (
           <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border p-2">

@@ -12,6 +12,7 @@ export default function ConfigPerfilPage() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [unifiedProfile, setUnifiedProfile] = useState(false);
   const [guardado, setGuardado] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function ConfigPerfilPage() {
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("id, display_name, bio")
+        .select("id, display_name, bio, unified_profile")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -40,6 +41,7 @@ export default function ConfigPerfilPage() {
         setProfileId(profile.id);
         setDisplayName(profile.display_name || "");
         setBio(profile.bio || "");
+        setUnifiedProfile(Boolean(profile.unified_profile));
       } else {
         setProfileId(PROFILE_ID);
       }
@@ -57,6 +59,7 @@ export default function ConfigPerfilPage() {
       .update({
         display_name: displayName.trim(),
         bio: bio.trim(),
+        unified_profile: unifiedProfile,
       })
       .eq("id", profileId);
 
@@ -113,6 +116,31 @@ export default function ConfigPerfilPage() {
               className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500 resize-none"
               placeholder="Escribe algo sobre ti..."
             />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            <div>
+              <p className="text-sm font-medium text-white">Unificar perfil</p>
+              <p className="text-xs text-zinc-400 mt-0.5 max-w-sm">
+                Muestra Merch y Servicios junto con tu Perfil, Canciones y Donaciones en una sola página.
+                Si está desactivado, Merch y Servicios aparecen en una pestaña aparte.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={unifiedProfile}
+              onClick={() => setUnifiedProfile((v) => !v)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                unifiedProfile ? "bg-amber-500" : "bg-zinc-700"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 size-5 rounded-full bg-white transition-transform ${
+                  unifiedProfile ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
           </div>
 
           <div className="flex items-center justify-between pt-2">

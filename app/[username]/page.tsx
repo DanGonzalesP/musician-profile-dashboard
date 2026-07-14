@@ -3,12 +3,19 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block, type TracksData, dbBlockToBlock, getSongOptions } from "@/lib/blocks";
+import { type Block, type BlockType, type TracksData, dbBlockToBlock } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
+import { Store, Home } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
+
+// Perfil "separado" (default): Hero, Track List y Donaciones viven en la
+// página principal; Merch y Servicios quedan en su propia pestaña. Si el
+// artista activa "Unificar perfil" (profiles.unified_profile), se muestran
+// todos los bloques juntos, en el orden guardado, como antes.
+const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "tracks", "donation"];
 
 export default function PerfilPublicoPage() {
   const params = useParams();2
@@ -20,7 +27,8 @@ export default function PerfilPublicoPage() {
   const [state, setState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState("");
-  const [profileId, setProfileId] = useState("");
+  const [unifiedProfile, setUnifiedProfile] = useState(false);
+  const [activeTab, setActiveTab] = useState<"main" | "store">("main");
 
   useEffect(() => {
     setShareUrl(window.location.href);
@@ -46,7 +54,7 @@ export default function PerfilPublicoPage() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, unified_profile")
           .ilike("display_name", displayNameSlug)
           .maybeSingle();
 
@@ -62,7 +70,7 @@ export default function PerfilPublicoPage() {
           return;
         }
 
-        setProfileId(profile.id);
+        setUnifiedProfile(Boolean(profile.unified_profile));
 
         // Cargar bloques del perfil
         const { data: dbBlocks, error: blocksError } = await supabase
@@ -149,12 +157,40 @@ export default function PerfilPublicoPage() {
 
   const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
   const albumCovers = tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? [];
-  const songOptions = getSongOptions(tracksData);
+
+  const mainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type));
+  const storeBlocks = blocks.filter((b) => !MAIN_BLOCK_TYPES.includes(b.type));
+  const showStoreTab = !unifiedProfile && storeBlocks.length > 0;
+  const visibleBlocks = unifiedProfile ? blocks : activeTab === "store" ? storeBlocks : mainBlocks;
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
       <main className="mx-auto flex max-w-5xl flex-col gap-8 animate-fade-in">
-        {blocks.map((block) => (
+        {showStoreTab && (
+          <nav className="mx-auto flex w-fit gap-1 rounded-full border border-border bg-card p-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("main")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === "main" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Home className="size-4" />
+              Inicio
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("store")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === "store" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Store className="size-4" />
+              Merch y Servicios
+            </button>
+          </nav>
+        )}
+        {visibleBlocks.map((block) => (
           <BlockRenderer
             key={block.id}
             block={block}
@@ -162,8 +198,6 @@ export default function PerfilPublicoPage() {
             services={services}
             shareUrl={shareUrl}
             albumCovers={albumCovers}
-            songOptions={songOptions}
-            profileId={profileId}
           />
         ))}
       </main>

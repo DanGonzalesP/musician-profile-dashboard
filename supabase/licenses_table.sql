@@ -25,13 +25,16 @@ create index licenses_profile_id_idx on licenses (profile_id);
 
 alter table licenses enable row level security;
 
--- Cualquiera puede registrar una licencia generada (incluye al organizador
--- anónimo generándola desde la página pública del artista) — el registro es
--- justamente la prueba de que se emitió, sin importar quién la generó.
-create policy "licenses_insert_anyone"
+-- Solo el dueño autenticado del perfil puede registrar una licencia (esta
+-- herramienta vive en /perfil/legal, que ya exige login) — o el perfil
+-- semilla PROFILE_ID para pruebas locales sin cuenta real.
+create policy "licenses_insert_owner"
 on licenses for insert
-to anon, authenticated
-with check (true);
+to authenticated
+with check (
+  profile_id = '00000000-0000-0000-0000-000000000000'
+  or profile_id in (select id from profiles where user_id = auth.uid())
+);
 
 -- Pero el historial solo lo puede LEER el dueño del perfil (o el perfil
 -- semilla PROFILE_ID que usa este proyecto como fallback de demo).

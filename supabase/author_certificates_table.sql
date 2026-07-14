@@ -17,13 +17,15 @@ create index if not exists author_certificates_profile_id_idx on author_certific
 alter table author_certificates enable row level security;
 
 -- Igual que en "licenses": el registro ocurre desde el propio editor del
--- artista (autenticado, o con el perfil semilla PROFILE_ID como fallback de
--- demo), así que el insert se deja abierto y la protección real está en el
--- SELECT.
-create policy "author_certificates_insert_anyone"
+-- artista, autenticado (o con el perfil semilla PROFILE_ID como fallback de
+-- demo) — el insert queda atado al dueño real del perfil.
+create policy "author_certificates_insert_owner"
 on author_certificates for insert
-to anon, authenticated
-with check (true);
+to authenticated
+with check (
+  profile_id = '00000000-0000-0000-0000-000000000000'
+  or profile_id in (select id from profiles where user_id = auth.uid())
+);
 
 -- Solo el dueño del perfil (o el perfil semilla PROFILE_ID) puede ver sus
 -- propios certificados.
