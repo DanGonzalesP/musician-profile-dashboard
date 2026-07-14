@@ -584,7 +584,12 @@ function TracksFields({
 
   const togglePreview = (key: string, url?: string) => {
     if (!url) return
-    if (previewingKey === key) {
+    // Comparar también el src real cargado, no solo la key de posición: si
+    // el artista subió un audio nuevo para esta misma pista, previewingKey
+    // sigue apuntando a esta posición pero el archivo cargado ya es el
+    // viejo — en ese caso el clic debe cargar y sonar el archivo nuevo, no
+    // limitarse a pausar el anterior.
+    if (previewingKey === key && previewAudioRef.current?.src === url) {
       previewAudioRef.current?.pause()
       previewAudioRef.current = null
       setPreviewingKey(null)

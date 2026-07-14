@@ -81,6 +81,12 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   const [carouselPaused, setCarouselPaused] = useState(false)
   const [isClosingPanel, setIsClosingPanel] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  // Guarda qué audioUrl quedó realmente cargado en audioRef — no solo el
+  // índice de la pista. Si el artista sube un archivo nuevo para la misma
+  // posición mientras el panel sigue abierto, el índice no cambia, así que
+  // sin esta referencia el siguiente clic en Play creía que "ya estaba
+  // sonando esa pista" y solo la detenía en vez de cargar el archivo nuevo.
+  const loadedUrlRef = useRef<string | null>(null)
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const switchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const slideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,6 +97,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     audio.pause()
     audio.currentTime = 0
     audioRef.current = null
+    loadedUrlRef.current = null
     setActiveAudio(null)
   }
 
@@ -119,12 +126,14 @@ export function TrackListBlock({ data }: { data: TracksData }) {
       if (withCors) audio.crossOrigin = "anonymous"
       audio.src = track!.audioUrl!
       audioRef.current = audio
+      loadedUrlRef.current = track!.audioUrl!
       setPlayingTrack(trackIndex)
       if (withCors) setActiveAudio(audio)
 
       function giveUp() {
         if (audioRef.current === audio) {
           audioRef.current = null
+          loadedUrlRef.current = null
           setPlayingTrack(null)
           setActiveAudio(null)
         }
@@ -146,6 +155,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
           playTrackAt(albumIndex, nextIndex)
         } else {
           audioRef.current = null
+          loadedUrlRef.current = null
           setPlayingTrack(null)
           setActiveAudio(null)
         }
@@ -210,7 +220,17 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
   function handleTrackClick(albumIndex: number, trackIndex: number) {
     pauseCarouselBriefly()
-    if (panelAlbumIndex === albumIndex && playingTrack === trackIndex) {
+    const track = albums[albumIndex]?.tracks[trackIndex]
+    // Solo se trata como "pausar la pista que ya suena" si el archivo
+    // realmente cargado coincide con el audioUrl actual de esa posición.
+    // Si el artista reemplazó el audio de esa pista, el índice sigue siendo
+    // el mismo pero el archivo cargado ya no coincide — en ese caso el clic
+    // debe cargar y reproducir el archivo nuevo, no solo detener el viejo.
+    const isSameLoadedTrack =
+      panelAlbumIndex === albumIndex &&
+      playingTrack === trackIndex &&
+      loadedUrlRef.current === track?.audioUrl
+    if (isSameLoadedTrack) {
       stopAudio()
       setPlayingTrack(null)
       return
