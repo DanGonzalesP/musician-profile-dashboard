@@ -108,15 +108,14 @@ export function ServiceSkeleton() {
 
 export function DonationSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 via-card/60 to-card/40 p-6 sm:p-8">
-      <div className="mb-5 flex items-center gap-3">
-        <Bone className="size-11 shrink-0 rounded-full" />
-        <Bone className="h-5 w-40" />
-      </div>
-      <Bone className="mb-2 h-3.5 w-full" />
-      <Bone className="mb-5 h-3.5 w-2/3" />
-      <Bone className="mb-5 h-2 w-full rounded-full" />
-      <Bone className="h-10 w-full rounded-lg" />
+    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
+      <Bone className="mb-3 h-3 w-40" />
+      <Bone className="mb-2 h-5 w-48" />
+      <Bone className="mb-1.5 h-3.5 w-full" />
+      <Bone className="mb-4 h-3.5 w-2/3" />
+      <Bone className="mb-2 h-1.5 w-full rounded-full" />
+      <Bone className="mb-4 h-3 w-1/2" />
+      <Bone className="h-9 w-28 rounded-full" />
     </div>
   )
 }

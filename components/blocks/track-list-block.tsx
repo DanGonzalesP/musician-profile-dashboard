@@ -36,7 +36,7 @@ function AlbumCover({
         )}
       </div>
       <p className={`w-full truncate text-center text-xs font-medium ${active ? "text-primary" : "text-foreground"}`}>
-        {album.title || "Untitled Album"}
+        {album.title || "Álbum sin título"}
       </p>
     </button>
   )
@@ -293,7 +293,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <span>{activeAlbum.title || "Untitled Album"}</span>
+                <span>{activeAlbum.title || "Álbum sin título"}</span>
                 <span>
                   {activeAlbum.tracks.length} {activeAlbum.tracks.length === 1 ? "canción" : "canciones"}
                 </span>

@@ -65,8 +65,8 @@ export function CanvasBlock({
           }}
           onDragEnd={onDragEnd}
           onClick={(e) => e.stopPropagation()}
-          title="Drag to reorder"
-          aria-label="Drag to reorder block"
+          title="Arrastrar para reordenar"
+          aria-label="Arrastrar para reordenar bloque"
           className="flex size-7 cursor-grab items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
         >
           <GripVertical className="size-4" />
@@ -76,26 +76,26 @@ export function CanvasBlock({
         <ControlButton
           disabled={index === 0}
           onClick={() => onMove(-1)}
-          title="Move up"
-          label="Move block up"
+          title="Subir"
+          label="Subir bloque"
         >
           <ArrowUp className="size-4" />
         </ControlButton>
         <ControlButton
           disabled={index === total - 1}
           onClick={() => onMove(1)}
-          title="Move down"
-          label="Move block down"
+          title="Bajar"
+          label="Bajar bloque"
         >
           <ArrowDown className="size-4" />
         </ControlButton>
-        <ControlButton onClick={onSelect} title="Edit" label="Edit block">
+        <ControlButton onClick={onSelect} title="Editar" label="Editar bloque">
           <Pencil className="size-4" />
         </ControlButton>
         <ControlButton
           onClick={onDelete}
-          title="Delete"
-          label="Delete block"
+          title="Eliminar"
+          label="Eliminar bloque"
           className="text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
         >
           <Trash2 className="size-4" />

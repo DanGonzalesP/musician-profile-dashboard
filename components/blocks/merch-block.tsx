@@ -17,7 +17,7 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
     <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
       <h3 className="mb-5 flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
         <ShoppingBag className="size-5 text-primary" />
-        {data.title || "Official Merch"}
+        {data.title || "Merch Oficial"}
       </h3>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {productos.map((product, i) => (

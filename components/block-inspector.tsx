@@ -50,9 +50,9 @@ export function BlockInspector({
           <BackToPanelLink />
         </div>
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-          <p className="text-sm font-medium text-foreground">Nothing selected</p>
+          <p className="text-sm font-medium text-foreground">Nada seleccionado</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Select a block on the canvas to edit its content here.
+            Selecciona un bloque en el lienzo para editar su contenido aquí.
           </p>
         </div>
       </div>
@@ -67,13 +67,13 @@ export function BlockInspector({
       <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
         <div>
           <BackToPanelLink />
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary">Editing</p>
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary">Editando</p>
           <p className="text-sm font-semibold text-foreground">{def?.label}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close inspector"
+          aria-label="Cerrar panel de edición"
           className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <X className="size-4" />
@@ -116,7 +116,7 @@ export function BlockInspector({
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
         >
           <Trash2 className="size-4" />
-          Delete block
+          Eliminar bloque
         </button>
       </div>
     </div>
@@ -182,7 +182,7 @@ function ImageUploader({
     <div className="space-y-2">
       {displayUrl && (
         <div className="relative h-20 w-full overflow-hidden rounded-lg border border-sidebar-border bg-muted">
-          <img src={displayUrl} alt="Preview" className="h-full w-full object-cover" />
+          <img src={displayUrl} alt="Vista previa" className="h-full w-full object-cover" />
         </div>
       )}
       <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
@@ -312,7 +312,7 @@ function SocialLinksFields({
           onClick={addSocial}
           className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
         >
-          <Plus className="size-3" /> Add Link
+          <Plus className="size-3" /> Agregar enlace
         </button>
       </div>
 
@@ -366,7 +366,7 @@ function HeroFields({
 }) {
   return (
     <>
-      <Field label="Artist name">
+      <Field label="Nombre del artista">
         <TextInput value={data.name || ""} onChange={(e) => onChange({ ...data, name: e.target.value })} />
       </Field>
       <Field label="Foto de perfil (avatar)">
@@ -383,7 +383,7 @@ function HeroFields({
           blobRegistry={blobRegistry}
         />
       </Field>
-      <Field label="Tagline">
+      <Field label="Frase de presentación">
         <textarea
           value={data.tagline || ""}
           onChange={(e) => onChange({ ...data, tagline: e.target.value })}
@@ -391,14 +391,14 @@ function HeroFields({
           className={inputClass}
         />
       </Field>
-      <Field label="Location">
+      <Field label="Ubicación">
         <TextInput value={data.location || ""} onChange={(e) => onChange({ ...data, location: e.target.value })} />
       </Field>
       <Field label="Oyentes mensuales (opcional)">
         <TextInput
           value={data.monthlyListeners || ""}
           onChange={(e) => onChange({ ...data, monthlyListeners: e.target.value })}
-          placeholder="Ej. 12,400 monthly listeners"
+          placeholder="Ej. 12,400 oyentes mensuales"
         />
       </Field>
       <SocialLinksFields
@@ -463,7 +463,7 @@ function TracksFields({
   }
 
   const addAlbum = () => {
-    const newAlbum: Album = { id: `album-${Date.now()}`, title: "New Album", cover: "", tracks: [] }
+    const newAlbum: Album = { id: `album-${Date.now()}`, title: "Nuevo Álbum", cover: "", tracks: [] }
     updateAlbums([...albums, newAlbum])
     setActiveAlbumId(newAlbum.id)
   }
@@ -540,7 +540,7 @@ function TracksFields({
   const addTrack = (albumIndex: number) => {
     updateAlbums(
       albums.map((a, idx) =>
-        idx === albumIndex ? { ...a, tracks: [...a.tracks, { title: "New Track", duration: "" }] } : a
+        idx === albumIndex ? { ...a, tracks: [...a.tracks, { title: "Nueva Pista", duration: "" }] } : a
       )
     )
   }
@@ -614,7 +614,7 @@ function TracksFields({
           onClick={addAlbum}
           className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
         >
-          <Plus className="size-3" /> Add Album
+          <Plus className="size-3" /> Agregar Álbum
         </button>
       </div>
 
@@ -650,7 +650,7 @@ function TracksFields({
           <div key={activeAlbum.id} className="space-y-3 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-                <Disc3 className="size-3.5" /> Album #{activeAlbumIndex + 1}
+                <Disc3 className="size-3.5" /> Álbum #{activeAlbumIndex + 1}
                 {activeAlbum.isExample && (
                   <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600">
                     Ejemplo
@@ -667,14 +667,14 @@ function TracksFields({
               </button>
             </div>
 
-            <Field label="Album title">
+            <Field label="Título del álbum">
               <TextInput
                 value={activeAlbum.title || ""}
                 onChange={(e) => setAlbum(activeAlbumIndex, { title: e.target.value })}
                 placeholder="Ej. Digital Ethereal"
               />
             </Field>
-            <Field label="Album cover">
+            <Field label="Portada del álbum">
               <ImageUploader
                 currentImageUrl={activeAlbum.cover}
                 onUploadReady={(url) => setAlbum(activeAlbumIndex, { cover: url })}
@@ -683,13 +683,13 @@ function TracksFields({
             </Field>
 
             <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tracks</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pistas</p>
               <button
                 type="button"
                 onClick={() => addTrack(activeAlbumIndex)}
                 className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
               >
-                <Plus className="size-3" /> Add Track
+                <Plus className="size-3" /> Agregar Pista
               </button>
             </div>
 
@@ -809,24 +809,24 @@ function MerchFields({
 
   return (
     <>
-      <Field label="Section title">
+      <Field label="Título de la sección">
         <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Products</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Productos</p>
         <button
           type="button"
           onClick={addProduct}
           className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
         >
-          <Plus className="size-3" /> Add Product
+          <Plus className="size-3" /> Agregar Producto
         </button>
       </div>
       <div className="space-y-4">
         {products.map((product, i) => (
           <div key={product.id} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-muted-foreground">Product #{i + 1}</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">Producto #{i + 1}</span>
               <button
                 type="button"
                 onClick={() => removeProduct(i)}
@@ -835,14 +835,14 @@ function MerchFields({
                 <Trash2 className="size-3.5" />
               </button>
             </div>
-            <Field label="Name">
+            <Field label="Nombre">
               <TextInput
                 value={product.name || ""}
                 onChange={(e) => setProduct(i, { name: e.target.value })}
-                placeholder="Product name"
+                placeholder="Nombre del producto"
               />
             </Field>
-            <Field label="Image">
+            <Field label="Imagen">
               <ImageUploader
                 currentImageUrl={product.imageUrl}
                 onUploadReady={(url) => setProduct(i, { imageUrl: url })}
@@ -850,7 +850,7 @@ function MerchFields({
               />
             </Field>
             <div className="flex gap-2">
-              <Field label="Price">
+              <Field label="Precio">
                 <TextInput
                   value={product.price || ""}
                   onChange={(e) => setProduct(i, { price: e.target.value })}
@@ -903,24 +903,24 @@ function ServiceFields({
 
   return (
     <>
-      <Field label="Section title">
+      <Field label="Título de la sección">
         <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Offers</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ofertas</p>
         <button
           type="button"
           onClick={addService}
           className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
         >
-          <Plus className="size-3" /> Add Offer
+          <Plus className="size-3" /> Agregar Oferta
         </button>
       </div>
       <div className="space-y-3">
         {services.map((service, i) => (
           <div key={service.id} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-muted-foreground">Offer #{i + 1}</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">Oferta #{i + 1}</span>
               <button
                 type="button"
                 onClick={() => removeService(i)}
@@ -932,19 +932,19 @@ function ServiceFields({
             <TextInput
               value={service.title || ""}
               onChange={(e) => setService(i, "title", e.target.value)}
-              placeholder="Service title"
+              placeholder="Título del servicio"
             />
             <TextInput
               value={service.price || ""}
               onChange={(e) => setService(i, "price", e.target.value)}
-              placeholder="Price"
+              placeholder="Precio"
             />
             <textarea
               value={service.description || ""}
               onChange={(e) => setService(i, "description", e.target.value)}
               rows={2}
               className={inputClass}
-              placeholder="Description"
+              placeholder="Descripción"
             />
           </div>
         ))}
@@ -972,7 +972,7 @@ function DonationFields({
         <TextInput
           value={data.title || ""}
           onChange={(e) => onChange({ ...data, title: e.target.value })}
-          placeholder="Support My Music"
+          placeholder="Apoya Mi Música"
         />
       </Field>
       <Field label="Descripción">

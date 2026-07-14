@@ -6,6 +6,12 @@ import { ChevronDown, Plus, GripVertical } from "lucide-react"
 
 const CATEGORIES = ["Layout", "Music", "Commerce"] as const
 
+const CATEGORY_LABELS: Record<(typeof CATEGORIES)[number], string> = {
+  Layout: "Diseño",
+  Music: "Música",
+  Commerce: "Comercio",
+}
+
 type Props = {
   onAdd: (type: BlockType) => void
   onDragStart: (type: BlockType) => void
@@ -32,7 +38,7 @@ export function BlockLibrary({ onAdd, onDragStart, onDragEnd }: Props) {
               className="flex w-full items-center justify-between px-3 py-2.5 text-left"
             >
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {category}
+                {CATEGORY_LABELS[category]}
               </span>
               <ChevronDown
                 className={`size-4 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`}
@@ -65,8 +71,8 @@ export function BlockLibrary({ onAdd, onDragStart, onDragEnd }: Props) {
                       <button
                         type="button"
                         onClick={() => onAdd(block.type)}
-                        title={`Add ${block.label}`}
-                        aria-label={`Add ${block.label}`}
+                        title={`Agregar ${block.label}`}
+                        aria-label={`Agregar ${block.label}`}
                         className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-primary hover:text-primary-foreground group-hover:opacity-100"
                       >
                         <Plus className="size-4" />

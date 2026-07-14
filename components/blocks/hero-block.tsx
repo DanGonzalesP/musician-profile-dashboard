@@ -41,7 +41,7 @@ export function HeroBlock({
       <div className="relative -mt-12 px-6 pb-6 sm:-mt-16 sm:px-8 sm:pb-8">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-end">
           <div className="relative size-24 shrink-0 overflow-hidden rounded-full border-4 border-card shadow-2xl shadow-black/40 sm:size-32">
-            <img src={imagePreview} alt={data.name || "Artist Name"} className="size-full object-cover" />
+            <img src={imagePreview} alt={data.name || "Nombre del Artista"} className="size-full object-cover" />
           </div>
           <div className="flex-1 pb-1 text-center sm:text-left">
             <h2 className="text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl">
@@ -84,7 +84,7 @@ export function HeroBlock({
 
         {socials.length > 0 && (
           <nav
-            aria-label="Social links"
+            aria-label="Redes sociales"
             className="mt-5 flex flex-wrap items-center justify-center gap-2 sm:justify-start"
           >
             {socials.map((social, i) => {

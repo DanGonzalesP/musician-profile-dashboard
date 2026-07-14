@@ -66,7 +66,7 @@ export function PreviewCanvas({
             dropIndex === index ? "opacity-100" : "opacity-0"
           }`}
         >
-          Drop here
+          Soltar aquí
         </span>
       </div>
     </div>
@@ -111,9 +111,9 @@ export function PreviewCanvas({
               <span className="mb-4 flex size-14 items-center justify-center rounded-full bg-accent text-primary">
                 <MousePointerClick className="size-6" />
               </span>
-              <p className="text-sm font-medium text-foreground">Your profile is empty</p>
+              <p className="text-sm font-medium text-foreground">Tu perfil está vacío</p>
               <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
-                Drag blocks from the left panel and drop them here, or hit the plus button to build your artist page.
+                Arrastra bloques desde el panel izquierdo y suéltalos aquí, o usa el botón de más para construir tu página de artista.
               </p>
             </div>
           ) : (

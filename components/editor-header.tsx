@@ -23,21 +23,21 @@ export function EditorHeader({
   return (
     <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-3">
       <div className="text-sm font-semibold">
-        Dashboard <span className="text-muted-foreground font-normal">({blockCount} blocks)</span>
+        Editor <span className="text-muted-foreground font-normal">({blockCount} bloques)</span>
       </div>
       <div className="flex gap-2">
         <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
           Panel Admin
         </Link>
         <Button variant="outline" size="sm" onClick={() => window.open(previewHref, '_blank')}>
-          Preview
+          Vista previa
         </Button>
         <Button
           size="sm"
           onClick={onPublish}
           disabled={isPublishing}
         >
-          {isPublishing ? "Publishing..." : "Publish"}
+          {isPublishing ? "Publicando..." : "Publicar"}
         </Button>
       </div>
     </header>
