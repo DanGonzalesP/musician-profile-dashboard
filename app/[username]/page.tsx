@@ -120,8 +120,8 @@ export default function PerfilPublicoPage() {
   // UI States
   if (state === "loading") {
     return (
-      <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-        <main className="mx-auto max-w-5xl">
+      <div className="min-h-screen bg-background text-foreground px-4 py-6 sm:px-6 sm:py-8">
+        <main className="mx-auto max-w-4xl">
           <ProfileSkeleton />
         </main>
       </div>
@@ -175,8 +175,8 @@ export default function PerfilPublicoPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-      <main className="mx-auto flex max-w-5xl flex-col gap-8 animate-fade-in">
+    <div className="min-h-screen bg-background text-foreground px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 animate-fade-in">
         {unifiedProfile
           ? blocks.map(renderBlock)
           : (
