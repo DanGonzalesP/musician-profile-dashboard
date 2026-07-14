@@ -4,6 +4,14 @@ import { SAMPLE_FEED_TRACKS } from "@/lib/feed/sampleTracks";
 import FeedContainer from "@/components/feed/FeedContainer";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 
+// Sin esto, Next.js pre-renderiza esta página UNA vez en el build y la
+// congela: si en ese momento `music_feed` estaba vacía, quedaba sirviendo
+// SAMPLE_FEED_TRACKS para siempre, sin importar cuántas canciones reales se
+// publicaran después. force-dynamic obliga a re-consultar Supabase en cada
+// visita, para que una canción recién subida reemplace el fallback de
+// inmediato.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const realTracks = await fetchAllPublicFeed();
   const isSampleFeed = realTracks.length === 0;
