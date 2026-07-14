@@ -10,7 +10,7 @@ export default async function HomePage() {
 
   return (
     <main className="relative h-dvh w-full bg-background text-foreground">
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-gradient-to-b from-background/90 to-transparent px-6 py-4">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-linear-to-b from-background/90 to-transparent px-6 py-4">
         <div className="pointer-events-auto flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             D
