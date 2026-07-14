@@ -6,7 +6,7 @@ import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData,
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
 import type { LicenseHistoryEntry } from "@/lib/licenses"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft, FileCheck2, History, Download } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft, FileCheck2, History, Download, ShieldCheck } from "lucide-react"
 
 function BackToPanelLink() {
   return (
@@ -32,6 +32,7 @@ type Props = {
   services: CatalogService[]
   onServicesChange: (services: CatalogService[]) => void
   profileId?: string
+  artistName?: string
 }
 
 export function BlockInspector({
@@ -45,6 +46,7 @@ export function BlockInspector({
   services,
   onServicesChange,
   profileId,
+  artistName,
 }: Props) {
   if (!block) {
     return (
@@ -88,7 +90,13 @@ export function BlockInspector({
           <HeroFields data={block.data as HeroData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "tracks" && (
-          <TracksFields data={block.data as TracksData} onChange={update} blobRegistry={blobRegistry} />
+          <TracksFields
+            data={block.data as TracksData}
+            onChange={update}
+            blobRegistry={blobRegistry}
+            profileId={profileId}
+            artistName={artistName}
+          />
         )}
         {block.type === "merch" && (
           <MerchFields
@@ -207,14 +215,15 @@ function AudioUploader({
   currentAudioUrl,
   blobRegistry,
 }: {
-  onUploadReady: (blobUrl: string) => void
+  onUploadReady: (blobUrl: string, fileHash: string) => void
   currentAudioUrl?: string
   blobRegistry: BlobRegistry
 }) {
   const [fileName, setFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [hashing, setHashing] = useState(false)
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
 
@@ -229,11 +238,25 @@ function AudioUploader({
     }
 
     setError(null)
+
+    // Huella SHA-256 calculada aquí mismo, en el navegador, antes de que el
+    // archivo toque Supabase — es la base del certificado de autoría.
+    setHashing(true)
+    let fileHash = ""
+    try {
+      const { sha256File } = await import("@/lib/audio-hash")
+      fileHash = await sha256File(file)
+    } catch (err) {
+      console.error("[AudioUploader] No se pudo calcular el hash SHA-256:", err)
+    } finally {
+      setHashing(false)
+    }
+
     const blobUrl = URL.createObjectURL(file)
     blobRegistry.current.set(blobUrl, file)
 
     setFileName(file.name)
-    onUploadReady(blobUrl)
+    onUploadReady(blobUrl, fileHash)
     e.target.value = ""
   }
 
@@ -248,6 +271,7 @@ function AudioUploader({
           <span className="truncate">{displayName}</span>
         </p>
       )}
+      {hashing && <p className="text-[11px] text-muted-foreground">Calculando huella digital SHA-256...</p>}
       {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
       <label
         className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -435,10 +459,14 @@ function TracksFields({
   data,
   onChange,
   blobRegistry,
+  profileId,
+  artistName,
 }: {
   data: TracksData
   onChange: (d: TracksData) => void
   blobRegistry: BlobRegistry
+  profileId?: string
+  artistName?: string
 }) {
   const albums = data.albums || []
   const previewAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -543,7 +571,7 @@ function TracksFields({
     )
   }
 
-  const handleAudioUploaded = async (albumIndex: number, trackIndex: number, url: string) => {
+  const handleAudioUploaded = async (albumIndex: number, trackIndex: number, url: string, fileHash: string) => {
     // Ambos campos se guardan juntos en una sola actualización. Si se guardaran
     // por separado (audioUrl primero, duration después de esperar la metadata),
     // el segundo guardado usaría una copia vieja del estado y borraría la URL
@@ -563,7 +591,9 @@ function TracksFields({
         ? {
             ...a,
             isExample: false,
-            tracks: a.tracks.map((t, tIdx) => (tIdx === trackIndex ? { ...t, audioUrl: url, duration } : t)),
+            tracks: a.tracks.map((t, tIdx) =>
+              tIdx === trackIndex ? { ...t, audioUrl: url, duration, fileHash } : t
+            ),
           }
         : a
     )
@@ -741,8 +771,14 @@ function TracksFields({
                     </div>
                     <AudioUploader
                       currentAudioUrl={track.audioUrl}
-                      onUploadReady={(url) => handleAudioUploaded(activeAlbumIndex, trackIndex, url)}
+                      onUploadReady={(url, hash) => handleAudioUploaded(activeAlbumIndex, trackIndex, url, hash)}
                       blobRegistry={blobRegistry}
+                    />
+                    <CertificateButton
+                      profileId={profileId}
+                      artistName={artistName}
+                      songTitle={track.title}
+                      fileHash={track.fileHash}
                     />
                     <textarea
                       value={track.description || ""}
@@ -765,6 +801,71 @@ function TracksFields({
         )}
       </div>
     </>
+  )
+}
+
+// ─── CertificateButton — certificado de autoría (marcado de tiempo) ───────
+
+function CertificateButton({
+  profileId,
+  artistName,
+  songTitle,
+  fileHash,
+}: {
+  profileId?: string
+  artistName?: string
+  songTitle: string
+  fileHash?: string
+}) {
+  const [status, setStatus] = useState<"idle" | "loading" | "not-registered" | "error">("idle")
+
+  if (!fileHash) return null
+
+  async function handleClick() {
+    if (!profileId) {
+      setStatus("not-registered")
+      return
+    }
+    setStatus("loading")
+    try {
+      const { fetchCertificateByHash } = await import("@/lib/author-certificates")
+      const cert = await fetchCertificateByHash(profileId, fileHash as string)
+      if (!cert) {
+        setStatus("not-registered")
+        return
+      }
+      const { generateAuthorshipCertificatePdf } = await import("@/lib/generate-authorship-certificate-pdf")
+      generateAuthorshipCertificatePdf({
+        artistName: artistName || "—",
+        songTitle: songTitle || cert.songTitle,
+        fileHash: cert.fileHash,
+        registeredAt: cert.createdAt,
+      })
+      setStatus("idle")
+    } catch (err) {
+      console.error("[CertificateButton] Error obteniendo el certificado:", err)
+      setStatus("error")
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={status === "loading"}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-600 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <ShieldCheck className="size-3.5" />
+        {status === "loading" ? "Buscando registro..." : "Descargar Certificado de Autoría"}
+      </button>
+      {status === "not-registered" && (
+        <p className="text-[10px] italic text-muted-foreground">
+          Todavía no está registrado — publica tu perfil para fijar la fecha oficial del certificado.
+        </p>
+      )}
+      {status === "error" && <p className="text-[10px] text-destructive">No se pudo obtener el certificado.</p>}
+    </div>
   )
 }
 

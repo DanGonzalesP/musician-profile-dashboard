@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { type Block, type BlockType, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks"
+import { type Block, type BlockType, type HeroData, type TracksData, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog } from "@/lib/catalog"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
@@ -393,6 +393,32 @@ export function ProfileEditor() {
 
       if (blocksError) throw blocksError
 
+      // 4.5. Registrar el marcado de tiempo (certificado de autoría) de cada
+      // pista que ya tiene huella SHA-256 calculada. Es "best effort": si
+      // falla, no debe tumbar la publicación — el certificado simplemente
+      // quedaría pendiente para el próximo publish. recordAuthorCertificate
+      // ya es idempotente (ignora el conflicto si ya estaba registrado).
+      const tracksBlocks = publishBlocks.filter((b) => b.type === "tracks")
+      if (tracksBlocks.length > 0) {
+        const { recordAuthorCertificate } = await import("@/lib/author-certificates")
+        for (const block of tracksBlocks) {
+          const albums = (block.data as TracksData).albums ?? []
+          for (const album of albums) {
+            for (const track of album.tracks) {
+              if (!track.fileHash) continue
+              try {
+                await recordAuthorCertificate(profileId, {
+                  songTitle: track.title || "Sin título",
+                  fileHash: track.fileHash,
+                })
+              } catch (err) {
+                console.error("[handlePublish] No se pudo registrar el certificado de autoría:", err)
+              }
+            }
+          }
+        }
+      }
+
       // 5. Publicar catálogo de productos y servicios
       await publishCatalog(profileId, products, services)
 
@@ -579,6 +605,7 @@ export function ProfileEditor() {
                 services={services}
                 onServicesChange={setServices}
                 profileId={profileIdRef.current ?? undefined}
+                artistName={(blocks.find((b) => b.type === "hero")?.data as HeroData | undefined)?.name}
               />
             </aside>
           </>

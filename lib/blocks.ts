@@ -19,6 +19,9 @@ export type Track = {
   audioUrl?: string
   description?: string
   image?: string
+  // Huella SHA-256 del archivo de audio, calculada en el navegador al
+  // subirlo — sirve de base para el certificado de autoría (marcado de tiempo).
+  fileHash?: string
 }
 
 export type Album = {
@@ -238,6 +241,7 @@ function normalizeTrack(raw: unknown): Track {
     audioUrl: t.audioUrl ? String(t.audioUrl) : undefined,
     description: t.description ? String(t.description) : undefined,
     image: t.image ? String(t.image) : undefined,
+    fileHash: t.fileHash ? String(t.fileHash) : undefined,
   }
 }
 
