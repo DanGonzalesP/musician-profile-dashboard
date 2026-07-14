@@ -12,7 +12,6 @@ interface TrackScreenProps {
   isSample: boolean;
   isActive: boolean;
   isPlaying: boolean;
-  needsTap: boolean;
   currentTime: number;
   duration: number;
   isLiked: boolean;
@@ -27,7 +26,6 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
     isSample,
     isActive,
     isPlaying,
-    needsTap,
     currentTime,
     duration,
     isLiked,
@@ -61,7 +59,6 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
           coverImageUrl={track.coverImageUrl}
           isActive={isActive}
           isPlaying={isPlaying}
-          needsTap={needsTap}
           onTap={onTogglePlay}
         />
 

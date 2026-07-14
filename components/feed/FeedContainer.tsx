@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeedTrack } from "@/lib/musicFeed";
-import { setActiveAudio } from "@/lib/audio-bus";
 import TrackScreen from "./TrackScreen";
 
 interface FeedContainerProps {
@@ -21,7 +20,6 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const [needsTap, setNeedsTap] = useState(false);
 
   const activeTrack = tracks[activeIndex];
 
@@ -46,49 +44,20 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !activeTrack) return;
-    let fallbackTried = false;
-
-    // Se intenta primero con crossOrigin habilitado (necesario para el fondo
-    // audio-reactivo). Si el host del audio no soporta CORS, la carga falla
-    // por completo — se reintenta UNA vez sin crossOrigin para no romper la
-    // reproducción; esa pista simplemente no alimentará el fondo reactivo.
-    function loadAndPlay(withCors: boolean) {
-      if (!audio) return;
-      audio.crossOrigin = withCors ? "anonymous" : "";
-      audio.src = activeTrack!.audioUrl;
-      audio.currentTime = 0;
-      setCurrentTime(0);
-      setDuration(0);
-      audio
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          setNeedsTap(false);
-        })
-        .catch(() => {
-          setIsPlaying(false);
-          setNeedsTap(true);
-        });
-    }
-
-    function handleError() {
-      if (fallbackTried) return;
-      fallbackTried = true;
-      loadAndPlay(false);
-    }
-
-    audio.addEventListener("error", handleError);
-    loadAndPlay(true);
-
-    return () => {
-      audio.removeEventListener("error", handleError);
-    };
+    audio.src = activeTrack.audioUrl;
+    audio.currentTime = 0;
+    setCurrentTime(0);
+    setDuration(0);
+    audio
+      .play()
+      .then(() => {
+        setIsPlaying(true);
+      })
+      .catch(() => {
+        setIsPlaying(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, activeTrack?.audioUrl]);
-
-  useEffect(() => {
-    setActiveAudio(isPlaying ? audioRef.current : null);
-  }, [isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -119,11 +88,8 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
     if (audio.paused) {
       audio
         .play()
-        .then(() => {
-          setIsPlaying(true);
-          setNeedsTap(false);
-        })
-        .catch(() => setNeedsTap(true));
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false));
     } else {
       audio.pause();
       setIsPlaying(false);
@@ -167,7 +133,6 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
           isSample={isSampleFeed}
           isActive={index === activeIndex}
           isPlaying={index === activeIndex && isPlaying}
-          needsTap={index === activeIndex && needsTap}
           currentTime={index === activeIndex ? currentTime : 0}
           duration={index === activeIndex ? duration : track.durationSeconds ?? 0}
           isLiked={likedIds.has(track.id)}

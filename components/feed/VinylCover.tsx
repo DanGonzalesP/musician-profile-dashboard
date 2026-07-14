@@ -8,7 +8,6 @@ interface VinylCoverProps {
   coverImageUrl?: string;
   isActive: boolean;
   isPlaying: boolean;
-  needsTap: boolean;
   onTap: () => void;
 }
 
@@ -18,7 +17,6 @@ export default function VinylCover({
   coverImageUrl,
   isActive,
   isPlaying,
-  needsTap,
   onTap,
 }: VinylCoverProps) {
   const [phase, setPhase] = useState<Phase>(isActive ? "entering" : "idle");
@@ -78,12 +76,6 @@ export default function VinylCover({
       {!isPlaying && (
         <span className="absolute inset-0 flex items-center justify-center rounded-full bg-background/30 opacity-0 transition-opacity group-hover:opacity-100">
           <Play className="h-10 w-10 fill-primary-foreground text-primary-foreground" />
-        </span>
-      )}
-
-      {needsTap && (
-        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-          Toca para reproducir
         </span>
       )}
     </button>
