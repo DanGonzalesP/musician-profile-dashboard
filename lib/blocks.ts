@@ -61,6 +61,9 @@ export type DonationData = {
   buttonUrl: string
   goalAmount: string
   currency: string
+  // Monto acumulado y fecha límite de la campaña de apoyo (estilo Kickstarter).
+  currentAmount: string
+  deadline: string
 }
 
 export type LicenseSongOption = { id: string; label: string }
@@ -212,6 +215,8 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         buttonUrl: String(content.buttonUrl ?? ""),
         goalAmount: String(content.goalAmount ?? ""),
         currency: String(content.currency ?? "USD"),
+        currentAmount: String(content.currentAmount ?? "0"),
+        deadline: content.deadline ? String(content.deadline) : "",
       }
   }
 }
@@ -362,12 +367,14 @@ function defaultData(type: BlockType): BlockData {
       }
     case "donation":
       return {
-        title: "Support My Music",
-        description: "Every contribution helps me create more music, tour, and connect with fans like you.",
-        buttonText: "Support Now",
+        title: "Apoya Mi Música",
+        description: "Cada aporte me ayuda a crear más música, girar y conectar con fans como tú.",
+        buttonText: "Apoyar",
         buttonUrl: "",
-        goalAmount: "",
+        goalAmount: "1000",
         currency: "USD",
+        currentAmount: "0",
+        deadline: "",
       }
   }
 }

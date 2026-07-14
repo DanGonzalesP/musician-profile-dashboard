@@ -1001,9 +1001,29 @@ function DonationFields({
         </Field>
         <Field label="Meta de recaudación">
           <TextInput
+            type="number"
+            min="0"
             value={data.goalAmount || ""}
             onChange={(e) => onChange({ ...data, goalAmount: e.target.value })}
-            placeholder="500 (opcional)"
+            placeholder="1000"
+          />
+        </Field>
+      </div>
+      <div className="flex gap-2">
+        <Field label="Monto ya recaudado">
+          <TextInput
+            type="number"
+            min="0"
+            value={data.currentAmount || "0"}
+            onChange={(e) => onChange({ ...data, currentAmount: e.target.value })}
+            placeholder="0"
+          />
+        </Field>
+        <Field label="Fecha límite">
+          <TextInput
+            type="date"
+            value={data.deadline || ""}
+            onChange={(e) => onChange({ ...data, deadline: e.target.value })}
           />
         </Field>
       </div>
