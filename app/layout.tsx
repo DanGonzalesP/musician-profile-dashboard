@@ -1,9 +1,11 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist_Mono, Plus_Jakarta_Sans, Unbounded } from 'next/font/google'
 import './globals.css'
+import { ThemeScript } from '@/components/theme-script'
 
-const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
+const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta' })
+const unbounded = Unbounded({ subsets: ['latin'], variable: '--font-unbounded' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
@@ -40,7 +42,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`dark bg-background ${geistSans.variable} ${geistMono.variable}`}>
+    <html
+      lang="es"
+      className={`bg-background ${jakarta.variable} ${unbounded.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <ThemeScript />
+      </head>
       <body className="font-sans antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}

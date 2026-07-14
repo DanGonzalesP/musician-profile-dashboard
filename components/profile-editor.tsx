@@ -617,11 +617,11 @@ export function ProfileEditor() {
         <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar sm:w-72 lg:w-80">
           <div className="flex items-center gap-2 border-b border-sidebar-border px-4 py-3">
             <Layers className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Blocks</h2>
+            <h2 className="text-sm font-semibold text-foreground">Bloques</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-              Drag a block onto your profile, or press the plus button to append it.
+              Arrastra un bloque a tu perfil, o presiona el botón de más para agregarlo.
             </p>
             <BlockLibrary
               onAdd={addBlock}
@@ -635,8 +635,8 @@ export function ProfileEditor() {
         <main className="relative flex-1 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklch,var(--primary)_8%,transparent),transparent_60%)] p-4 sm:p-6 lg:p-8">
           <div className="mx-auto mb-5 flex max-w-2xl items-center justify-between">
             <div>
-              <h1 className="text-lg font-semibold text-foreground">Live Preview</h1>
-              <p className="text-xs text-muted-foreground">This is how fans will see your page.</p>
+              <h1 className="text-lg font-semibold text-foreground">Vista en vivo</h1>
+              <p className="text-xs text-muted-foreground">Así es como los fans verán tu página.</p>
             </div>
           </div>
           <PreviewCanvas

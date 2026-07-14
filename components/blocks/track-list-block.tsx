@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react"
 import { Play, Pause, Music } from "lucide-react"
 import type { TracksData, Album } from "@/lib/blocks"
+import { setActiveAudio } from "@/lib/audio-bus"
+import { useLocale } from "@/components/locale-provider"
 
 function AlbumCover({
   album,
@@ -13,6 +15,7 @@ function AlbumCover({
   active: boolean
   onClick: () => void
 }) {
+  const { t } = useLocale()
   return (
     <button
       type="button"
@@ -23,7 +26,7 @@ function AlbumCover({
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-md shadow-md">
         {album.cover ? (
-          <img src={album.cover} alt={album.title || "Album cover"} className="h-full w-full object-cover" />
+          <img src={album.cover} alt={album.title || t("album_cover_alt")} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-muted">
             <Music className="size-8 text-muted-foreground/40" />
@@ -31,12 +34,12 @@ function AlbumCover({
         )}
         {album.isExample && (
           <span className="absolute left-1 top-1 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white">
-            Ejemplo
+            {t("example_badge")}
           </span>
         )}
       </div>
       <p className={`w-full truncate text-center text-xs font-medium ${active ? "text-primary" : "text-foreground"}`}>
-        {album.title || "Álbum sin título"}
+        {album.title || t("album_untitled")}
       </p>
     </button>
   )
@@ -67,6 +70,7 @@ function TypewriterText({ text }: { text: string }) {
 }
 
 export function TrackListBlock({ data }: { data: TracksData }) {
+  const { t } = useLocale()
   const albums = data.albums || []
   // selectedAlbum: cuál álbum debe estar en la posición izquierda del carrusel.
   // panelAlbumIndex: cuál álbum tiene su panel/vinilo realmente desplegado.
@@ -87,6 +91,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     audio.pause()
     audio.currentTime = 0
     audioRef.current = null
+    setActiveAudio(null)
   }
 
   // El carrusel se pausa mientras el usuario interactúa y se reanuda solo
@@ -102,32 +107,54 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     if (!track?.audioUrl) return
 
     stopAudio()
-    const audio = new Audio(track.audioUrl)
-    audioRef.current = audio
-    setPlayingTrack(trackIndex)
+    let fallbackTried = false
 
-    audio.onended = () => {
-      const tracks = albums[albumIndex]?.tracks || []
-      const nextIndex = tracks.findIndex((t, idx) => idx > trackIndex && Boolean(t.audioUrl))
-      if (nextIndex >= 0) {
-        playTrackAt(albumIndex, nextIndex)
-      } else {
-        audioRef.current = null
-        setPlayingTrack(null)
+    // Se intenta primero con crossOrigin habilitado (necesario para que el
+    // fondo audio-reactivo pueda leer las frecuencias). Si el host del audio
+    // no soporta CORS, la carga falla por completo (no solo el análisis) —
+    // en ese caso se reintenta UNA vez sin crossOrigin para no romper la
+    // reproducción; esa pista simplemente no alimentará el fondo reactivo.
+    function createAndPlay(withCors: boolean) {
+      const audio = new Audio()
+      if (withCors) audio.crossOrigin = "anonymous"
+      audio.src = track!.audioUrl!
+      audioRef.current = audio
+      setPlayingTrack(trackIndex)
+      if (withCors) setActiveAudio(audio)
+
+      function giveUp() {
+        if (audioRef.current === audio) {
+          audioRef.current = null
+          setPlayingTrack(null)
+          setActiveAudio(null)
+        }
       }
+
+      function retryOrGiveUp() {
+        if (withCors && !fallbackTried) {
+          fallbackTried = true
+          createAndPlay(false)
+          return
+        }
+        giveUp()
+      }
+
+      audio.onended = () => {
+        const tracks = albums[albumIndex]?.tracks || []
+        const nextIndex = tracks.findIndex((t, idx) => idx > trackIndex && Boolean(t.audioUrl))
+        if (nextIndex >= 0) {
+          playTrackAt(albumIndex, nextIndex)
+        } else {
+          audioRef.current = null
+          setPlayingTrack(null)
+          setActiveAudio(null)
+        }
+      }
+      audio.onerror = retryOrGiveUp
+      audio.play().catch(retryOrGiveUp)
     }
-    audio.onerror = () => {
-      if (audioRef.current === audio) {
-        audioRef.current = null
-        setPlayingTrack(null)
-      }
-    }
-    audio.play().catch(() => {
-      if (audioRef.current === audio) {
-        audioRef.current = null
-        setPlayingTrack(null)
-      }
-    })
+
+    createAndPlay(true)
   }
 
   function dropVinylFor(index: number) {
@@ -207,7 +234,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   if (albums.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
-        No hay álbumes publicados todavía.
+        {t("discography_empty")}
       </div>
     )
   }
@@ -226,7 +253,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
       <div className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Discografía
+        {t("discography_title")}
       </div>
 
       {/* Carrusel infinito de álbumes */}
@@ -293,9 +320,9 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <span>{activeAlbum.title || "Álbum sin título"}</span>
+                <span>{activeAlbum.title || t("album_untitled")}</span>
                 <span>
-                  {activeAlbum.tracks.length} {activeAlbum.tracks.length === 1 ? "canción" : "canciones"}
+                  {activeAlbum.tracks.length} {t(activeAlbum.tracks.length === 1 ? "song_one" : "song_other")}
                 </span>
               </div>
 
@@ -338,9 +365,9 @@ export function TrackListBlock({ data }: { data: TracksData }) {
                           {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                         </span>
                         <span className={`flex-1 truncate text-sm ${isPlaying ? "font-medium text-primary" : "text-foreground"}`}>
-                          {track.title || "Nueva Pista"}
+                          {track.title || t("track_untitled")}
                         </span>
-                        {!hasAudio && <span className="text-[10px] italic text-muted-foreground/50">sin audio</span>}
+                        {!hasAudio && <span className="text-[10px] italic text-muted-foreground/50">{t("track_no_audio")}</span>}
                         <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
                           {track.duration || "—"}
                         </span>

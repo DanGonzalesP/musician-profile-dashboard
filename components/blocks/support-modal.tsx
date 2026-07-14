@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Heart, X } from "lucide-react"
+import { useLocale } from "@/components/locale-provider"
 
 const SUGGESTED_AMOUNTS = [5, 10, 25, 50]
 
@@ -14,6 +15,7 @@ export function SupportModal({
   onClose: () => void
   onConfirm: (amount: number) => void
 }) {
+  const { t } = useLocale()
   const [selected, setSelected] = useState<number | null>(SUGGESTED_AMOUNTS[1])
   const [customAmount, setCustomAmount] = useState("")
   const [confirmed, setConfirmed] = useState(false)
@@ -37,12 +39,12 @@ export function SupportModal({
         <div className="mb-4 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
             <Heart className="size-5 text-primary" />
-            Apoyar campaña
+            {t("modal_title")}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t("common_close")}
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
@@ -54,17 +56,14 @@ export function SupportModal({
             <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Heart className="size-6" />
             </span>
-            <p className="text-sm font-medium text-foreground">¡Gracias por tu apoyo simulado!</p>
-            <p className="text-xs text-muted-foreground">La barra de progreso ya se actualizó.</p>
+            <p className="text-sm font-medium text-foreground">{t("modal_thanks_title")}</p>
+            <p className="text-xs text-muted-foreground">{t("modal_thanks_sub")}</p>
           </div>
         ) : (
           <>
-            <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-              Esta es una simulación: todavía no está conectada una pasarela de pago real, pero puedes
-              probar aquí mismo cómo se vería el flujo de apoyo completo.
-            </p>
+            <p className="mb-4 text-xs leading-relaxed text-muted-foreground">{t("modal_intro")}</p>
 
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Elige un monto</p>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">{t("modal_choose_amount")}</p>
             <div className="mb-3 grid grid-cols-4 gap-2">
               {SUGGESTED_AMOUNTS.map((value) => (
                 <button
@@ -87,7 +86,7 @@ export function SupportModal({
 
             <label className="mb-4 block space-y-1.5">
               <span className="block text-xs font-medium text-muted-foreground">
-                O escribe otro monto ({currency})
+                {t("modal_custom_amount", { currency })}
               </span>
               <input
                 type="number"
@@ -97,7 +96,7 @@ export function SupportModal({
                   setCustomAmount(e.target.value)
                   setSelected(null)
                 }}
-                placeholder="Ej: 15"
+                placeholder={t("modal_placeholder")}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/25"
               />
             </label>
@@ -109,7 +108,8 @@ export function SupportModal({
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Heart className="size-4" />
-              Confirmar pago simulado{isValid ? ` (${currency} ${amount})` : ""}
+              {t("modal_confirm")}
+              {isValid ? ` (${currency} ${amount})` : ""}
             </button>
           </>
         )}

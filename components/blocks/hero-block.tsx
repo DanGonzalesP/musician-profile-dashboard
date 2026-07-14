@@ -4,6 +4,7 @@ import { useState } from "react"
 import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2 } from "lucide-react"
 import type { HeroData, SocialPlatform } from "@/lib/blocks"
 import { ShareProfileDialog } from "./share-profile-dialog"
+import { useLocale } from "@/components/locale-provider"
 
 export const socialIcons: Record<SocialPlatform, typeof Camera> = {
   instagram: Camera,
@@ -22,6 +23,7 @@ export function HeroBlock({
   shareUrl?: string
   albumCovers?: string[]
 }) {
+  const { t } = useLocale()
   const imagePreview = data.image || "/placeholder.svg"
   const socials = data.socials || []
   const [shareOpen, setShareOpen] = useState(false)
@@ -41,11 +43,11 @@ export function HeroBlock({
       <div className="relative -mt-12 px-6 pb-6 sm:-mt-16 sm:px-8 sm:pb-8">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-end">
           <div className="relative size-24 shrink-0 overflow-hidden rounded-full border-4 border-card shadow-2xl shadow-black/40 sm:size-32">
-            <img src={imagePreview} alt={data.name || "Nombre del Artista"} className="size-full object-cover" />
+            <img src={imagePreview} alt={data.name || t("hero_artist_name_fallback")} className="size-full object-cover" />
           </div>
           <div className="flex-1 pb-1 text-center sm:text-left">
-            <h2 className="text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl">
-              {data.name || "Nombre del Artista"}
+            <h2 className="font-display text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl">
+              {data.name || t("hero_artist_name_fallback")}
             </h2>
             <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground sm:justify-start">
               {data.location && (
@@ -77,14 +79,14 @@ export function HeroBlock({
               className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-accent"
             >
               <Share2 className="size-4" />
-              Compartir perfil
+              {t("hero_share")}
             </button>
           )}
         </div>
 
         {socials.length > 0 && (
           <nav
-            aria-label="Redes sociales"
+            aria-label={t("hero_social_aria")}
             className="mt-5 flex flex-wrap items-center justify-center gap-2 sm:justify-start"
           >
             {socials.map((social, i) => {

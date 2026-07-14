@@ -5,6 +5,7 @@ import QRCode from "qrcode"
 import { X, Copy, Check, Download, MapPin, Image as ImageIcon } from "lucide-react"
 import type { HeroData } from "@/lib/blocks"
 import { socialIcons } from "./hero-block"
+import { useLocale } from "@/components/locale-provider"
 
 type ImageCandidate = {
   key: string
@@ -12,12 +13,16 @@ type ImageCandidate = {
   url?: string
 }
 
-function useQrCandidates(data: HeroData, albumCovers: string[]): ImageCandidate[] {
-  const candidates: ImageCandidate[] = [{ key: "none", label: "Sin imagen" }]
-  if (data.image) candidates.push({ key: "avatar", label: "Foto de perfil", url: data.image })
+function useQrCandidates(
+  data: HeroData,
+  albumCovers: string[],
+  t: (key: string, vars?: Record<string, string | number>) => string
+): ImageCandidate[] {
+  const candidates: ImageCandidate[] = [{ key: "none", label: t("share_no_image") }]
+  if (data.image) candidates.push({ key: "avatar", label: t("share_profile_photo"), url: data.image })
   if (data.banner) candidates.push({ key: "banner", label: "Banner", url: data.banner })
   albumCovers.forEach((url, i) => {
-    if (url) candidates.push({ key: `album-${i}`, label: `Portada ${i + 1}`, url })
+    if (url) candidates.push({ key: `album-${i}`, label: t("share_cover", { n: i + 1 }), url })
   })
   return candidates
 }
@@ -33,7 +38,8 @@ export function ShareProfileDialog({
   albumCovers: string[]
   onClose: () => void
 }) {
-  const candidates = useQrCandidates(data, albumCovers)
+  const { t } = useLocale()
+  const candidates = useQrCandidates(data, albumCovers, t)
   const [selectedKey, setSelectedKey] = useState(candidates[1]?.key ?? "none")
   const [copied, setCopied] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -123,11 +129,11 @@ export function ShareProfileDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold tracking-tight text-foreground">Compartir perfil</h3>
+          <h3 className="text-lg font-semibold tracking-tight text-foreground">{t("share_dialog_title")}</h3>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t("common_close")}
             className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
@@ -142,7 +148,7 @@ export function ShareProfileDialog({
         {/* Selector de imagen para el centro del QR */}
         <div className="mt-4">
           <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            <ImageIcon className="size-3.5" /> Imagen dentro del QR
+            <ImageIcon className="size-3.5" /> {t("share_qr_image_label")}
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {candidates.map((c) => (
@@ -173,7 +179,7 @@ export function ShareProfileDialog({
             <img src={data.image} alt="" className="size-12 shrink-0 rounded-full object-cover" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-foreground">{data.name || "Nombre del artista"}</p>
+            <p className="truncate text-sm font-semibold text-foreground">{data.name || t("share_artist_name_fallback")}</p>
             <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
               {data.location && (
                 <span className="inline-flex items-center gap-1">
@@ -221,7 +227,7 @@ export function ShareProfileDialog({
             className="flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-            {copied ? "¡Copiado!" : "Copiar link"}
+            {copied ? t("share_copied") : t("share_copy_link")}
           </button>
           <button
             type="button"
@@ -229,7 +235,7 @@ export function ShareProfileDialog({
             className="flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             <Download className="size-4" />
-            Descargar QR
+            {t("share_download_qr")}
           </button>
         </div>
       </div>

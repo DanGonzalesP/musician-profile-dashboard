@@ -40,7 +40,7 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
   return (
     <section
       ref={ref}
-      className="relative flex h-dvh w-full snap-start snap-always items-center justify-center overflow-hidden bg-background px-6 pb-28 pt-24"
+      className="relative flex h-dvh w-full snap-start snap-always items-center justify-center overflow-hidden px-6 pb-28 pt-24"
     >
       {track.coverImageUrl && (
         <div
@@ -49,12 +49,6 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
           style={{ backgroundImage: `url(${track.coverImageUrl})` }}
         />
       )}
-      <div
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          backgroundImage: "linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0.7), rgba(255,255,255,1))",
-        }}
-      />
 
       <div className="flex w-full max-w-sm flex-col items-center gap-6 sm:max-w-md">
         {isSample && (

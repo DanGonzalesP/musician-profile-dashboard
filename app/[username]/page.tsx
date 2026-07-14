@@ -7,6 +7,9 @@ import { type Block, type BlockType, type TracksData, dbBlockToBlock, isKnownBlo
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
+import { AudioReactiveBackground } from "@/components/audio-reactive-background";
+import { LocaleProvider, useLocale } from "@/components/locale-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Store, Home } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
@@ -18,7 +21,16 @@ type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "tracks", "donation"];
 
 export default function PerfilPublicoPage() {
-  const params = useParams();2
+  return (
+    <LocaleProvider>
+      <PerfilPublicoContent />
+    </LocaleProvider>
+  );
+}
+
+function PerfilPublicoContent() {
+  const { t } = useLocale();
+  const params = useParams();
   const username = (params?.username as string)?.trim().toLowerCase();
 
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -175,8 +187,12 @@ export default function PerfilPublicoPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-4 py-6 sm:px-6 sm:py-8">
+    <div className="min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8">
+      <AudioReactiveBackground />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 animate-fade-in">
+        <div className="flex justify-end">
+          <LanguageSwitcher />
+        </div>
         {unifiedProfile
           ? blocks.map(renderBlock)
           : (
@@ -194,7 +210,7 @@ export default function PerfilPublicoPage() {
                     }`}
                   >
                     <Home className="size-4" />
-                    Inicio
+                    {t("tab_home")}
                   </button>
                   <button
                     type="button"
@@ -206,7 +222,7 @@ export default function PerfilPublicoPage() {
                     }`}
                   >
                     <Store className="size-4" />
-                    Merch y Servicios
+                    {t("tab_store")}
                   </button>
                 </div>
               )}

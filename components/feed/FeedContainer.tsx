@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeedTrack } from "@/lib/musicFeed";
+import { setActiveAudio } from "@/lib/audio-bus";
 import TrackScreen from "./TrackScreen";
 
 interface FeedContainerProps {
@@ -45,22 +46,49 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !activeTrack) return;
-    audio.src = activeTrack.audioUrl;
-    audio.currentTime = 0;
-    setCurrentTime(0);
-    setDuration(0);
-    audio
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-        setNeedsTap(false);
-      })
-      .catch(() => {
-        setIsPlaying(false);
-        setNeedsTap(true);
-      });
+    let fallbackTried = false;
+
+    // Se intenta primero con crossOrigin habilitado (necesario para el fondo
+    // audio-reactivo). Si el host del audio no soporta CORS, la carga falla
+    // por completo — se reintenta UNA vez sin crossOrigin para no romper la
+    // reproducción; esa pista simplemente no alimentará el fondo reactivo.
+    function loadAndPlay(withCors: boolean) {
+      if (!audio) return;
+      audio.crossOrigin = withCors ? "anonymous" : "";
+      audio.src = activeTrack!.audioUrl;
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      setDuration(0);
+      audio
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+          setNeedsTap(false);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setNeedsTap(true);
+        });
+    }
+
+    function handleError() {
+      if (fallbackTried) return;
+      fallbackTried = true;
+      loadAndPlay(false);
+    }
+
+    audio.addEventListener("error", handleError);
+    loadAndPlay(true);
+
+    return () => {
+      audio.removeEventListener("error", handleError);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, activeTrack?.audioUrl]);
+
+  useEffect(() => {
+    setActiveAudio(isPlaying ? audioRef.current : null);
+  }, [isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;

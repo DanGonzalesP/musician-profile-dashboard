@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PROFILE_ID } from "@/lib/blocks";
 import LayoutAdmin from "@/components/LayoutAdmin";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Loader2 } from "lucide-react";
 
 export default function ConfigPerfilPage() {
@@ -94,6 +95,8 @@ export default function ConfigPerfilPage() {
             {errorMensaje}
           </div>
         )}
+
+        <ThemeToggle />
 
         <form onSubmit={guardarCambios} className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 space-y-4">
           <div>

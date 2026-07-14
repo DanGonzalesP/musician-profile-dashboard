@@ -2,6 +2,7 @@ import Link from "next/link";
 import { fetchAllPublicFeed } from "@/lib/musicFeed";
 import { SAMPLE_FEED_TRACKS } from "@/lib/feed/sampleTracks";
 import FeedContainer from "@/components/feed/FeedContainer";
+import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 
 export default async function HomePage() {
   const realTracks = await fetchAllPublicFeed();
@@ -9,13 +10,14 @@ export default async function HomePage() {
   const tracks = isSampleFeed ? SAMPLE_FEED_TRACKS : realTracks;
 
   return (
-    <main className="relative h-dvh w-full bg-background text-foreground">
+    <main className="relative h-dvh w-full text-foreground">
+      <AudioReactiveBackground />
       <header className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-linear-to-b from-background/90 to-transparent px-6 py-4">
         <div className="pointer-events-auto flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             D
           </div>
-          <span className="text-lg font-semibold text-foreground">Décima</span>
+          <span className="font-display text-lg font-semibold text-foreground">Décima</span>
         </div>
 
         <div className="pointer-events-auto flex items-center gap-3">
