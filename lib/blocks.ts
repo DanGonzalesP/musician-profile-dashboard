@@ -58,7 +58,6 @@ export type DonationData = {
   title: string
   description: string
   buttonText: string
-  buttonUrl: string
   goalAmount: string
   currency: string
   // Monto acumulado y fecha límite de la campaña de apoyo (estilo Kickstarter).
@@ -212,7 +211,6 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         title: String(content.title ?? ""),
         description: String(content.description ?? ""),
         buttonText: String(content.buttonText ?? "Apoyar"),
-        buttonUrl: String(content.buttonUrl ?? ""),
         goalAmount: String(content.goalAmount ?? ""),
         currency: String(content.currency ?? "USD"),
         currentAmount: String(content.currentAmount ?? "0"),
@@ -370,7 +368,6 @@ function defaultData(type: BlockType): BlockData {
         title: "Apoya Mi Música",
         description: "Cada aporte me ayuda a crear más música, girar y conectar con fans como tú.",
         buttonText: "Apoyar",
-        buttonUrl: "",
         goalAmount: "1000",
         currency: "USD",
         currentAmount: "0",

@@ -27,50 +27,40 @@ export function DonationBlock({ data }: { data: DonationData }) {
   const remaining = daysRemaining(data.deadline)
 
   return (
-    <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 via-card/60 to-card/40 p-6 sm:p-8">
-      {/* Header */}
-      <div className="mb-5 flex items-center gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Heart className="size-5" />
-        </span>
-        <div>
-          <h3 className="text-xl font-semibold tracking-tight text-foreground">
-            {data.title || "Apoya Mi Música"}
-          </h3>
-          {hasGoal && (
-            <p className="text-xs text-muted-foreground">
-              Meta: {currency} {goal.toLocaleString()}
-            </p>
-          )}
-        </div>
+    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
+      <div className="mb-3 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <Heart className="size-3.5 text-primary" />
+        Campaña de Recaudación
       </div>
 
-      {/* Description */}
+      <h3 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+        {data.title || "Apoya Mi Música"}
+      </h3>
+
       {data.description && (
-        <p className="mb-5 text-sm leading-relaxed text-muted-foreground">{data.description}</p>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{data.description}</p>
       )}
 
       {/* Barra de progreso — calculada en vivo a partir de meta y monto recaudado */}
       {hasGoal && (
-        <div className="mb-5">
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+        <div className="mt-4">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-700"
+              className="h-full rounded-full bg-primary transition-all duration-700"
               style={{ width: `${percent}%` }}
             />
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span>
-              <span className="font-semibold text-primary">{percent}% completado</span>
-              {" — "}
-              {currency} {raised.toLocaleString()} de {currency} {goal.toLocaleString()} requeridos
+              <span className="font-medium text-foreground">{percent}%</span> completado — {currency}{" "}
+              {raised.toLocaleString()} de {currency} {goal.toLocaleString()}
             </span>
             {remaining !== null && (
-              <span className="font-medium">
+              <span>
                 {remaining > 0
                   ? `Quedan ${remaining} ${remaining === 1 ? "día" : "días"}`
                   : remaining === 0
-                    ? "¡Último día!"
+                    ? "Último día"
                     : "Campaña finalizada"}
               </span>
             )}
@@ -82,9 +72,9 @@ export function DonationBlock({ data }: { data: DonationData }) {
       <button
         type="button"
         onClick={() => setModalOpen(true)}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110 active:scale-95"
+        className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary/90 px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
       >
-        <Heart className="size-4" />
+        <Heart className="size-3.5" />
         {data.buttonText || "Apoyar"}
       </button>
 

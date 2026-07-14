@@ -17,7 +17,7 @@ function AlbumCover({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex w-40 shrink-0 flex-col items-center gap-2 rounded-lg p-2 text-left transition-colors ${
+      className={`group flex w-48 shrink-0 flex-col items-center gap-2 rounded-lg p-2 text-left transition-colors ${
         active ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-accent/50"
       }`}
     >
@@ -42,7 +42,7 @@ function AlbumCover({
   )
 }
 
-const ALBUM_ITEM_WIDTH = 160 // w-40
+const ALBUM_ITEM_WIDTH = 192 // w-48
 const ALBUM_ITEM_GAP = 12 // gap-3
 
 function TypewriterText({ text }: { text: string }) {
@@ -265,11 +265,11 @@ export function TrackListBlock({ data }: { data: TracksData }) {
       {panelAlbumIndex !== null && activeAlbum && (
         <div className="mt-4 rounded-lg border border-border bg-background/40 p-4">
           <div className="flex flex-col gap-4 sm:flex-row">
-            {/* El vinilo mide exactamente lo mismo que la portada en el carrusel (w-40 = 160px):
+            {/* El vinilo mide exactamente lo mismo que la portada en el carrusel (w-48 = 192px):
                 solo él se desliza al abrir/cambiar de álbum, el panel no se mueve. */}
-            <div className="flex w-40 shrink-0 items-center justify-center overflow-hidden">
+            <div className="flex w-48 shrink-0 items-center justify-center overflow-hidden">
               <div
-                className={`aspect-square w-40 shrink-0 overflow-hidden rounded-full shadow-2xl ${
+                className={`aspect-square w-48 shrink-0 overflow-hidden rounded-full shadow-2xl ${
                   isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
                 }`}
               >
@@ -309,45 +309,40 @@ export function TrackListBlock({ data }: { data: TracksData }) {
                         type="button"
                         onClick={() => handleTrackClick(panelAlbumIndex, i)}
                         disabled={!hasAudio}
-                        className={`group flex w-full items-center rounded-lg px-2 py-2 text-left transition-colors ${
+                        className={`group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
                           isPlaying ? "bg-primary/10" : hasAudio ? "hover:bg-accent/60" : "cursor-not-allowed opacity-60"
                         }`}
                       >
-                        {/* Grupo acotado a max-w-md: el título usa flex-1 dentro de este
-                            ancho límite (no del row completo), así la duración queda
-                            pegada al nombre en vez de quedar pegada al borde derecho. */}
-                        <span className="flex w-full max-w-md items-center gap-3">
-                          <span className="size-9 shrink-0 overflow-hidden rounded-md bg-muted">
-                            {track.image || activeAlbum.cover ? (
-                              <img
-                                src={track.image || activeAlbum.cover}
-                                alt=""
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <span className="flex size-full items-center justify-center">
-                                <Music className="size-4 text-muted-foreground/40" />
-                              </span>
-                            )}
-                          </span>
-                          <span
-                            className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                              isPlaying
-                                ? "border-primary bg-primary/10 text-primary"
-                                : hasAudio
-                                  ? "border-border text-muted-foreground group-hover:border-primary group-hover:text-primary"
-                                  : "border-border/50 text-muted-foreground/40"
-                            }`}
-                          >
-                            {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-                          </span>
-                          <span className={`flex-1 truncate text-sm ${isPlaying ? "font-medium text-primary" : "text-foreground"}`}>
-                            {track.title || "Nueva Pista"}
-                          </span>
-                          {!hasAudio && <span className="text-[10px] italic text-muted-foreground/50">sin audio</span>}
-                          <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
-                            {track.duration || "—"}
-                          </span>
+                        <span className="size-9 shrink-0 overflow-hidden rounded-md bg-muted">
+                          {track.image || activeAlbum.cover ? (
+                            <img
+                              src={track.image || activeAlbum.cover}
+                              alt=""
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex size-full items-center justify-center">
+                              <Music className="size-4 text-muted-foreground/40" />
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                            isPlaying
+                              ? "border-primary bg-primary/10 text-primary"
+                              : hasAudio
+                                ? "border-border text-muted-foreground group-hover:border-primary group-hover:text-primary"
+                                : "border-border/50 text-muted-foreground/40"
+                          }`}
+                        >
+                          {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                        </span>
+                        <span className={`flex-1 truncate text-sm ${isPlaying ? "font-medium text-primary" : "text-foreground"}`}>
+                          {track.title || "Nueva Pista"}
+                        </span>
+                        {!hasAudio && <span className="text-[10px] italic text-muted-foreground/50">sin audio</span>}
+                        <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+                          {track.duration || "—"}
                         </span>
                       </button>
                     </li>

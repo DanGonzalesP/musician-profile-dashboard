@@ -135,7 +135,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputClass =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/25"
+  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground"
 
 function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input type="text" {...props} className={inputClass} />
@@ -1011,13 +1011,7 @@ function DonationFields({
       </div>
       <div className="flex gap-2">
         <Field label="Monto ya recaudado">
-          <TextInput
-            type="number"
-            min="0"
-            value={data.currentAmount || "0"}
-            onChange={(e) => onChange({ ...data, currentAmount: e.target.value })}
-            placeholder="0"
-          />
+          <TextInput type="number" disabled value={data.currentAmount || "0"} />
         </Field>
         <Field label="Fecha límite">
           <TextInput
@@ -1027,18 +1021,15 @@ function DonationFields({
           />
         </Field>
       </div>
+      <p className="-mt-4 text-[11px] leading-relaxed text-muted-foreground">
+        El monto recaudado se calculará automáticamente con las transacciones reales de la pasarela de pago —
+        aquí solo se muestra como referencia.
+      </p>
       <Field label="Texto del botón">
         <TextInput
           value={data.buttonText || ""}
           onChange={(e) => onChange({ ...data, buttonText: e.target.value })}
-          placeholder="Support Now"
-        />
-      </Field>
-      <Field label="URL del botón (Ko-fi, PayPal, etc.)">
-        <TextInput
-          value={data.buttonUrl || ""}
-          onChange={(e) => onChange({ ...data, buttonUrl: e.target.value })}
-          placeholder="https://ko-fi.com/tu-usuario"
+          placeholder="Apoyar"
         />
       </Field>
     </>
