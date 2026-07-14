@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { type Block, type TracksData, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks";
+import { type Block, type TracksData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
@@ -52,7 +52,7 @@ export default function PerfilPreviewPage() {
         }
 
         if (draft) {
-          setBlocks(draft.blocks ?? []);
+          setBlocks((draft.blocks ?? []).filter((b) => isKnownBlockType(b.type)));
           setProducts(draft.products ?? []);
           setServices(draft.services ?? []);
         } else {
@@ -64,9 +64,10 @@ export default function PerfilPreviewPage() {
 
           if (blocksError) throw blocksError;
 
+          const validDbBlocks = (dbBlocks ?? []).filter((b) => isKnownBlockType(b.block_type));
           setBlocks(
-            dbBlocks && dbBlocks.length > 0
-              ? dbBlocks.map(dbBlockToBlock)
+            validDbBlocks.length > 0
+              ? validDbBlocks.map(dbBlockToBlock)
               : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
           );
 

@@ -135,6 +135,20 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
   },
 ]
 
+const KNOWN_BLOCK_TYPES = BLOCK_LIBRARY.map((b) => b.type)
+
+/**
+ * Filtra block_type que ya no existen en BLOCK_LIBRARY (ej. "license", del
+ * bloque de licencia express que se removió del editor) — filas que quedaron
+ * huérfanas en profile_blocks/draft_content de antes de ese cambio. Sin este
+ * filtro, normalizeBlockData no las reconoce y devuelve `data: undefined`,
+ * lo que rompe cualquier código que recorra las propiedades del bloque
+ * (ej. el escaneo de blob URLs al publicar).
+ */
+export function isKnownBlockType(type: string): type is BlockType {
+  return (KNOWN_BLOCK_TYPES as string[]).includes(type)
+}
+
 export function createBlock(type: BlockType): Block {
   return {
     id: `${type}-${Math.random().toString(36).slice(2, 9)}`,

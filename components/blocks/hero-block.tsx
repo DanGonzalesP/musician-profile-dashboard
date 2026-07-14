@@ -35,7 +35,7 @@ export function HeroBlock({
         ) : (
           <div className="size-full bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_70%)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-card from-20% via-card/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-card via-card/45 to-transparent" />
       </div>
 
       <div className="relative -mt-12 px-6 pb-6 sm:-mt-16 sm:px-8 sm:pb-8">

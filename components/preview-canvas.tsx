@@ -18,6 +18,8 @@ type Props = {
   onDragEnd: () => void
   products?: CatalogProduct[]
   services?: CatalogService[]
+  shareUrl?: string
+  albumCovers?: string[]
 }
 
 export function PreviewCanvas({
@@ -32,6 +34,8 @@ export function PreviewCanvas({
   onDragEnd,
   products,
   services,
+  shareUrl,
+  albumCovers,
 }: Props) {
   const [dropIndex, setDropIndex] = useState<number | null>(null)
 
@@ -129,6 +133,8 @@ export function PreviewCanvas({
                     onDragEnd={onDragEnd}
                     products={products}
                     services={services}
+                    shareUrl={shareUrl}
+                    albumCovers={albumCovers}
                   />
                   <Indicator index={i + 1} />
                 </div>

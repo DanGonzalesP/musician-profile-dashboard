@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block, type BlockType, type TracksData, dbBlockToBlock } from "@/lib/blocks";
+import { type Block, type BlockType, type TracksData, dbBlockToBlock, isKnownBlockType } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
@@ -86,7 +86,7 @@ export default function PerfilPublicoPage() {
           throw new Error(`Error al cargar bloques: ${blocksError.message}`);
         }
 
-        const parsedBlocks = (dbBlocks ?? []).map(dbBlockToBlock);
+        const parsedBlocks = (dbBlocks ?? []).filter((b) => isKnownBlockType(b.block_type)).map(dbBlockToBlock);
 
         const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profile.id);
 
@@ -158,48 +158,61 @@ export default function PerfilPublicoPage() {
   const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
   const albumCovers = tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? [];
 
-  const mainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type));
+  const heroBlock = blocks.find((b) => b.type === "hero");
+  const restMainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type) && b.type !== "hero");
   const storeBlocks = blocks.filter((b) => !MAIN_BLOCK_TYPES.includes(b.type));
   const showStoreTab = !unifiedProfile && storeBlocks.length > 0;
-  const visibleBlocks = unifiedProfile ? blocks : activeTab === "store" ? storeBlocks : mainBlocks;
+
+  const renderBlock = (block: Block) => (
+    <BlockRenderer
+      key={block.id}
+      block={block}
+      products={products}
+      services={services}
+      shareUrl={shareUrl}
+      albumCovers={albumCovers}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
       <main className="mx-auto flex max-w-5xl flex-col gap-8 animate-fade-in">
-        {showStoreTab && (
-          <nav className="mx-auto flex w-fit gap-1 rounded-full border border-border bg-card p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("main")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeTab === "main" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Home className="size-4" />
-              Inicio
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("store")}
-              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeTab === "store" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Store className="size-4" />
-              Merch y Servicios
-            </button>
-          </nav>
-        )}
-        {visibleBlocks.map((block) => (
-          <BlockRenderer
-            key={block.id}
-            block={block}
-            products={products}
-            services={services}
-            shareUrl={shareUrl}
-            albumCovers={albumCovers}
-          />
-        ))}
+        {unifiedProfile
+          ? blocks.map(renderBlock)
+          : (
+            <>
+              {heroBlock && renderBlock(heroBlock)}
+              {showStoreTab && (
+                <div className="sticky top-2 z-20 flex gap-6 rounded-xl border border-border bg-card/95 px-4 shadow-lg backdrop-blur">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("main")}
+                    className={`flex items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
+                      activeTab === "main"
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Home className="size-4" />
+                    Inicio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("store")}
+                    className={`flex items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
+                      activeTab === "store"
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Store className="size-4" />
+                    Merch y Servicios
+                  </button>
+                </div>
+              )}
+              {(activeTab === "store" ? storeBlocks : restMainBlocks).map(renderBlock)}
+            </>
+          )}
       </main>
     </div>
   );

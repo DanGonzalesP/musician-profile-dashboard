@@ -1,13 +1,12 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { type Block, type BlockType, type HeroData, type TracksData, createBlock, dbBlockToBlock, PROFILE_ID } from "@/lib/blocks"
+import { type Block, type BlockType, type TracksData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog } from "@/lib/catalog"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
 import { BlockInspector } from "@/components/block-inspector"
-import { ShareProfileDialog } from "@/components/blocks/share-profile-dialog"
 import { Layers } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import imageCompression from "browser-image-compression"
@@ -22,7 +21,8 @@ type DragPayload = { kind: "new"; type: BlockType } | { kind: "reorder"; index: 
  * Dado un bloque, devuelve todos los strings que son blob URLs
  * junto con la ruta de la propiedad que los contiene.
  */
-function collectBlobPaths(data: Record<string, unknown>, prefix = ""): { path: string; url: string }[] {
+function collectBlobPaths(data: Record<string, unknown> | null | undefined, prefix = ""): { path: string; url: string }[] {
+  if (!data) return []
   const results: { path: string; url: string }[] = []
 
   for (const [key, value] of Object.entries(data)) {
@@ -154,6 +154,47 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
   return data.publicUrl
 }
 
+/**
+ * Sube el File registrado para una blob URL y libera el registro. Si por
+ * alguna razón el File ya no está (ej. recarga de página), devuelve la
+ * misma blob URL tal cual — collectBlobPaths ya la habría filtrado antes en
+ * ese caso, así que esto solo cubre el caso raro de registro perdido.
+ */
+async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Promise<string> {
+  const file = blobRegistry.get(url)
+  if (!file) {
+    console.warn(`[handlePublish] No se encontró el File para blob URL: ${url}`)
+    return url
+  }
+  const folder: "images" | "audio" = file.type.startsWith("audio") ? "audio" : "images"
+  const permanentUrl = await uploadFileToStorage(file, folder)
+  URL.revokeObjectURL(url)
+  blobRegistry.delete(url)
+  return permanentUrl
+}
+
+/**
+ * Reemplaza todas las blob URLs de un bloque/producto/servicio por sus URLs
+ * permanentes en Storage. Usado en handlePublish tanto para blocks como para
+ * products/services — antes, solo blocks pasaba por acá, así que una imagen
+ * de producto subida en el editor nunca se publicaba (se quedaba en blob:,
+ * un link muerto en cuanto se cerraba la pestaña).
+ */
+async function resolveEntityBlobs<T extends Record<string, unknown>>(
+  item: T,
+  blobRegistry: Map<string, File>
+): Promise<T> {
+  const blobPaths = collectBlobPaths(item)
+  if (blobPaths.length === 0) return item
+
+  let updated: Record<string, unknown> = { ...item }
+  for (const { path, url } of blobPaths) {
+    const permanentUrl = await uploadBlobFile(url, blobRegistry)
+    updated = setDeep(updated, path, permanentUrl)
+  }
+  return updated as T
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 
 export function ProfileEditor() {
@@ -167,7 +208,6 @@ export function ProfileEditor() {
   // Slug de la página pública ya publicada (deriva de profiles.display_name)
   // — solo existe una vez que el artista publicó al menos una vez.
   const [publicSlug, setPublicSlug] = useState("")
-  const [shareOpen, setShareOpen] = useState(false)
 
   /**
    * Registro de blob URLs → File real.
@@ -229,10 +269,12 @@ export function ProfileEditor() {
         }
 
         if (draft) {
-          const cleanBlocks = (draft.blocks ?? []).map((b) => ({
-            ...b,
-            data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"],
-          }))
+          const cleanBlocks = (draft.blocks ?? [])
+            .filter((b) => isKnownBlockType(b.type))
+            .map((b) => ({
+              ...b,
+              data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"],
+            }))
           setBlocks(cleanBlocks)
           setProducts((draft.products ?? []).map((p) => stripDeadBlobUrls(p as unknown as Record<string, unknown>) as unknown as CatalogProduct))
           setServices((draft.services ?? []).map((s) => stripDeadBlobUrls(s as unknown as Record<string, unknown>) as unknown as CatalogService))
@@ -246,7 +288,7 @@ export function ProfileEditor() {
           if (error) throw error
 
           if (dbBlocks && dbBlocks.length > 0) {
-            setBlocks(dbBlocks.map(dbBlockToBlock))
+            setBlocks(dbBlocks.filter((b) => isKnownBlockType(b.block_type)).map(dbBlockToBlock))
           } else {
             setBlocks([
               createBlock("hero"),
@@ -337,54 +379,33 @@ export function ProfileEditor() {
       // 1. Clonar bloques para trabajar sin mutar el estado de React
       let publishBlocks: Block[] = JSON.parse(JSON.stringify(blocks))
 
-      // 2. Escanear cada bloque buscando blob URLs y subirlas a Storage
-      const uploadPromises: Promise<void>[] = []
-
+      // 2. Escanear bloques, productos y servicios buscando blob URLs y
+      // subirlas a Storage antes de publicar.
       publishBlocks = await Promise.all(
         publishBlocks.map(async (block) => {
-          const data = block.data as Record<string, unknown>
-          const blobPaths = collectBlobPaths(data)
-
-          if (blobPaths.length === 0) return block
-
-          let updatedData = { ...data }
-
-          for (const { path, url } of blobPaths) {
-            const file = blobRegistryRef.current.get(url)
-            if (!file) {
-              console.warn(`[handlePublish] No se encontró el File para blob URL: ${url}`)
-              continue
-            }
-
-            // Determinar carpeta por tipo MIME
-            const folder: "images" | "audio" = file.type.startsWith("audio") ? "audio" : "images"
-
-            try {
-              const permanentUrl = await uploadFileToStorage(file, folder)
-              updatedData = setDeep(updatedData, path, permanentUrl) as Record<string, unknown>
-
-              // Limpiar la blob URL del navegador
-              URL.revokeObjectURL(url)
-              blobRegistryRef.current.delete(url)
-
-              // Actualizar el estado de React con la URL permanente
-              // para que la vista previa muestre la URL definitiva
-              setBlocks((prev) =>
-                prev.map((b) =>
-                  b.id === block.id
-                    ? { ...b, data: setDeep(b.data as Record<string, unknown>, path, permanentUrl) as Block["data"] }
-                    : b
-                )
-              )
-            } catch (uploadErr) {
-              console.error(`[handlePublish] Error subiendo archivo en ${path}:`, uploadErr)
-              throw uploadErr
-            }
-          }
-
+          const updatedData = await resolveEntityBlobs(block.data as Record<string, unknown>, blobRegistryRef.current)
+          // Refleja la URL permanente en el estado de React para que la
+          // vista previa deje de apuntar a una blob URL en cuanto termina.
+          setBlocks((prev) => prev.map((b) => (b.id === block.id ? { ...b, data: updatedData as Block["data"] } : b)))
           return { ...block, data: updatedData as Block["data"] }
         })
       )
+
+      const publishProducts: CatalogProduct[] = await Promise.all(
+        products.map(
+          async (p) =>
+            (await resolveEntityBlobs(p as unknown as Record<string, unknown>, blobRegistryRef.current)) as unknown as CatalogProduct
+        )
+      )
+      setProducts(publishProducts)
+
+      const publishServices: CatalogService[] = await Promise.all(
+        services.map(
+          async (s) =>
+            (await resolveEntityBlobs(s as unknown as Record<string, unknown>, blobRegistryRef.current)) as unknown as CatalogService
+        )
+      )
+      setServices(publishServices)
 
       // 3. Upsert del perfil — atado al usuario autenticado, con PROFILE_ID
       // como fallback, para que cada cuenta publique y recupere lo suyo.
@@ -467,7 +488,7 @@ export function ProfileEditor() {
       }
 
       // 5. Publicar catálogo de productos y servicios
-      await publishCatalog(profileId, products, services)
+      await publishCatalog(profileId, publishProducts, publishServices)
 
       // Ya está publicado: se limpia el borrador para no recargarlo la
       // próxima vez que se abra el editor.
@@ -588,8 +609,7 @@ export function ProfileEditor() {
         blockCount={blocks.length}
         onPublish={handlePublish}
         isPublishing={publishing}
-        onShare={() => setShareOpen(true)}
-        shareDisabled={!publicSlug}
+        publicSlug={publicSlug}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -631,6 +651,12 @@ export function ProfileEditor() {
             onDragEnd={() => setDragPayload(null)}
             products={products}
             services={services}
+            shareUrl={publicSlug ? `${window.location.origin}/${publicSlug}` : undefined}
+            albumCovers={
+              (blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined)?.albums
+                .map((a) => a.cover)
+                .filter(Boolean) ?? []
+            }
           />
         </main>
 
@@ -658,19 +684,6 @@ export function ProfileEditor() {
           </>
         )}
       </div>
-
-      {shareOpen && publicSlug && (
-        <ShareProfileDialog
-          shareUrl={`${window.location.origin}/${publicSlug}`}
-          data={(blocks.find((b) => b.type === "hero")?.data as HeroData) ?? { name: "", tagline: "", location: "", image: "" }}
-          albumCovers={
-            (blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined)?.albums
-              .map((a) => a.cover)
-              .filter(Boolean) ?? []
-          }
-          onClose={() => setShareOpen(false)}
-        />
-      )}
     </div>
   )
 }

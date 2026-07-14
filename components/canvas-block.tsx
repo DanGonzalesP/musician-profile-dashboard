@@ -19,6 +19,8 @@ type Props = {
   children?: React.ReactNode
   products?: CatalogProduct[]
   services?: CatalogService[]
+  shareUrl?: string
+  albumCovers?: string[]
 }
 
 export function CanvasBlock({
@@ -34,6 +36,8 @@ export function CanvasBlock({
   children, // Recibimos el componente hijo aquí
   products,
   services,
+  shareUrl,
+  albumCovers,
 }: Props) {
   const label = BLOCK_LIBRARY.find((b) => b.type === block.type)?.label ?? block.type
 
@@ -98,9 +102,21 @@ export function CanvasBlock({
         </ControlButton>
       </div>
 
-      {/* Live preview content (non-interactive selection surface) */}
-      <div className={`overflow-hidden rounded-xl ${block.type === "tracks" ? "" : "pointer-events-none"}`}>
-        <BlockRenderer block={block} products={products} services={services} />
+      {/* Live preview content (non-interactive selection surface, salvo
+          "tracks" que necesita el mini-reproductor, y "hero" que necesita el
+          botón de Compartir clicable) */}
+      <div
+        className={`overflow-hidden rounded-xl ${
+          block.type === "tracks" || block.type === "hero" ? "" : "pointer-events-none"
+        }`}
+      >
+        <BlockRenderer
+          block={block}
+          products={products}
+          services={services}
+          shareUrl={block.type === "hero" ? shareUrl : undefined}
+          albumCovers={albumCovers}
+        />
       </div>
 
       {/* Renderiza los componentes inyectados (como el MusicPlayer) */}
