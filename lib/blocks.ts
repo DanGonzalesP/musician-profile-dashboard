@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
-export type BlockType = "hero" | "single" | "crowdfunding" | "tracks" | "merch" | "service" | "donation"
+export type BlockType = "hero" | "single" | "crowdfunding" | "tracks" | "catalog" | "merch" | "service" | "donation"
 
 export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
 
@@ -24,12 +24,21 @@ export type Track = {
   fileHash?: string
 }
 
+export type ReleaseType = "album" | "ep" | "single"
+
 export type Album = {
   id: string
   title: string
   cover: string
   tracks: Track[]
   isExample?: boolean
+  // Campos usados por el bloque "catalog" (Bloque 3, carrusel de
+  // Álbumes/EPs/Singles) — quedan opcionales porque el bloque "tracks" ya
+  // existente sigue guardando Album sin ellos y no los necesita para nada.
+  // Un item "single" siempre trae exactamente 1 track en `tracks`.
+  releaseType?: ReleaseType
+  genre?: string
+  year?: string
 }
 
 export type HeroData = {
@@ -43,6 +52,10 @@ export type HeroData = {
 }
 
 export type TracksData = {
+  albums: Album[]
+}
+
+export type CatalogData = {
   albums: Album[]
 }
 
@@ -115,6 +128,7 @@ export type BlockData =
   | SingleData
   | CrowdfundingData
   | TracksData
+  | CatalogData
   | MerchData
   | ServiceData
   | DonationData
@@ -160,6 +174,13 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     label: "Lista de Canciones",
     description: "Lista reproducible de canciones con mini reproductor.",
     icon: ListMusic,
+    category: "Music",
+  },
+  {
+    type: "catalog",
+    label: "Catálogo de Lanzamientos",
+    description: "Carrusel horizontal con tus álbumes, EPs y singles anteriores.",
+    icon: Library,
     category: "Music",
   },
   {
@@ -246,6 +267,8 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
       }
       return { albums: [] }
     }
+    case "catalog":
+      return { albums: Array.isArray(content.albums) ? content.albums.map((a, i) => normalizeAlbum(a, i)) : [] }
     case "single":
       return {
         title: String(content.title ?? ""),
@@ -311,6 +334,8 @@ function normalizeTrack(raw: unknown): Track {
   }
 }
 
+const RELEASE_TYPES: ReleaseType[] = ["album", "ep", "single"]
+
 function normalizeAlbum(raw: unknown, index: number): Album {
   const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
   return {
@@ -319,6 +344,9 @@ function normalizeAlbum(raw: unknown, index: number): Album {
     cover: String(a.cover ?? "/album-1.png"),
     tracks: Array.isArray(a.tracks) ? a.tracks.map(normalizeTrack) : [],
     isExample: Boolean(a.isExample),
+    releaseType: RELEASE_TYPES.includes(a.releaseType as ReleaseType) ? (a.releaseType as ReleaseType) : "album",
+    genre: String(a.genre ?? ""),
+    year: String(a.year ?? ""),
   }
 }
 
@@ -333,6 +361,11 @@ export function dbBlockToBlock(dbBlock: DbProfileBlock): Block {
 
 function defaultData(type: BlockType): BlockData {
   switch (type) {
+    case "catalog":
+      // Sin álbumes de ejemplo a propósito, igual que "single" y
+      // "crowdfunding" — el carrusel público debe quedar vacío hasta que el
+      // artista cargue su catálogo real.
+      return { albums: [] }
     case "crowdfunding":
       return {
         title: "",

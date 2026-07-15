@@ -20,7 +20,7 @@ type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 // (profiles.unified_profile), se muestran todos los bloques juntos, pero
 // Hero, Single Destacado y Meta de Producción igual quedan forzados al
 // tope, en ese orden — ver más abajo.
-const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "donation"];
+const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "catalog", "donation"];
 
 export default function PerfilPublicoPage() {
   return (
@@ -172,14 +172,11 @@ function PerfilPublicoContent() {
   const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
   const albumCovers = tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? [];
 
-  const heroBlock = blocks.find((b) => b.type === "hero");
-  const singleBlock = blocks.find((b) => b.type === "single");
-  const crowdfundingBlock = blocks.find((b) => b.type === "crowdfunding");
-  const forcedTopTypes = ["hero", "single", "crowdfunding"];
-  const restMainBlocks = blocks.filter(
-    (b) => MAIN_BLOCK_TYPES.includes(b.type) && !forcedTopTypes.includes(b.type)
-  );
-  const otherBlocksUnified = blocks.filter((b) => !forcedTopTypes.includes(b.type));
+  // Orden estrictamente igual al de blocks[] (ya viene ordenado por
+  // position_index desde la consulta) — nunca se fuerza un tipo de bloque
+  // a una posición fija, para que el orden del editor/dashboard se respete
+  // tal cual en el perfil público.
+  const mainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type));
   const storeBlocks = blocks.filter((b) => !MAIN_BLOCK_TYPES.includes(b.type));
   const showStoreTab = !unifiedProfile && storeBlocks.length > 0;
 
@@ -204,17 +201,11 @@ function PerfilPublicoContent() {
         {unifiedProfile
           ? (
             <>
-              {heroBlock && renderBlock(heroBlock)}
-              {singleBlock && renderBlock(singleBlock)}
-              {crowdfundingBlock && renderBlock(crowdfundingBlock)}
-              {otherBlocksUnified.map(renderBlock)}
+              {blocks.map(renderBlock)}
             </>
           )
           : (
             <>
-              {heroBlock && renderBlock(heroBlock)}
-              {singleBlock && renderBlock(singleBlock)}
-              {crowdfundingBlock && renderBlock(crowdfundingBlock)}
               {showStoreTab && (
                 <div className="sticky top-2 z-20 flex gap-6 rounded-xl border border-border bg-card/95 px-4 shadow-lg backdrop-blur">
                   <button
@@ -243,7 +234,7 @@ function PerfilPublicoContent() {
                   </button>
                 </div>
               )}
-              {(activeTab === "store" ? storeBlocks : restMainBlocks).map(renderBlock)}
+              {(activeTab === "store" ? storeBlocks : mainBlocks).map(renderBlock)}
             </>
           )}
       </main>

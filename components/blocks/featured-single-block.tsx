@@ -135,45 +135,43 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
 
   if (!hasAudio) {
     return (
-      <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-          <div className="flex size-40 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border sm:size-52">
-            <Disc3 className="size-10 text-muted-foreground" />
+      <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
+        <div className="flex items-center gap-4">
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border sm:size-20">
+            <Disc3 className="size-6 text-muted-foreground" />
           </div>
 
-          <div className="min-w-0 flex-1 text-center sm:text-left">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+          <div className="min-w-0 flex-1">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
               <Disc3 className="size-3.5" />
               {t("single_eyebrow")}
             </span>
-            <h3 className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h3 className="mt-1 font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
               {t("single_upcoming_title")}
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">{t("single_upcoming_subtitle")}</p>
-
-            <div className="mt-4">
-              <button
-                type="button"
-                disabled
-                aria-label={t("single_play_aria")}
-                className="flex size-12 shrink-0 cursor-not-allowed items-center justify-center rounded-full border border-input opacity-60 sm:size-14"
-              >
-                <Play className="size-5 text-foreground" />
-              </button>
-            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t("single_upcoming_subtitle")}</p>
           </div>
+
+          <button
+            type="button"
+            disabled
+            aria-label={t("single_play_aria")}
+            className="flex size-9 shrink-0 cursor-not-allowed items-center justify-center rounded-full border border-input opacity-60"
+          >
+            <Play className="size-4 text-foreground" />
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
-      <div className="flex flex-col gap-6 sm:flex-row">
-        <div className="relative flex size-40 shrink-0 items-center justify-center sm:size-52">
+    <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
+      <div className="flex items-center gap-4">
+        <div className="relative flex size-16 shrink-0 items-center justify-center sm:size-20">
           <div
             aria-hidden
-            className={`absolute inset-0 rounded-full blur-xl transition-opacity duration-500 ${
+            className={`absolute inset-0 rounded-full blur-lg transition-opacity duration-500 ${
               isPlaying ? "opacity-100" : "opacity-40"
             }`}
             style={{
@@ -183,10 +181,10 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
           />
 
           <div
-            className="relative flex size-full animate-spin items-center justify-center rounded-full shadow-2xl"
+            className="relative flex size-full animate-spin items-center justify-center rounded-full shadow-xl"
             style={{
               background:
-                "repeating-radial-gradient(circle, #111 0px, #111 6px, #262626 7px, #111 8px)",
+                "repeating-radial-gradient(circle, #111 0px, #111 3px, #262626 4px, #111 5px)",
               animationDuration: "6s",
               animationPlayState: isPlaying ? "running" : "paused",
             }}
@@ -194,55 +192,47 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
             <img
               src={data.cover}
               alt={t("single_cover_alt")}
-              className="size-14 rounded-full border-2 border-black/70 object-cover sm:size-16"
+              className="size-6 rounded-full border-2 border-black/70 object-cover sm:size-7"
             />
           </div>
         </div>
 
         <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
             <Disc3 className="size-3.5" />
             {t("single_eyebrow")}
           </span>
 
-          <h3 className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {data.title}
-          </h3>
-
-          {(data.genre || data.year) && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {data.genre && (
-                <span className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary">
-                  {data.genre}
-                </span>
-              )}
-              {data.year && (
-                <span className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary">
-                  {data.year}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
+            <h3 className="truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+              {data.title}
+            </h3>
+            {(data.genre || data.year) && (
+              <span className="truncate text-xs text-muted-foreground">
+                {[data.genre, data.year].filter(Boolean).join(" • ")}
+              </span>
+            )}
+          </div>
 
           {data.description && (
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{data.description}</p>
+            <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-muted-foreground">{data.description}</p>
           )}
 
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-2 flex items-center gap-2.5">
             <button
               type="button"
               onClick={togglePlay}
               aria-label={isPlaying ? t("single_pause_aria") : t("single_play_aria")}
-              className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_18px_color-mix(in_oklch,var(--primary)_55%,transparent)] transition-opacity hover:opacity-90 sm:size-14"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_55%,transparent)] transition-opacity hover:opacity-90"
             >
               {isPlaying ? (
-                <Pause className="size-5 fill-primary-foreground" />
+                <Pause className="size-4 fill-primary-foreground" />
               ) : (
-                <Play className="ml-0.5 size-5 fill-primary-foreground" />
+                <Play className="ml-0.5 size-4 fill-primary-foreground" />
               )}
             </button>
 
-            <span className="w-9 shrink-0 text-xs tabular-nums text-muted-foreground">
+            <span className="w-8 shrink-0 text-[11px] tabular-nums text-muted-foreground">
               {formatTime(currentTime)}
             </span>
 
@@ -255,10 +245,10 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
               disabled={!duration}
               onChange={(e) => seek(Number(e.target.value))}
               aria-label={t("track_seek_aria")}
-              className="h-1.5 w-full flex-1 cursor-pointer appearance-none rounded-full bg-border accent-primary disabled:cursor-not-allowed"
+              className="h-1 w-full flex-1 cursor-pointer appearance-none rounded-full bg-border accent-primary disabled:cursor-not-allowed"
             />
 
-            <span className="w-9 shrink-0 text-xs tabular-nums text-muted-foreground">
+            <span className="w-8 shrink-0 text-[11px] tabular-nums text-muted-foreground">
               {formatTime(duration)}
             </span>
           </div>

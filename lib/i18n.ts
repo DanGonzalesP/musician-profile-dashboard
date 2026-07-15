@@ -30,6 +30,13 @@ export const dictionaries: Record<Locale, Dict> = {
     song_one: "canción",
     song_other: "canciones",
 
+    catalog_eyebrow: "Catálogo",
+    catalog_empty: "Todavía no hay álbumes, EPs o singles en el catálogo.",
+    catalog_untitled: "Sin título",
+    catalog_open_aria: "Abrir lista de canciones",
+    catalog_play_aria: "Reproducir",
+    catalog_pause_aria: "Pausar",
+
     single_eyebrow: "Lanzamiento Actual",
     single_upcoming_title: "Próximo Lanzamiento",
     single_upcoming_subtitle: "Este artista todavía no subió su single destacado.",
@@ -110,6 +117,13 @@ export const dictionaries: Record<Locale, Dict> = {
     track_seek_aria: "Track progress",
     song_one: "song",
     song_other: "songs",
+
+    catalog_eyebrow: "Catalog",
+    catalog_empty: "No albums, EPs or singles in the catalog yet.",
+    catalog_untitled: "Untitled",
+    catalog_open_aria: "Open track list",
+    catalog_play_aria: "Play",
+    catalog_pause_aria: "Pause",
 
     single_eyebrow: "Current Release",
     single_upcoming_title: "Upcoming Release",

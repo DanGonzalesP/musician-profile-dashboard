@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, MerchData, ServiceData, DonationData, Album, Track, ReleaseType, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
 import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft } from "lucide-react"
@@ -92,6 +92,9 @@ export function BlockInspector({
         )}
         {block.type === "tracks" && (
           <TracksFields data={block.data as TracksData} onChange={update} blobRegistry={blobRegistry} />
+        )}
+        {block.type === "catalog" && (
+          <CatalogFields data={block.data as CatalogData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "merch" && (
           <MerchFields
@@ -997,6 +1000,365 @@ function TracksFields({
         )}
         {albums.length === 0 && (
           <p className="text-[11px] italic text-muted-foreground">Añade tu primer álbum para empezar.</p>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ─── CatalogFields — Bloque 3: carrusel de Álbumes/EPs/Singles ────────────
+// Reutiliza el mismo tipo Album/Track del bloque "tracks" (extendido con
+// releaseType/genre/year), así que el editor por-pista es casi idéntico al
+// de TracksFields. La única diferencia real: un item "single" siempre tiene
+// exactamente 1 pista y se edita con un solo AudioUploader, sin la lista de
+// pistas múltiples.
+
+const RELEASE_TYPE_LABELS: Record<ReleaseType, string> = {
+  album: "Álbum",
+  ep: "EP",
+  single: "Single",
+}
+
+function CatalogFields({
+  data,
+  onChange,
+  blobRegistry,
+}: {
+  data: CatalogData
+  onChange: (d: CatalogData) => void
+  blobRegistry: BlobRegistry
+}) {
+  const albums = data.albums || []
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [previewingKey, setPreviewingKey] = useState<string | null>(null)
+  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(albums[0]?.id ?? null)
+
+  const updateAlbums = (next: Album[]) => onChange({ albums: next })
+
+  const setAlbum = (albumIndex: number, changes: Partial<Album>) => {
+    updateAlbums(albums.map((a, idx) => (idx === albumIndex ? { ...a, ...changes } : a)))
+  }
+
+  const addAlbum = () => {
+    const newItem: Album = {
+      id: `catalog-${Date.now()}`,
+      title: "Nuevo Lanzamiento",
+      cover: "",
+      tracks: [],
+      releaseType: "album",
+      genre: "",
+      year: "",
+    }
+    updateAlbums([...albums, newItem])
+    setActiveAlbumId(newItem.id)
+  }
+
+  const removeAlbum = (albumIndex: number) => {
+    const removedId = albums[albumIndex]?.id
+    const next = albums.filter((_, idx) => idx !== albumIndex)
+    updateAlbums(next)
+    if (removedId === activeAlbumId) {
+      setActiveAlbumId(next[0]?.id ?? null)
+    }
+  }
+
+  const setReleaseType = (albumIndex: number, releaseType: ReleaseType) => {
+    const current = albums[albumIndex]
+    if (!current) return
+    // Un "Single" siempre trae exactamente 1 pista — al cambiar a Single se
+    // conserva la primera pista ya cargada (o se crea una vacía); al volver
+    // a Álbum/EP las pistas existentes no se pierden.
+    const tracks =
+      releaseType === "single"
+        ? current.tracks.length > 0
+          ? [current.tracks[0]]
+          : [{ title: current.title || "Nueva Pista", duration: "" }]
+        : current.tracks
+    setAlbum(albumIndex, { releaseType, tracks })
+  }
+
+  const setTrackFields = (albumIndex: number, trackIndex: number, changes: Partial<Track>) => {
+    updateAlbums(
+      albums.map((a, aIdx) =>
+        aIdx === albumIndex
+          ? { ...a, tracks: a.tracks.map((t, tIdx) => (tIdx === trackIndex ? { ...t, ...changes } : t)) }
+          : a
+      )
+    )
+  }
+
+  const setTrack = (albumIndex: number, trackIndex: number, key: keyof Track, value: string) =>
+    setTrackFields(albumIndex, trackIndex, { [key]: value })
+
+  const addTrack = (albumIndex: number) => {
+    updateAlbums(
+      albums.map((a, idx) =>
+        idx === albumIndex ? { ...a, tracks: [...a.tracks, { title: "Nueva Pista", duration: "" }] } : a
+      )
+    )
+  }
+
+  const removeTrack = (albumIndex: number, trackIndex: number) => {
+    updateAlbums(
+      albums.map((a, idx) =>
+        idx === albumIndex ? { ...a, tracks: a.tracks.filter((_, tIdx) => tIdx !== trackIndex) } : a
+      )
+    )
+  }
+
+  const handleAudioUploaded = async (albumIndex: number, trackIndex: number, url: string, fileHash: string) => {
+    let duration = ""
+    try {
+      duration = formatDuration(await extractAudioDuration(url))
+    } catch {
+      // Sin metadata legible: se deja vacío, el artista puede escribirla manualmente.
+    }
+    updateAlbums(
+      albums.map((a, aIdx) =>
+        aIdx === albumIndex
+          ? {
+              ...a,
+              tracks: a.tracks.map((t, tIdx) =>
+                tIdx === trackIndex ? { ...t, audioUrl: url, duration, fileHash } : t
+              ),
+            }
+          : a
+      )
+    )
+  }
+
+  const togglePreview = (key: string, url?: string) => {
+    if (!url) return
+    if (previewingKey === key && previewAudioRef.current?.src === url) {
+      previewAudioRef.current?.pause()
+      previewAudioRef.current = null
+      setPreviewingKey(null)
+      return
+    }
+    previewAudioRef.current?.pause()
+    const audio = new Audio(url)
+    previewAudioRef.current = audio
+    setPreviewingKey(key)
+    audio.onended = () => setPreviewingKey(null)
+    audio.onerror = () => setPreviewingKey(null)
+    audio.play().catch(() => setPreviewingKey(null))
+  }
+
+  const activeAlbumIndex = Math.max(
+    0,
+    albums.findIndex((a) => a.id === activeAlbumId)
+  )
+  const activeAlbum = albums[activeAlbumIndex] ?? null
+  const isSingle = activeAlbum?.releaseType === "single"
+
+  return (
+    <>
+      <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Catálogo</p>
+        <button
+          type="button"
+          onClick={addAlbum}
+          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <Plus className="size-3" /> Agregar Lanzamiento
+        </button>
+      </div>
+
+      {albums.length > 0 && (
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          {albums.map((album) => (
+            <button
+              key={album.id}
+              type="button"
+              onClick={() => setActiveAlbumId(album.id)}
+              className={`flex w-16 shrink-0 flex-col items-center gap-1 rounded-md p-1 transition-colors ${
+                album.id === activeAlbum?.id ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-accent/50"
+              }`}
+            >
+              <span className="flex size-10 w-full items-center justify-center overflow-hidden rounded bg-muted">
+                {album.cover ? (
+                  <img src={album.cover} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <Disc3 className="size-4 text-muted-foreground/40" />
+                )}
+              </span>
+              <span className="w-full truncate text-center text-[9px] text-muted-foreground">
+                {album.title || "Sin título"}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {activeAlbum && (
+          <div key={activeAlbum.id} className="space-y-3 rounded-lg border border-sidebar-border p-3 bg-background/50">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+                <Disc3 className="size-3.5" /> Lanzamiento #{activeAlbumIndex + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeAlbum(activeAlbumIndex)}
+                className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                title="Eliminar lanzamiento"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+
+            <Field label="Tipo">
+              <select
+                value={activeAlbum.releaseType || "album"}
+                onChange={(e) => setReleaseType(activeAlbumIndex, e.target.value as ReleaseType)}
+                className={inputClass}
+              >
+                {(["album", "ep", "single"] as ReleaseType[]).map((rt) => (
+                  <option key={rt} value={rt}>
+                    {RELEASE_TYPE_LABELS[rt]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Título">
+              <TextInput
+                value={activeAlbum.title || ""}
+                onChange={(e) => setAlbum(activeAlbumIndex, { title: e.target.value })}
+                placeholder="Ej. Digital Ethereal"
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Género">
+                <TextInput
+                  value={activeAlbum.genre || ""}
+                  onChange={(e) => setAlbum(activeAlbumIndex, { genre: e.target.value })}
+                  placeholder="Ej. Synth Pop"
+                />
+              </Field>
+              <Field label="Año">
+                <TextInput
+                  value={activeAlbum.year || ""}
+                  onChange={(e) => setAlbum(activeAlbumIndex, { year: e.target.value })}
+                  placeholder="Ej. 2026"
+                />
+              </Field>
+            </div>
+
+            <Field label="Portada">
+              <ImageUploader
+                currentImageUrl={activeAlbum.cover}
+                onUploadReady={(url) => setAlbum(activeAlbumIndex, { cover: url })}
+                blobRegistry={blobRegistry}
+              />
+            </Field>
+
+            {isSingle ? (
+              <div className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-sidebar/40">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Audio</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => togglePreview(`${activeAlbumIndex}-0`, activeAlbum.tracks[0]?.audioUrl)}
+                    disabled={!activeAlbum.tracks[0]?.audioUrl}
+                    aria-label={
+                      previewingKey === `${activeAlbumIndex}-0` ? "Pausar preescucha" : "Escuchar antes de publicar"
+                    }
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
+                  >
+                    {previewingKey === `${activeAlbumIndex}-0` ? (
+                      <Pause className="size-3.5" />
+                    ) : (
+                      <Play className="size-3.5" />
+                    )}
+                  </button>
+                  {activeAlbum.tracks[0]?.duration && (
+                    <span className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground">
+                      {activeAlbum.tracks[0].duration}
+                    </span>
+                  )}
+                </div>
+                <AudioUploader
+                  currentAudioUrl={activeAlbum.tracks[0]?.audioUrl}
+                  onUploadReady={(url, hash) => handleAudioUploaded(activeAlbumIndex, 0, url, hash)}
+                  blobRegistry={blobRegistry}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pistas</p>
+                  <button
+                    type="button"
+                    onClick={() => addTrack(activeAlbumIndex)}
+                    className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                  >
+                    <Plus className="size-3" /> Agregar Pista
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {activeAlbum.tracks.map((track, trackIndex) => {
+                    const key = `${activeAlbumIndex}-${trackIndex}`
+                    const isPreviewing = previewingKey === key
+                    return (
+                      <div key={trackIndex} className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-sidebar/40">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Pista {trackIndex + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeTrack(activeAlbumIndex, trackIndex)}
+                            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            title="Eliminar pista"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={track.title || ""}
+                          onChange={(e) => setTrack(activeAlbumIndex, trackIndex, "title", e.target.value)}
+                          className={`${inputClass} w-full`}
+                          placeholder="Nombre de la canción"
+                          aria-label="Nombre de la canción"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => togglePreview(key, track.audioUrl)}
+                            disabled={!track.audioUrl}
+                            aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}
+                            className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
+                          >
+                            {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                          </button>
+                          {track.duration && (
+                            <span className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground">
+                              {track.duration}
+                            </span>
+                          )}
+                        </div>
+                        <AudioUploader
+                          currentAudioUrl={track.audioUrl}
+                          onUploadReady={(url, hash) => handleAudioUploaded(activeAlbumIndex, trackIndex, url, hash)}
+                          blobRegistry={blobRegistry}
+                        />
+                      </div>
+                    )
+                  })}
+                  {activeAlbum.tracks.length === 0 && (
+                    <p className="text-[11px] italic text-muted-foreground">Este lanzamiento no tiene pistas todavía.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        {albums.length === 0 && (
+          <p className="text-[11px] italic text-muted-foreground">Añade tu primer álbum, EP o single para empezar.</p>
         )}
       </div>
     </>
