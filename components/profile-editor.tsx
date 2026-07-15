@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { type Block, type BlockType, type TracksData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks"
+import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog } from "@/lib/catalog"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
@@ -665,6 +665,7 @@ export function ProfileEditor() {
                 .map((a) => a.cover)
                 .filter(Boolean) ?? []
             }
+            creditsCount={(blocks.find((b) => b.type === "credits")?.data as CreditsData | undefined)?.credits.length ?? 0}
           />
         </main>
 

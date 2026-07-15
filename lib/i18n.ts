@@ -18,6 +18,10 @@ export const dictionaries: Record<Locale, Dict> = {
     hero_share: "Compartir perfil",
     hero_social_aria: "Redes sociales",
     hero_artist_name_fallback: "Nombre del Artista",
+    hero_credits_one: "Crédito",
+    hero_credits_other: "Créditos",
+    hero_contact_fallback: "Contacto",
+    hero_contact_aria: "Contactar al artista",
 
     discography_title: "Discografía",
     discography_empty: "No hay álbumes publicados todavía.",
@@ -119,6 +123,10 @@ export const dictionaries: Record<Locale, Dict> = {
     hero_share: "Share profile",
     hero_social_aria: "Social links",
     hero_artist_name_fallback: "Artist Name",
+    hero_credits_one: "Credit",
+    hero_credits_other: "Credits",
+    hero_contact_fallback: "Contact",
+    hero_contact_aria: "Contact the artist",
 
     discography_title: "Discography",
     discography_empty: "No albums published yet.",

@@ -21,6 +21,7 @@ type Props = {
   services?: CatalogService[]
   shareUrl?: string
   albumCovers?: string[]
+  creditsCount?: number
 }
 
 export function CanvasBlock({
@@ -38,6 +39,7 @@ export function CanvasBlock({
   services,
   shareUrl,
   albumCovers,
+  creditsCount,
 }: Props) {
   const label = BLOCK_LIBRARY.find((b) => b.type === block.type)?.label ?? block.type
 
@@ -126,6 +128,7 @@ export function CanvasBlock({
           services={services}
           shareUrl={block.type === "hero" ? shareUrl : undefined}
           albumCovers={albumCovers}
+          creditsCount={creditsCount}
         />
       </div>
 

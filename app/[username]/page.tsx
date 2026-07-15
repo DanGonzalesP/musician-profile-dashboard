@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block, type BlockType, type TracksData, dbBlockToBlock, isKnownBlockType } from "@/lib/blocks";
+import { type Block, type BlockType, type TracksData, type CreditsData, dbBlockToBlock, isKnownBlockType } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
@@ -171,6 +171,7 @@ function PerfilPublicoContent() {
 
   const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
   const albumCovers = tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? [];
+  const creditsCount = (blocks.find((b) => b.type === "credits")?.data as CreditsData | undefined)?.credits.length ?? 0;
 
   // Orden estrictamente igual al de blocks[] (ya viene ordenado por
   // position_index desde la consulta) — nunca se fuerza un tipo de bloque
@@ -188,6 +189,7 @@ function PerfilPublicoContent() {
       services={services}
       shareUrl={shareUrl}
       albumCovers={albumCovers}
+      creditsCount={creditsCount}
     />
   );
 

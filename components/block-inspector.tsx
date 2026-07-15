@@ -424,6 +424,20 @@ function HeroFields({
         socials={data.socials || []}
         onChange={(socials) => onChange({ ...data, socials })}
       />
+      <Field label="Texto del botón de contacto (opcional)">
+        <TextInput
+          value={data.contactLabel || ""}
+          onChange={(e) => onChange({ ...data, contactLabel: e.target.value })}
+          placeholder="Ej. Contacto o Contratar"
+        />
+      </Field>
+      <Field label="Enlace de contacto (opcional)">
+        <TextInput
+          value={data.contactUrl || ""}
+          onChange={(e) => onChange({ ...data, contactUrl: e.target.value })}
+          placeholder="Ej. mailto:tu@correo.com o https://wa.me/..."
+        />
+      </Field>
     </>
   )
 }
@@ -903,6 +917,22 @@ function TracksFields({
                 placeholder="Ej. Digital Ethereal"
               />
             </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Género">
+                <TextInput
+                  value={activeAlbum.genre || ""}
+                  onChange={(e) => setAlbum(activeAlbumIndex, { genre: e.target.value })}
+                  placeholder="Ej. Synth Pop"
+                />
+              </Field>
+              <Field label="Año">
+                <TextInput
+                  value={activeAlbum.year || ""}
+                  onChange={(e) => setAlbum(activeAlbumIndex, { year: e.target.value })}
+                  placeholder="Ej. 2026"
+                />
+              </Field>
+            </div>
             <Field label="Portada del álbum">
               <ImageUploader
                 currentImageUrl={activeAlbum.cover}

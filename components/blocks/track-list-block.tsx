@@ -42,6 +42,11 @@ function AlbumCover({
       <p className={`w-full truncate text-center text-xs font-medium ${active ? "text-primary" : "text-foreground"}`}>
         {album.title || t("album_untitled")}
       </p>
+      {(album.genre || album.year) && (
+        <p className="w-full truncate text-center text-[11px] text-muted-foreground">
+          {[album.genre, album.year].filter(Boolean).join(" • ")}
+        </p>
+      )}
     </button>
   )
 }
@@ -416,11 +421,18 @@ export function TrackListBlock({ data }: { data: TracksData }) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <span>{activeAlbum.title || t("album_untitled")}</span>
-                <span>
-                  {activeAlbum.tracks.length} {t(activeAlbum.tracks.length === 1 ? "song_one" : "song_other")}
-                </span>
+              <div className="mb-2 border-b border-border pb-2">
+                <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span>{activeAlbum.title || t("album_untitled")}</span>
+                  <span>
+                    {activeAlbum.tracks.length} {t(activeAlbum.tracks.length === 1 ? "song_one" : "song_other")}
+                  </span>
+                </div>
+                {(activeAlbum.genre || activeAlbum.year) && (
+                  <p className="mt-0.5 text-xs normal-case tracking-normal text-muted-foreground">
+                    {[activeAlbum.genre, activeAlbum.year].filter(Boolean).join(" • ")}
+                  </p>
+                )}
               </div>
 
               <ul className="flex flex-col">

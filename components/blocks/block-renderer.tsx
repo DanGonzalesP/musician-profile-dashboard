@@ -18,16 +18,18 @@ export function BlockRenderer({
   services = [],
   shareUrl,
   albumCovers = [],
+  creditsCount = 0,
 }: {
   block: Block
   products?: CatalogProduct[]
   services?: CatalogService[]
   shareUrl?: string
   albumCovers?: string[]
+  creditsCount?: number
 }) {
   switch (block.type) {
     case "hero":
-      return <HeroBlock data={block.data as HeroData} shareUrl={shareUrl} albumCovers={albumCovers} />
+      return <HeroBlock data={block.data as HeroData} shareUrl={shareUrl} albumCovers={albumCovers} creditsCount={creditsCount} />
     case "single":
       return <FeaturedSingleBlock data={block.data as SingleData} />
     case "crowdfunding":

@@ -20,6 +20,7 @@ type Props = {
   services?: CatalogService[]
   shareUrl?: string
   albumCovers?: string[]
+  creditsCount?: number
 }
 
 export function PreviewCanvas({
@@ -36,6 +37,7 @@ export function PreviewCanvas({
   services,
   shareUrl,
   albumCovers,
+  creditsCount,
 }: Props) {
   const [dropIndex, setDropIndex] = useState<number | null>(null)
 
@@ -135,6 +137,7 @@ export function PreviewCanvas({
                     services={services}
                     shareUrl={shareUrl}
                     albumCovers={albumCovers}
+                    creditsCount={creditsCount}
                   />
                   <Indicator index={i + 1} />
                 </div>

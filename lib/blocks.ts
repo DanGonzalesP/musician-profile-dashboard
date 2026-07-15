@@ -58,6 +58,8 @@ export type HeroData = {
   banner?: string
   monthlyListeners?: string
   socials?: SocialLink[]
+  contactUrl?: string
+  contactLabel?: string
 }
 
 export type TracksData = {
@@ -278,6 +280,8 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         banner: content.banner ? String(content.banner) : "",
         monthlyListeners: content.monthlyListeners ? String(content.monthlyListeners) : "",
         socials: Array.isArray(content.socials) ? content.socials.map(normalizeSocialLink) : [],
+        contactUrl: content.contactUrl ? String(content.contactUrl) : "",
+        contactLabel: content.contactLabel ? String(content.contactLabel) : "",
       }
     case "tracks": {
       if (Array.isArray(content.albums)) {

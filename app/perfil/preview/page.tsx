@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { type Block, type TracksData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks";
+import { type Block, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
@@ -121,6 +121,7 @@ export default function PerfilPreviewPage() {
       <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8 animate-fade-in">
         {blocks.map((block) => {
           const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
+          const creditsData = blocks.find((b) => b.type === "credits")?.data as CreditsData | undefined;
           return (
             <BlockRenderer
               key={block.id}
@@ -128,6 +129,7 @@ export default function PerfilPreviewPage() {
               products={products}
               services={services}
               albumCovers={tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? []}
+              creditsCount={creditsData?.credits.length ?? 0}
             />
           );
         })}
