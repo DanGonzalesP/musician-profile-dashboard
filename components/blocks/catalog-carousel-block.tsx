@@ -243,14 +243,19 @@ export function CatalogCarouselBlock({ data }: { data: CatalogData }) {
 
       {openAlbum && (
         <div className="mt-4 rounded-lg border border-border bg-background/40 p-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-foreground">
+          <div className="flex items-baseline justify-between gap-3">
+            <h4 className="min-w-0 truncate text-sm font-semibold text-foreground">
               {openAlbum.title || t("catalog_untitled")}
             </h4>
-            <span className="text-xs text-muted-foreground">
+            <span className="shrink-0 text-xs text-muted-foreground">
               {openAlbum.tracks.length} {t(openAlbum.tracks.length === 1 ? "song_one" : "song_other")}
             </span>
           </div>
+          {(openAlbum.genre || openAlbum.year) && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {[openAlbum.genre, openAlbum.year].filter(Boolean).join(" • ")}
+            </p>
+          )}
 
           <ul className="mt-3 flex flex-col gap-1">
             {openAlbum.tracks.map((track, index) => {

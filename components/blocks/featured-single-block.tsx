@@ -203,19 +203,25 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
             {t("single_eyebrow")}
           </span>
 
-          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
-            <h3 className="truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
-              {data.title}
-            </h3>
-            {(data.genre || data.year) && (
-              <span className="truncate text-xs text-muted-foreground">
-                {[data.genre, data.year].filter(Boolean).join(" • ")}
-              </span>
-            )}
-          </div>
+          <h3 className="mt-0.5 truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+            {data.title}
+          </h3>
 
-          {data.description && (
-            <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-muted-foreground">{data.description}</p>
+          {(data.genre || data.year || data.description) && (
+            <div className="mt-1 flex items-baseline justify-between gap-3">
+              {(data.genre || data.year) ? (
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {[data.genre, data.year].filter(Boolean).join(" • ")}
+                </span>
+              ) : (
+                <span />
+              )}
+              {data.description && (
+                <p className="min-w-0 flex-1 truncate text-right text-xs leading-relaxed text-muted-foreground">
+                  {data.description}
+                </p>
+              )}
+            </div>
           )}
 
           <div className="mt-2 flex items-center gap-2.5">

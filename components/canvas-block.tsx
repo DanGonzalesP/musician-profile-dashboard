@@ -103,12 +103,19 @@ export function CanvasBlock({
       </div>
 
       {/* Live preview content (non-interactive selection surface, salvo
-          "tracks" que necesita el mini-reproductor, "hero" que necesita el
-          botón de Compartir clicable, y "donation" que necesita el botón de
-          Apoyar para poder probar el flujo de pago simulado) */}
+          "tracks", "single" y "catalog" que necesitan el mini-reproductor,
+          "hero" que necesita el botón de Compartir clicable, y "donation"
+          que necesita el botón de Apoyar para poder probar el flujo de
+          pago simulado) */}
       <div
         className={`overflow-hidden rounded-xl ${
-          block.type === "tracks" || block.type === "hero" || block.type === "donation" ? "" : "pointer-events-none"
+          block.type === "tracks" ||
+          block.type === "single" ||
+          block.type === "catalog" ||
+          block.type === "hero" ||
+          block.type === "donation"
+            ? ""
+            : "pointer-events-none"
         }`}
       >
         <BlockRenderer
