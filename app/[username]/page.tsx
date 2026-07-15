@@ -14,12 +14,13 @@ import { Store, Home } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 
-// Perfil "separado" (default): Hero, Single Destacado, Track List y
-// Donaciones viven en la página principal; Merch y Servicios quedan en su
-// propia pestaña. Si el artista activa "Unificar perfil"
+// Perfil "separado" (default): Hero, Single Destacado, Meta de Producción,
+// Track List y Donaciones viven en la página principal; Merch y Servicios
+// quedan en su propia pestaña. Si el artista activa "Unificar perfil"
 // (profiles.unified_profile), se muestran todos los bloques juntos, pero
-// Hero y Single Destacado igual quedan forzados al tope — ver más abajo.
-const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "tracks", "donation"];
+// Hero, Single Destacado y Meta de Producción igual quedan forzados al
+// tope, en ese orden — ver más abajo.
+const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "donation"];
 
 export default function PerfilPublicoPage() {
   return (
@@ -173,10 +174,12 @@ function PerfilPublicoContent() {
 
   const heroBlock = blocks.find((b) => b.type === "hero");
   const singleBlock = blocks.find((b) => b.type === "single");
+  const crowdfundingBlock = blocks.find((b) => b.type === "crowdfunding");
+  const forcedTopTypes = ["hero", "single", "crowdfunding"];
   const restMainBlocks = blocks.filter(
-    (b) => MAIN_BLOCK_TYPES.includes(b.type) && b.type !== "hero" && b.type !== "single"
+    (b) => MAIN_BLOCK_TYPES.includes(b.type) && !forcedTopTypes.includes(b.type)
   );
-  const otherBlocksUnified = blocks.filter((b) => b.type !== "hero" && b.type !== "single");
+  const otherBlocksUnified = blocks.filter((b) => !forcedTopTypes.includes(b.type));
   const storeBlocks = blocks.filter((b) => !MAIN_BLOCK_TYPES.includes(b.type));
   const showStoreTab = !unifiedProfile && storeBlocks.length > 0;
 
@@ -203,6 +206,7 @@ function PerfilPublicoContent() {
             <>
               {heroBlock && renderBlock(heroBlock)}
               {singleBlock && renderBlock(singleBlock)}
+              {crowdfundingBlock && renderBlock(crowdfundingBlock)}
               {otherBlocksUnified.map(renderBlock)}
             </>
           )
@@ -210,6 +214,7 @@ function PerfilPublicoContent() {
             <>
               {heroBlock && renderBlock(heroBlock)}
               {singleBlock && renderBlock(singleBlock)}
+              {crowdfundingBlock && renderBlock(crowdfundingBlock)}
               {showStoreTab && (
                 <div className="sticky top-2 z-20 flex gap-6 rounded-xl border border-border bg-card/95 px-4 shadow-lg backdrop-blur">
                   <button

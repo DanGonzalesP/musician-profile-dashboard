@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3 } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
-export type BlockType = "hero" | "single" | "tracks" | "merch" | "service" | "donation"
+export type BlockType = "hero" | "single" | "crowdfunding" | "tracks" | "merch" | "service" | "donation"
 
 export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
 
@@ -58,6 +58,21 @@ export type SingleData = {
   duration: string
 }
 
+export type CrowdfundingData = {
+  title: string
+  description: string
+  targetAmount: string
+  // currentAmount, backerCount y hypeCount son bases de referencia: el fan
+  // ve el total sumando sus propias interacciones de la sesión encima de
+  // esta base, pero esos incrementos nunca se guardan (misma simulación sin
+  // pasarela real que ya usa DonationData.currentAmount).
+  currentAmount: string
+  daysLeft: string
+  chosenStudio: string
+  hypeCount: string
+  backerCount: string
+}
+
 export type MerchData = {
   title: string
 }
@@ -95,7 +110,14 @@ export function getSongOptions(tracksData: TracksData | undefined): LicenseSongO
   )
 }
 
-export type BlockData = HeroData | SingleData | TracksData | MerchData | ServiceData | DonationData
+export type BlockData =
+  | HeroData
+  | SingleData
+  | CrowdfundingData
+  | TracksData
+  | MerchData
+  | ServiceData
+  | DonationData
 
 export type Block = {
   id: string
@@ -125,6 +147,13 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     description: "El single o canción destacada que se muestra al tope de tu perfil.",
     icon: Disc3,
     category: "Music",
+  },
+  {
+    type: "crowdfunding",
+    label: "Meta de Producción",
+    description: "Campaña de recaudación estilo Kickstarter para financiar tu próxima grabación.",
+    icon: Rocket,
+    category: "Commerce",
   },
   {
     type: "tracks",
@@ -227,6 +256,17 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         audioUrl: content.audioUrl ? String(content.audioUrl) : undefined,
         duration: String(content.duration ?? ""),
       }
+    case "crowdfunding":
+      return {
+        title: String(content.title ?? ""),
+        description: String(content.description ?? ""),
+        targetAmount: String(content.targetAmount ?? ""),
+        currentAmount: String(content.currentAmount ?? "0"),
+        daysLeft: String(content.daysLeft ?? ""),
+        chosenStudio: String(content.chosenStudio ?? ""),
+        hypeCount: String(content.hypeCount ?? "0"),
+        backerCount: String(content.backerCount ?? "0"),
+      }
     case "merch":
       return {
         title: String(content.title ?? ""),
@@ -293,6 +333,17 @@ export function dbBlockToBlock(dbBlock: DbProfileBlock): Block {
 
 function defaultData(type: BlockType): BlockData {
   switch (type) {
+    case "crowdfunding":
+      return {
+        title: "",
+        description: "",
+        targetAmount: "",
+        currentAmount: "0",
+        daysLeft: "",
+        chosenStudio: "",
+        hypeCount: "0",
+        backerCount: "0",
+      }
     case "single":
       // Sin título, portada ni audio de ejemplo a propósito: hasta que el
       // artista suba su single, el bloque público debe mostrar el estado

@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, SingleData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft } from "lucide-react"
 
 function BackToPanelLink() {
   return (
@@ -86,6 +86,9 @@ export function BlockInspector({
         )}
         {block.type === "single" && (
           <SingleFields data={block.data as SingleData} onChange={update} blobRegistry={blobRegistry} />
+        )}
+        {block.type === "crowdfunding" && (
+          <CrowdfundingFields data={block.data as CrowdfundingData} onChange={update} />
         )}
         {block.type === "tracks" && (
           <TracksFields data={block.data as TracksData} onChange={update} blobRegistry={blobRegistry} />
@@ -565,6 +568,93 @@ function SingleFields({
           placeholder="Cuenta la historia detrás de esta canción: en qué te inspiraste, dónde la grabaste..."
         />
       </Field>
+    </>
+  )
+}
+
+// ─── CrowdfundingFields — meta de producción / crowdfunding ────────────────
+
+const STUDIO_OPTIONS = ["Estudio A", "Estudio B", "Estudio C"]
+
+function CrowdfundingFields({
+  data,
+  onChange,
+}: {
+  data: CrowdfundingData
+  onChange: (d: CrowdfundingData) => void
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2 rounded-lg bg-primary/8 px-3 py-2 text-xs text-primary">
+        <Rocket className="size-3.5 shrink-0" />
+        <span>Meta de Producción — campaña de recaudación para tu próxima grabación</span>
+      </div>
+      <Field label="Título de la campaña">
+        <TextInput
+          value={data.title || ""}
+          onChange={(e) => onChange({ ...data, title: e.target.value })}
+          placeholder="Ej. Grabar mi nuevo EP en Estudio SonidoX"
+        />
+      </Field>
+      <Field label="Descripción">
+        <textarea
+          value={data.description || ""}
+          onChange={(e) => onChange({ ...data, description: e.target.value })}
+          rows={3}
+          className={inputClass}
+          placeholder="Cuéntale a tus fans para qué es esta grabación..."
+        />
+      </Field>
+      <Field label="Estudio aliado">
+        <select
+          value={data.chosenStudio || ""}
+          onChange={(e) => onChange({ ...data, chosenStudio: e.target.value })}
+          className={inputClass}
+        >
+          <option value="">Selecciona un estudio</option>
+          {STUDIO_OPTIONS.map((studio) => (
+            <option key={studio} value={studio}>
+              {studio}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="flex gap-2">
+        <Field label="Monto objetivo">
+          <TextInput
+            type="number"
+            min="0"
+            value={data.targetAmount || ""}
+            onChange={(e) => onChange({ ...data, targetAmount: e.target.value })}
+            placeholder="5000"
+          />
+        </Field>
+        <Field label="Días restantes">
+          <TextInput
+            type="number"
+            min="0"
+            value={data.daysLeft || ""}
+            onChange={(e) => onChange({ ...data, daysLeft: e.target.value })}
+            placeholder="30"
+          />
+        </Field>
+      </div>
+      <div className="flex gap-2">
+        <Field label="Monto ya recaudado">
+          <TextInput type="number" disabled value={data.currentAmount || "0"} />
+        </Field>
+        <Field label="Personas que ya aportaron">
+          <TextInput type="number" disabled value={data.backerCount || "0"} />
+        </Field>
+      </div>
+      <Field label="Personas en espera (hype)">
+        <TextInput type="number" disabled value={data.hypeCount || "0"} />
+      </Field>
+      <p className="-mt-4 text-[11px] leading-relaxed text-muted-foreground">
+        Los tres contadores de arriba se calcularán automáticamente con las interacciones reales de tus fans —
+        aquí solo se muestran como referencia. Mientras no haya pasarela de pago real conectada, cada visitante
+        ve estos números sumados con sus propias interacciones simuladas de esa sesión.
+      </p>
     </>
   )
 }

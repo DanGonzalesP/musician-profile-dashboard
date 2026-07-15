@@ -1,9 +1,10 @@
 "use client"
 
-import type { Block, HeroData, SingleData, TracksData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
 import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { HeroBlock } from "./hero-block"
 import { FeaturedSingleBlock } from "./featured-single-block"
+import { CrowdfundingBlock } from "./crowdfunding-block"
 import { TrackListBlock } from "./track-list-block"
 import { MerchBlock } from "./merch-block"
 import { ServiceBlock } from "./service-block"
@@ -27,6 +28,8 @@ export function BlockRenderer({
       return <HeroBlock data={block.data as HeroData} shareUrl={shareUrl} albumCovers={albumCovers} />
     case "single":
       return <FeaturedSingleBlock data={block.data as SingleData} />
+    case "crowdfunding":
+      return <CrowdfundingBlock data={block.data as CrowdfundingData} />
     case "tracks":
       return <TrackListBlock data={block.data as TracksData} />
     case "merch":
