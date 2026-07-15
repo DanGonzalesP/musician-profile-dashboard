@@ -230,19 +230,22 @@ function AudioUploader({
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
 
-    // Solo aceptamos .mp3: formatos pesados como .wav/.flac saturarían el
-    // almacenamiento, así que se rechazan aquí mismo, antes de registrar
-    // el archivo o generar ningún blob URL.
+    // Aceptamos .mp3, .aac/.m4a y .wav. AAC es el formato nativo de Storage
+    // para esa extensión — no hace falta transcodificar, es tan liviano como
+    // el mp3 y se reproduce nativo en <audio>/<iframe> de todos los
+    // navegadores modernos. WAV pesa más al no estar comprimido, pero se
+    // acepta igual porque es un formato de entrega habitual entre músicos.
     // La validación por nombre de archivo sola era demasiado estricta: un
     // nombre con espacios al final, mayúsculas, o sin extensión visible (el
     // navegador a veces la omite al venir de un recorte/exportación) hacía
-    // que un .mp3 real fuera rechazado. Ahora también se acepta si el
-    // navegador reporta un MIME de audio mp3, aunque el nombre no sea claro.
+    // que un archivo válido fuera rechazado. Ahora también se acepta si el
+    // navegador reporta un MIME de audio compatible, aunque el nombre no sea claro.
     const rawName = file.name.trim()
     const ext = rawName.includes(".") ? rawName.split(".").pop()?.toLowerCase().trim() : ""
-    const mimeIsMp3 = /mpeg|mp3/i.test(file.type)
-    if (ext !== "mp3" && !mimeIsMp3) {
-      setError("Solo se aceptan archivos .mp3. Sube un audio optimizado para la web.")
+    const ACCEPTED_EXTS = new Set(["mp3", "aac", "m4a", "wav"])
+    const mimeIsAccepted = /mpeg|mp3|aac|mp4|wav|wave/i.test(file.type)
+    if (!ACCEPTED_EXTS.has(ext ?? "") && !mimeIsAccepted) {
+      setError("Solo se aceptan archivos .mp3, .aac/.m4a o .wav. Sube un audio optimizado para la web.")
       e.target.value = ""
       return
     }
@@ -291,8 +294,13 @@ function AudioUploader({
         }`}
       >
         <Music className="size-3.5 text-muted-foreground" />
-        <span>Subir audio (.mp3)</span>
-        <input type="file" accept=".mp3,audio/mpeg" onChange={handleFileChange} className="hidden" />
+        <span>Subir audio (.mp3, .aac, .wav)</span>
+        <input
+          type="file"
+          accept=".mp3,.aac,.m4a,.wav,audio/mpeg,audio/aac,audio/mp4,audio/wav,audio/x-wav"
+          onChange={handleFileChange}
+          className="hidden"
+        />
       </label>
     </div>
   )
