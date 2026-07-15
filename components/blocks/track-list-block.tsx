@@ -48,6 +48,13 @@ function AlbumCover({
 const ALBUM_ITEM_WIDTH = 192 // w-48
 const ALBUM_ITEM_GAP = 12 // gap-3
 
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) return "0:00"
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, "0")}`
+}
+
 function TypewriterText({ text }: { text: string }) {
   const [visibleChars, setVisibleChars] = useState(0)
 
@@ -77,7 +84,14 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   // Van desfasados a propósito para poder secuenciar: retraer → deslizar → desplegar.
   const [selectedAlbum, setSelectedAlbum] = useState<number | null>(null)
   const [panelAlbumIndex, setPanelAlbumIndex] = useState<number | null>(null)
-  const [playingTrack, setPlayingTrack] = useState<number | null>(null)
+  // currentTrackIndex: qué pista está cargada/seleccionada dentro del álbum
+  // abierto — se queda así aunque el audio esté en pausa, para que la
+  // descripción y la barra de progreso no desaparezcan. isPlaying es lo
+  // único que refleja si el audio está sonando de verdad en este momento.
+  const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
   const [carouselPaused, setCarouselPaused] = useState(false)
   const [isClosingPanel, setIsClosingPanel] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -91,14 +105,33 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   const switchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const slideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function stopAudio() {
+  // Descarta el elemento de audio actual por completo — solo para cuando se
+  // cambia de pista, de álbum, o se cierra el panel. Una pausa normal NO
+  // pasa por aquí: ver handleTrackClick, que solo llama a audio.pause() y
+  // conserva todo para poder reanudar exactamente donde se quedó.
+  function teardownAudio() {
     const audio = audioRef.current
-    if (!audio) return
-    audio.pause()
-    audio.currentTime = 0
+    if (audio) {
+      audio.pause()
+      audio.onended = null
+      audio.onerror = null
+      audio.ontimeupdate = null
+      audio.onloadedmetadata = null
+    }
     audioRef.current = null
     loadedUrlRef.current = null
     setActiveAudio(null)
+  }
+
+  // Reinicio completo del reproductor: cierra el panel del álbum o cambia a
+  // otro álbum. Acá sí debe desaparecer la descripción y la barra de
+  // progreso, porque ya no hay ningún disco puesto.
+  function resetPlayback() {
+    teardownAudio()
+    setIsPlaying(false)
+    setCurrentTrackIndex(null)
+    setCurrentTime(0)
+    setDuration(0)
   }
 
   // El carrusel se pausa mientras el usuario interactúa y se reanuda solo
@@ -109,11 +142,14 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     resumeTimeoutRef.current = setTimeout(() => setCarouselPaused(false), 2500)
   }
 
-  function playTrackAt(albumIndex: number, trackIndex: number) {
+  function loadAndPlay(albumIndex: number, trackIndex: number) {
     const track = albums[albumIndex]?.tracks[trackIndex]
     if (!track?.audioUrl) return
 
-    stopAudio()
+    teardownAudio()
+    setCurrentTrackIndex(trackIndex)
+    setCurrentTime(0)
+    setDuration(0)
     let fallbackTried = false
 
     // Se intenta primero con crossOrigin habilitado (necesario para que el
@@ -127,14 +163,13 @@ export function TrackListBlock({ data }: { data: TracksData }) {
       audio.src = track!.audioUrl!
       audioRef.current = audio
       loadedUrlRef.current = track!.audioUrl!
-      setPlayingTrack(trackIndex)
       if (withCors) setActiveAudio(audio)
 
       function giveUp() {
         if (audioRef.current === audio) {
           audioRef.current = null
           loadedUrlRef.current = null
-          setPlayingTrack(null)
+          setIsPlaying(false)
           setActiveAudio(null)
         }
       }
@@ -148,20 +183,25 @@ export function TrackListBlock({ data }: { data: TracksData }) {
         giveUp()
       }
 
+      audio.ontimeupdate = () => setCurrentTime(audio.currentTime)
+      audio.onloadedmetadata = () => setDuration(audio.duration || 0)
       audio.onended = () => {
         const tracks = albums[albumIndex]?.tracks || []
         const nextIndex = tracks.findIndex((t, idx) => idx > trackIndex && Boolean(t.audioUrl))
         if (nextIndex >= 0) {
-          playTrackAt(albumIndex, nextIndex)
+          loadAndPlay(albumIndex, nextIndex)
         } else {
-          audioRef.current = null
-          loadedUrlRef.current = null
-          setPlayingTrack(null)
-          setActiveAudio(null)
+          // Termina la última pista reproducible del álbum: se detiene, pero
+          // el panel, la descripción y la barra de progreso se quedan tal
+          // cual — solo desaparecen si se cierra el disco o se cambia de
+          // álbum, nunca solo porque la canción terminó de sonar.
+          audio.currentTime = 0
+          setCurrentTime(0)
+          setIsPlaying(false)
         }
       }
       audio.onerror = retryOrGiveUp
-      audio.play().catch(retryOrGiveUp)
+      audio.play().then(() => setIsPlaying(true)).catch(retryOrGiveUp)
     }
 
     createAndPlay(true)
@@ -170,9 +210,10 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   function dropVinylFor(index: number) {
     setPanelAlbumIndex(index)
     const firstPlayable = albums[index]?.tracks.findIndex((t) => Boolean(t.audioUrl)) ?? -1
-    setPlayingTrack(null)
     if (firstPlayable >= 0) {
-      playTrackAt(index, firstPlayable)
+      loadAndPlay(index, firstPlayable)
+    } else {
+      setCurrentTrackIndex(null)
     }
   }
 
@@ -185,8 +226,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     if (panelAlbumIndex === index) {
       // Mismo álbum: el vinilo se guarda en su funda y el panel recién
       // entonces se cierra por completo.
-      stopAudio()
-      setPlayingTrack(null)
+      resetPlayback()
       setIsClosingPanel(true)
       switchTimeoutRef.current = setTimeout(() => {
         setIsClosingPanel(false)
@@ -196,8 +236,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
       return
     }
 
-    stopAudio()
-    setPlayingTrack(null)
+    resetPlayback()
 
     if (panelAlbumIndex !== null) {
       // El panel (la caja completa) no se mueve ni desaparece — solo el
@@ -221,26 +260,43 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   function handleTrackClick(albumIndex: number, trackIndex: number) {
     pauseCarouselBriefly()
     const track = albums[albumIndex]?.tracks[trackIndex]
-    // Solo se trata como "pausar la pista que ya suena" si el archivo
+    if (!track?.audioUrl) return
+    // Solo se trata como "esta pista ya está cargada" si el archivo
     // realmente cargado coincide con el audioUrl actual de esa posición.
     // Si el artista reemplazó el audio de esa pista, el índice sigue siendo
     // el mismo pero el archivo cargado ya no coincide — en ese caso el clic
-    // debe cargar y reproducir el archivo nuevo, no solo detener el viejo.
+    // debe cargar y reproducir el archivo nuevo desde cero, no solo
+    // pausar/reanudar el viejo.
     const isSameLoadedTrack =
       panelAlbumIndex === albumIndex &&
-      playingTrack === trackIndex &&
-      loadedUrlRef.current === track?.audioUrl
+      currentTrackIndex === trackIndex &&
+      loadedUrlRef.current === track.audioUrl
     if (isSameLoadedTrack) {
-      stopAudio()
-      setPlayingTrack(null)
+      // Pausa/reanuda en el mismo lugar — no se descarta el audio, así que
+      // la posición, la descripción y la barra de progreso se conservan.
+      const audio = audioRef.current
+      if (!audio) return
+      if (isPlaying) {
+        audio.pause()
+        setIsPlaying(false)
+      } else {
+        audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+      }
       return
     }
-    playTrackAt(albumIndex, trackIndex)
+    loadAndPlay(albumIndex, trackIndex)
+  }
+
+  function handleSeek(value: number) {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.currentTime = value
+    setCurrentTime(value)
   }
 
   useEffect(
     () => () => {
-      stopAudio()
+      teardownAudio()
       if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current)
       if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
       if (slideTimeoutRef.current) clearTimeout(slideTimeoutRef.current)
@@ -249,7 +305,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   )
 
   const activeAlbum = panelAlbumIndex !== null ? albums[panelAlbumIndex] : null
-  const activeTrack = activeAlbum && playingTrack !== null ? activeAlbum.tracks[playingTrack] : null
+  const activeTrack = activeAlbum && currentTrackIndex !== null ? activeAlbum.tracks[currentTrackIndex] : null
 
   if (albums.length === 0) {
     return (
@@ -322,7 +378,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
               >
                 <div
                   className={`flex h-full w-full items-center justify-center ${
-                    playingTrack !== null && !isClosingPanel ? "animate-spin" : ""
+                    isPlaying && !isClosingPanel ? "animate-spin" : ""
                   }`}
                   style={{
                     animationDuration: "6s",
@@ -348,7 +404,8 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
               <ul className="flex flex-col">
                 {activeAlbum.tracks.map((track, i) => {
-                  const isPlaying = playingTrack === i
+                  const isSelected = currentTrackIndex === i
+                  const isRowPlaying = isSelected && isPlaying
                   const hasAudio = Boolean(track.audioUrl)
                   return (
                     <li key={i}>
@@ -357,7 +414,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
                         onClick={() => handleTrackClick(panelAlbumIndex, i)}
                         disabled={!hasAudio}
                         className={`group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
-                          isPlaying ? "bg-primary/10" : hasAudio ? "hover:bg-accent/60" : "cursor-not-allowed opacity-60"
+                          isSelected ? "bg-primary/10" : hasAudio ? "hover:bg-accent/60" : "cursor-not-allowed opacity-60"
                         }`}
                       >
                         <span className="size-9 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -375,16 +432,16 @@ export function TrackListBlock({ data }: { data: TracksData }) {
                         </span>
                         <span
                           className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                            isPlaying
+                            isSelected
                               ? "border-primary bg-primary/10 text-primary"
                               : hasAudio
                                 ? "border-border text-muted-foreground group-hover:border-primary group-hover:text-primary"
                                 : "border-border/50 text-muted-foreground/40"
                           }`}
                         >
-                          {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                          {isRowPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                         </span>
-                        <span className={`flex-1 truncate text-sm ${isPlaying ? "font-medium text-primary" : "text-foreground"}`}>
+                        <span className={`flex-1 truncate text-sm ${isSelected ? "font-medium text-primary" : "text-foreground"}`}>
                           {track.title || t("track_untitled")}
                         </span>
                         {!hasAudio && <span className="text-[10px] italic text-muted-foreground/50">{t("track_no_audio")}</span>}
@@ -399,10 +456,38 @@ export function TrackListBlock({ data }: { data: TracksData }) {
             </div>
           </div>
 
-          {activeTrack?.description && (
-            <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-              <TypewriterText key={`${panelAlbumIndex}-${playingTrack}`} text={activeTrack.description} />
-            </p>
+          {/* Barra de progreso + descripción de la pista seleccionada — se
+              quedan visibles aunque el audio esté en pausa; solo
+              desaparecen si se cierra el disco (mismo álbum) o se cambia de
+              álbum, ver resetPlayback(). */}
+          {activeTrack && (
+            <div className="mt-3 border-t border-border pt-3">
+              <div className="flex items-center gap-2">
+                <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
+                  {formatTime(currentTime)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 0}
+                  step={0.1}
+                  value={Math.min(currentTime, duration || 0)}
+                  disabled={!duration}
+                  onChange={(e) => handleSeek(Number(e.target.value))}
+                  aria-label={t("track_seek_aria")}
+                  className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <span className="w-9 shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                  {formatTime(duration)}
+                </span>
+              </div>
+
+              {activeTrack.description && (
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  <TypewriterText key={`${panelAlbumIndex}-${currentTrackIndex}`} text={activeTrack.description} />
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}

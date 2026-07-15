@@ -26,6 +26,7 @@ export const dictionaries: Record<Locale, Dict> = {
     example_badge: "Ejemplo",
     track_untitled: "Nueva Pista",
     track_no_audio: "sin audio",
+    track_seek_aria: "Progreso de la canción",
     song_one: "canción",
     song_other: "canciones",
 
@@ -86,6 +87,7 @@ export const dictionaries: Record<Locale, Dict> = {
     example_badge: "Example",
     track_untitled: "New Track",
     track_no_audio: "no audio",
+    track_seek_aria: "Track progress",
     song_one: "song",
     song_other: "songs",
 
