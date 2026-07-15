@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { Play, Pause, Music } from "lucide-react"
 import type { TracksData, Album } from "@/lib/blocks"
 import { setActiveAudio } from "@/lib/audio-bus"
+import { claimNowPlaying, releaseNowPlaying } from "@/lib/now-playing"
 import { useLocale } from "@/components/locale-provider"
 
 function AlbumCover({
@@ -121,6 +122,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     audioRef.current = null
     loadedUrlRef.current = null
     setActiveAudio(null)
+    releaseNowPlaying("tracks-block")
   }
 
   // Reinicio completo del reproductor: cierra el panel del álbum o cambia a
@@ -201,7 +203,16 @@ export function TrackListBlock({ data }: { data: TracksData }) {
         }
       }
       audio.onerror = retryOrGiveUp
-      audio.play().then(() => setIsPlaying(true)).catch(retryOrGiveUp)
+      audio
+        .play()
+        .then(() => {
+          claimNowPlaying("tracks-block", () => {
+            audio.pause()
+            setIsPlaying(false)
+          })
+          setIsPlaying(true)
+        })
+        .catch(retryOrGiveUp)
     }
 
     createAndPlay(true)
@@ -279,8 +290,18 @@ export function TrackListBlock({ data }: { data: TracksData }) {
       if (isPlaying) {
         audio.pause()
         setIsPlaying(false)
+        releaseNowPlaying("tracks-block")
       } else {
-        audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+        audio
+          .play()
+          .then(() => {
+            claimNowPlaying("tracks-block", () => {
+              audio.pause()
+              setIsPlaying(false)
+            })
+            setIsPlaying(true)
+          })
+          .catch(() => setIsPlaying(false))
       }
       return
     }

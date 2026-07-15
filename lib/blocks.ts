@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3 } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
-export type BlockType = "hero" | "tracks" | "merch" | "service" | "donation"
+export type BlockType = "hero" | "single" | "tracks" | "merch" | "service" | "donation"
 
 export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
 
@@ -46,6 +46,18 @@ export type TracksData = {
   albums: Album[]
 }
 
+export type SingleData = {
+  title: string
+  genre: string
+  year: string
+  description?: string
+  cover: string
+  audioUrl?: string
+  // Igual que Track.duration: nunca es un número inventado, se calcula
+  // leyendo la metadata real del audio al subirlo.
+  duration: string
+}
+
 export type MerchData = {
   title: string
 }
@@ -83,7 +95,7 @@ export function getSongOptions(tracksData: TracksData | undefined): LicenseSongO
   )
 }
 
-export type BlockData = HeroData | TracksData | MerchData | ServiceData | DonationData
+export type BlockData = HeroData | SingleData | TracksData | MerchData | ServiceData | DonationData
 
 export type Block = {
   id: string
@@ -106,6 +118,13 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     description: "Encabezado grande con tu nombre, frase de presentación y foto.",
     icon: GalleryVerticalEnd,
     category: "Layout",
+  },
+  {
+    type: "single",
+    label: "Lanzamiento Actual",
+    description: "El single o canción destacada que se muestra al tope de tu perfil.",
+    icon: Disc3,
+    category: "Music",
   },
   {
     type: "tracks",
@@ -198,6 +217,16 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
       }
       return { albums: [] }
     }
+    case "single":
+      return {
+        title: String(content.title ?? ""),
+        genre: String(content.genre ?? ""),
+        year: String(content.year ?? ""),
+        description: content.description ? String(content.description) : "",
+        cover: String(content.cover ?? ""),
+        audioUrl: content.audioUrl ? String(content.audioUrl) : undefined,
+        duration: String(content.duration ?? ""),
+      }
     case "merch":
       return {
         title: String(content.title ?? ""),
@@ -264,6 +293,19 @@ export function dbBlockToBlock(dbBlock: DbProfileBlock): Block {
 
 function defaultData(type: BlockType): BlockData {
   switch (type) {
+    case "single":
+      // Sin título, portada ni audio de ejemplo a propósito: hasta que el
+      // artista suba su single, el bloque público debe mostrar el estado
+      // "Próximo Lanzamiento", nunca música de prueba.
+      return {
+        title: "",
+        genre: "",
+        year: "",
+        description: "",
+        cover: "",
+        audioUrl: undefined,
+        duration: "",
+      }
     case "hero":
       return {
         name: "Nova Reyes",

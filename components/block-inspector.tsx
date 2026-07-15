@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, TracksData, MerchData, ServiceData, DonationData, Album, Track, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
 import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, ArrowLeft } from "lucide-react"
@@ -83,6 +83,9 @@ export function BlockInspector({
       <div className="flex-1 space-y-6 overflow-y-auto p-4">
         {block.type === "hero" && (
           <HeroFields data={block.data as HeroData} onChange={update} blobRegistry={blobRegistry} />
+        )}
+        {block.type === "single" && (
+          <SingleFields data={block.data as SingleData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "tracks" && (
           <TracksFields data={block.data as TracksData} onChange={update} blobRegistry={blobRegistry} />
@@ -446,6 +449,124 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, "0")}`
+}
+
+// ─── SingleFields — el lanzamiento actual / single destacado ──────────────
+
+function SingleFields({
+  data,
+  onChange,
+  blobRegistry,
+}: {
+  data: SingleData
+  onChange: (d: SingleData) => void
+  blobRegistry: BlobRegistry
+}) {
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [isPreviewing, setIsPreviewing] = useState(false)
+
+  const handleAudioUploaded = async (url: string) => {
+    // Igual que en TracksFields: audioUrl y duration se guardan juntos en una
+    // sola actualización para no pisar el estado con una copia vieja.
+    let duration = ""
+    try {
+      duration = formatDuration(await extractAudioDuration(url))
+    } catch {
+      // Sin metadata legible: se deja vacío, el artista puede escribirla luego.
+    }
+    onChange({ ...data, audioUrl: url, duration })
+  }
+
+  const togglePreview = () => {
+    if (!data.audioUrl) return
+    if (isPreviewing && previewAudioRef.current?.src === data.audioUrl) {
+      previewAudioRef.current?.pause()
+      previewAudioRef.current = null
+      setIsPreviewing(false)
+      return
+    }
+    previewAudioRef.current?.pause()
+    const audio = new Audio(data.audioUrl)
+    previewAudioRef.current = audio
+    setIsPreviewing(true)
+    audio.onended = () => setIsPreviewing(false)
+    audio.onerror = () => setIsPreviewing(false)
+    audio.play().catch(() => setIsPreviewing(false))
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2 rounded-lg bg-primary/8 px-3 py-2 text-xs text-primary">
+        <Disc3 className="size-3.5 shrink-0" />
+        <span>Lanzamiento Actual — el single que se destaca al tope de tu perfil</span>
+      </div>
+      <Field label="Título de la canción">
+        <TextInput
+          value={data.title || ""}
+          onChange={(e) => onChange({ ...data, title: e.target.value })}
+          placeholder="Ej. Neon Horizon"
+        />
+      </Field>
+      <div className="flex gap-2">
+        <Field label="Género">
+          <TextInput
+            value={data.genre || ""}
+            onChange={(e) => onChange({ ...data, genre: e.target.value })}
+            placeholder="Ej. Synth Pop"
+          />
+        </Field>
+        <Field label="Año">
+          <TextInput
+            value={data.year || ""}
+            onChange={(e) => onChange({ ...data, year: e.target.value })}
+            placeholder="Ej. 2026"
+          />
+        </Field>
+      </div>
+      <Field label="Portada">
+        <ImageUploader
+          currentImageUrl={data.cover}
+          onUploadReady={(url) => onChange({ ...data, cover: url })}
+          blobRegistry={blobRegistry}
+        />
+      </Field>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={togglePreview}
+          disabled={!data.audioUrl}
+          title={data.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
+          aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}
+          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
+        >
+          {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+        </button>
+        {data.duration && (
+          <span
+            title="Calculado automáticamente al subir el audio"
+            aria-label={`Duración: ${data.duration}`}
+            className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
+          >
+            {data.duration}
+          </span>
+        )}
+      </div>
+      <AudioUploader
+        currentAudioUrl={data.audioUrl}
+        onUploadReady={(url) => handleAudioUploaded(url)}
+        blobRegistry={blobRegistry}
+      />
+      <Field label="Descripción (opcional)">
+        <textarea
+          value={data.description || ""}
+          onChange={(e) => onChange({ ...data, description: e.target.value })}
+          rows={3}
+          className={inputClass}
+          placeholder="Cuenta la historia detrás de esta canción: en qué te inspiraste, dónde la grabaste..."
+        />
+      </Field>
+    </>
+  )
 }
 
 function TracksFields({

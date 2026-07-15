@@ -14,11 +14,12 @@ import { Store, Home } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 
-// Perfil "separado" (default): Hero, Track List y Donaciones viven en la
-// página principal; Merch y Servicios quedan en su propia pestaña. Si el
-// artista activa "Unificar perfil" (profiles.unified_profile), se muestran
-// todos los bloques juntos, en el orden guardado, como antes.
-const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "tracks", "donation"];
+// Perfil "separado" (default): Hero, Single Destacado, Track List y
+// Donaciones viven en la página principal; Merch y Servicios quedan en su
+// propia pestaña. Si el artista activa "Unificar perfil"
+// (profiles.unified_profile), se muestran todos los bloques juntos, pero
+// Hero y Single Destacado igual quedan forzados al tope — ver más abajo.
+const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "tracks", "donation"];
 
 export default function PerfilPublicoPage() {
   return (
@@ -171,7 +172,11 @@ function PerfilPublicoContent() {
   const albumCovers = tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? [];
 
   const heroBlock = blocks.find((b) => b.type === "hero");
-  const restMainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type) && b.type !== "hero");
+  const singleBlock = blocks.find((b) => b.type === "single");
+  const restMainBlocks = blocks.filter(
+    (b) => MAIN_BLOCK_TYPES.includes(b.type) && b.type !== "hero" && b.type !== "single"
+  );
+  const otherBlocksUnified = blocks.filter((b) => b.type !== "hero" && b.type !== "single");
   const storeBlocks = blocks.filter((b) => !MAIN_BLOCK_TYPES.includes(b.type));
   const showStoreTab = !unifiedProfile && storeBlocks.length > 0;
 
@@ -194,10 +199,17 @@ function PerfilPublicoContent() {
           <LanguageSwitcher />
         </div>
         {unifiedProfile
-          ? blocks.map(renderBlock)
+          ? (
+            <>
+              {heroBlock && renderBlock(heroBlock)}
+              {singleBlock && renderBlock(singleBlock)}
+              {otherBlocksUnified.map(renderBlock)}
+            </>
+          )
           : (
             <>
               {heroBlock && renderBlock(heroBlock)}
+              {singleBlock && renderBlock(singleBlock)}
               {showStoreTab && (
                 <div className="sticky top-2 z-20 flex gap-6 rounded-xl border border-border bg-card/95 px-4 shadow-lg backdrop-blur">
                   <button

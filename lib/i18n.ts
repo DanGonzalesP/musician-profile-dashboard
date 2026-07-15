@@ -30,6 +30,14 @@ export const dictionaries: Record<Locale, Dict> = {
     song_one: "canción",
     song_other: "canciones",
 
+    single_eyebrow: "Lanzamiento Actual",
+    single_upcoming_title: "Próximo Lanzamiento",
+    single_upcoming_subtitle: "Este artista todavía no subió su single destacado.",
+    single_untitled: "Sin título",
+    single_play_aria: "Reproducir",
+    single_pause_aria: "Pausar",
+    single_cover_alt: "Portada del single",
+
     merch_title: "Merch Oficial",
     merch_empty: "No hay productos disponibles por ahora.",
     merch_sold_out: "Agotado",
@@ -90,6 +98,14 @@ export const dictionaries: Record<Locale, Dict> = {
     track_seek_aria: "Track progress",
     song_one: "song",
     song_other: "songs",
+
+    single_eyebrow: "Current Release",
+    single_upcoming_title: "Upcoming Release",
+    single_upcoming_subtitle: "This artist hasn't uploaded their featured single yet.",
+    single_untitled: "Untitled",
+    single_play_aria: "Play",
+    single_pause_aria: "Pause",
+    single_cover_alt: "Single cover",
 
     merch_title: "Official Merch",
     merch_empty: "No products available right now.",
