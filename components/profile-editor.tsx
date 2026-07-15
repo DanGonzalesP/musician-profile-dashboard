@@ -166,7 +166,15 @@ async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Pro
     console.warn(`[handlePublish] No se encontró el File para blob URL: ${url}`)
     return url
   }
-  const folder: "images" | "audio" = file.type.startsWith("audio") ? "audio" : "images"
+  // `file.type` no es confiable para decidir la carpeta: algunos navegadores
+  // reportan ciertos .mp3 como "video/mpeg" (el mismo problema documentado
+  // arriba, en AUDIO_MIME_TYPES). Con ese MIME, "video/mpeg".startsWith("audio")
+  // es falso, así que el audio se enrutaba como si fuera una imagen — pasaba
+  // por la compresión de imágenes y se publicaba con el MIME incorrecto, que
+  // Supabase Storage termina rechazando. La extensión del archivo es la señal
+  // confiable: si el navegador la validó como .mp3, es audio.
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase()
+  const folder: "images" | "audio" = ext in AUDIO_MIME_TYPES ? "audio" : "images"
   const permanentUrl = await uploadFileToStorage(file, folder)
   URL.revokeObjectURL(url)
   blobRegistry.delete(url)
