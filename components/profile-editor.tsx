@@ -688,6 +688,7 @@ export function ProfileEditor() {
                 onProductsChange={setProducts}
                 services={services}
                 onServicesChange={setServices}
+                profileId={profileIdRef.current}
               />
             </aside>
           </>

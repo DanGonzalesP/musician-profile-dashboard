@@ -72,12 +72,31 @@ export type CatalogData = {
 
 export type CreditRole = "A" | "C" | "P" | "R" | "M" | "V" | "I"
 
+// "internal": colaboración en una canción de otro artista de la plataforma —
+// requiere que el dueño de la canción la apruebe desde su panel de
+// notificaciones antes de aparecer en el perfil público (ver
+// lib/credit-requests.ts). "external": enlace de YouTube ajeno a la
+// plataforma, se publica de inmediato sin aprobación.
+export type CreditSourceType = "internal" | "external"
+export type CreditStatus = "pending" | "accepted" | "rejected"
+
 export type CreditItem = {
   id: string
+  sourceType: CreditSourceType
   title: string
   mainArtist: string
   role: CreditRole
+  // URL de YouTube — solo aplica cuando sourceType es "external".
   externalUrl?: string
+  // "external" siempre queda "accepted" (no requiere aprobación de nadie).
+  // "internal" nace "pending" y solo el dueño de la canción puede pasarlo a
+  // "accepted"/"rejected" — ver resolveCreditRequest en lib/credit-requests.ts.
+  status: CreditStatus
+  // Solo para sourceType "internal": enlazan este crédito con la fila de
+  // credit_requests que activa el flujo de notificaciones.
+  requestId?: string
+  ownerProfileId?: string
+  songKey?: string
 }
 
 export type CreditsData = {
@@ -389,14 +408,26 @@ function normalizeAlbum(raw: unknown, index: number): Album {
 
 const CREDIT_ROLES: CreditRole[] = ["A", "C", "P", "R", "M", "V", "I"]
 
+const CREDIT_STATUSES: CreditStatus[] = ["pending", "accepted", "rejected"]
+
 function normalizeCreditItem(raw: unknown, index: number): CreditItem {
   const c = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  // Créditos guardados antes de que existiera el flujo interno/externo caen
+  // en "external" + "accepted" — se siguen mostrando igual que antes, sin
+  // necesitar aprobación de nadie.
+  const sourceType: CreditSourceType = c.sourceType === "internal" ? "internal" : "external"
+  const status: CreditStatus = CREDIT_STATUSES.includes(c.status as CreditStatus) ? (c.status as CreditStatus) : "accepted"
   return {
     id: String(c.id ?? `credit-${index + 1}`),
+    sourceType,
     title: String(c.title ?? ""),
     mainArtist: String(c.mainArtist ?? ""),
     role: CREDIT_ROLES.includes(c.role as CreditRole) ? (c.role as CreditRole) : "M",
     externalUrl: c.externalUrl ? String(c.externalUrl) : undefined,
+    status,
+    requestId: c.requestId ? String(c.requestId) : undefined,
+    ownerProfileId: c.ownerProfileId ? String(c.ownerProfileId) : undefined,
+    songKey: c.songKey ? String(c.songKey) : undefined,
   }
 }
 

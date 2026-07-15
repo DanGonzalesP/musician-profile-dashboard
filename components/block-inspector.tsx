@@ -2,10 +2,13 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, CreditsData, CreditItem, CreditRole, MerchData, ServiceData, DonationData, Album, Track, ReleaseType, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, DonationData, Album, Track, ReleaseType, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react"
+import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
+import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
+import { fetchYoutubeMetadata } from "@/lib/youtube"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft, ArrowUp, ArrowDown, Search } from "lucide-react"
 
 function BackToPanelLink() {
   return (
@@ -30,6 +33,7 @@ type Props = {
   onProductsChange: (products: CatalogProduct[]) => void
   services: CatalogService[]
   onServicesChange: (services: CatalogService[]) => void
+  profileId?: string | null
 }
 
 export function BlockInspector({
@@ -42,6 +46,7 @@ export function BlockInspector({
   onProductsChange,
   services,
   onServicesChange,
+  profileId,
 }: Props) {
   if (!block) {
     return (
@@ -97,7 +102,7 @@ export function BlockInspector({
           <CatalogFields data={block.data as CatalogData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "credits" && (
-          <CreditsFields data={block.data as CreditsData} onChange={update} />
+          <CreditsFields data={block.data as CreditsData} onChange={update} profileId={profileId ?? null} />
         )}
         {block.type === "merch" && (
           <MerchFields
@@ -1412,12 +1417,26 @@ const CREDIT_ROLE_LABELS: Record<CreditRole, string> = {
   I: "Intérprete",
 }
 
+const CREDIT_STATUS_LABELS: Record<CreditStatus, string> = {
+  pending: "Pendiente de aprobación",
+  accepted: "Aceptado",
+  rejected: "Rechazado",
+}
+
+const CREDIT_STATUS_CLASSES: Record<CreditStatus, string> = {
+  pending: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+  accepted: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+  rejected: "border-destructive/30 bg-destructive/10 text-destructive",
+}
+
 function CreditsFields({
   data,
   onChange,
+  profileId,
 }: {
   data: CreditsData
   onChange: (d: CreditsData) => void
+  profileId: string | null
 }) {
   const credits = data.credits || []
 
@@ -1426,10 +1445,12 @@ function CreditsFields({
   const addCredit = () => {
     const newItem: CreditItem = {
       id: `credit-${Date.now()}`,
+      sourceType: "external",
       title: "",
       mainArtist: "",
       role: "M",
       externalUrl: "",
+      status: "accepted",
     }
     updateCredits([...credits, newItem])
   }
@@ -1448,6 +1469,62 @@ function CreditsFields({
     const next = [...credits]
     ;[next[index], next[target]] = [next[target], next[index]]
     updateCredits(next)
+  }
+
+  // Al cambiar el tipo de origen se limpian los campos específicos del otro
+  // tipo — así nunca queda un enlace de YouTube colgando en un crédito
+  // interno, ni una referencia de canción/solicitud en uno externo.
+  const setSourceType = (index: number, sourceType: CreditSourceType) => {
+    if (sourceType === "internal") {
+      setCredit(index, {
+        sourceType,
+        title: "",
+        mainArtist: "",
+        externalUrl: undefined,
+        status: "pending",
+        requestId: undefined,
+        ownerProfileId: undefined,
+        songKey: undefined,
+      })
+    } else {
+      setCredit(index, {
+        sourceType,
+        title: "",
+        mainArtist: "",
+        externalUrl: "",
+        status: "accepted",
+        requestId: undefined,
+        ownerProfileId: undefined,
+        songKey: undefined,
+      })
+    }
+  }
+
+  const handleSongSelect = async (index: number, credit: CreditItem, song: PlatformSongResult) => {
+    if (!profileId) return
+    const { id: requestId, status } = await createCreditRequest({
+      requesterProfileId: profileId,
+      requesterCreditId: credit.id,
+      ownerProfileId: song.ownerProfileId,
+      songTitle: song.title,
+      songKey: song.songKey,
+      role: credit.role,
+    })
+    setCredit(index, {
+      title: song.title,
+      mainArtist: song.ownerDisplayName,
+      ownerProfileId: song.ownerProfileId,
+      songKey: song.songKey,
+      requestId,
+      status,
+    })
+  }
+
+  const refreshStatus = async (index: number, credit: CreditItem) => {
+    if (!credit.requestId) return
+    const statuses = await fetchCreditRequestStatuses([credit.requestId])
+    const next = statuses[credit.requestId]
+    if (next) setCredit(index, { status: next })
   }
 
   return (
@@ -1501,21 +1578,27 @@ function CreditsFields({
               </div>
             </div>
 
-            <Field label="Título de la canción">
-              <TextInput
-                value={credit.title}
-                onChange={(e) => setCredit(index, { title: e.target.value })}
-                placeholder="Nombre de la canción"
-              />
+            <Field label="Tipo de origen">
+              <select
+                value={credit.sourceType}
+                onChange={(e) => setSourceType(index, e.target.value as CreditSourceType)}
+                className={inputClass}
+              >
+                <option value="internal">Colaboración con artista de la plataforma</option>
+                <option value="external">Crédito Externo (YouTube)</option>
+              </select>
             </Field>
 
-            <Field label="Artista principal">
-              <TextInput
-                value={credit.mainArtist}
-                onChange={(e) => setCredit(index, { mainArtist: e.target.value })}
-                placeholder="Nombre del artista"
+            {credit.sourceType === "internal" ? (
+              <InternalCreditFields
+                credit={credit}
+                profileId={profileId}
+                onSelectSong={(song) => handleSongSelect(index, credit, song)}
+                onRefreshStatus={() => refreshStatus(index, credit)}
               />
-            </Field>
+            ) : (
+              <ExternalCreditFields credit={credit} onFieldChange={(changes) => setCredit(index, changes)} />
+            )}
 
             <Field label="Tu rol">
               <select
@@ -1530,14 +1613,6 @@ function CreditsFields({
                 ))}
               </select>
             </Field>
-
-            <Field label="Enlace externo (Spotify/YouTube, opcional)">
-              <TextInput
-                value={credit.externalUrl || ""}
-                onChange={(e) => setCredit(index, { externalUrl: e.target.value })}
-                placeholder="https://..."
-              />
-            </Field>
           </div>
         ))}
 
@@ -1547,6 +1622,220 @@ function CreditsFields({
           </p>
         )}
       </div>
+    </>
+  )
+}
+
+// Opción A del Bloque 4: busca una canción ya publicada por OTRO artista de
+// la plataforma. Al seleccionarla se crea la solicitud de crédito
+// ("pending") y el título/artista quedan fijos — solo se pueden volver a
+// tocar buscando y eligiendo otra canción.
+function InternalCreditFields({
+  credit,
+  profileId,
+  onSelectSong,
+  onRefreshStatus,
+}: {
+  credit: CreditItem
+  profileId: string | null
+  onSelectSong: (song: PlatformSongResult) => Promise<void>
+  onRefreshStatus: () => Promise<void>
+}) {
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<PlatformSongResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [selecting, setSelecting] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
+
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setResults([])
+      return
+    }
+    let cancelled = false
+    setSearching(true)
+    const handle = setTimeout(() => {
+      searchPlatformSongs(query, profileId ?? undefined)
+        .then((found) => {
+          if (!cancelled) setResults(found)
+        })
+        .catch((err) => {
+          console.error("Error buscando canciones en la plataforma:", err)
+          if (!cancelled) setResults([])
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false)
+        })
+    }, 350)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
+    }
+  }, [query, profileId])
+
+  // Ya hay una canción de plataforma elegida — se muestra su estado en vez
+  // del buscador.
+  if (credit.songKey && credit.title) {
+    return (
+      <div className="space-y-2 rounded-lg border border-sidebar-border bg-sidebar/40 p-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{credit.title}</p>
+            <p className="truncate text-xs text-muted-foreground">{credit.mainArtist}</p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${CREDIT_STATUS_CLASSES[credit.status]}`}
+          >
+            {CREDIT_STATUS_LABELS[credit.status]}
+          </span>
+        </div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {credit.status === "pending" &&
+            "Este crédito se mostrará en tu perfil cuando el artista dueño de la canción lo acepte desde su panel de notificaciones."}
+          {credit.status === "rejected" && "El artista dueño de la canción rechazó este crédito — no se mostrará en tu perfil."}
+          {credit.status === "accepted" && "Aceptado — este crédito ya está visible en tu perfil público."}
+        </p>
+        <button
+          type="button"
+          disabled={refreshing}
+          onClick={async () => {
+            setRefreshing(true)
+            try {
+              await onRefreshStatus()
+            } catch (err) {
+              console.error("No se pudo actualizar el estado del crédito:", err)
+            } finally {
+              setRefreshing(false)
+            }
+          }}
+          className="text-[11px] font-medium text-primary hover:underline disabled:opacity-50"
+        >
+          {refreshing ? "Actualizando..." : "Actualizar estado"}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <Field label="Buscar canción en la plataforma">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Escribe el nombre de la canción..."
+          className={`${inputClass} pl-8`}
+        />
+      </div>
+      {searching && <p className="mt-1 text-[11px] text-muted-foreground">Buscando...</p>}
+      {!searching && query.trim().length >= 2 && results.length === 0 && (
+        <p className="mt-1 text-[11px] text-muted-foreground">Sin resultados.</p>
+      )}
+      {errorMessage && <p className="mt-1 text-[11px] text-destructive">{errorMessage}</p>}
+      {results.length > 0 && (
+        <div className="mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-sidebar-border bg-background/60 p-1">
+          {results.map((song) => (
+            <button
+              key={song.songKey}
+              type="button"
+              disabled={selecting}
+              onClick={async () => {
+                setSelecting(true)
+                setErrorMessage("")
+                try {
+                  await onSelectSong(song)
+                  setQuery("")
+                  setResults([])
+                } catch (err) {
+                  console.error("No se pudo crear la solicitud de crédito:", err)
+                  setErrorMessage("No se pudo enviar la solicitud. Intenta de nuevo.")
+                } finally {
+                  setSelecting(false)
+                }
+              }}
+              className="flex w-full flex-col items-start rounded px-2 py-1.5 text-left hover:bg-accent disabled:opacity-50"
+            >
+              <span className="truncate text-xs font-medium text-foreground">{song.title}</span>
+              <span className="truncate text-[10px] text-muted-foreground">
+                {song.ownerDisplayName}
+                {song.albumTitle ? ` — ${song.albumTitle}` : ""}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Field>
+  )
+}
+
+// Opción B del Bloque 4: solo pide el enlace de YouTube — al perder el foco
+// se consulta el oEmbed público del video para autocompletar título/canal,
+// pero el usuario puede retocar o limpiar ambos campos a mano.
+function ExternalCreditFields({
+  credit,
+  onFieldChange,
+}: {
+  credit: CreditItem
+  onFieldChange: (changes: Partial<CreditItem>) => void
+}) {
+  const [fetching, setFetching] = useState(false)
+  const [fetchFailed, setFetchFailed] = useState(false)
+
+  const handleUrlBlur = async () => {
+    const url = credit.externalUrl?.trim()
+    if (!url) return
+    setFetching(true)
+    setFetchFailed(false)
+    try {
+      const meta = await fetchYoutubeMetadata(url)
+      if (meta) {
+        onFieldChange({
+          title: credit.title || meta.title,
+          mainArtist: credit.mainArtist || meta.authorName,
+        })
+      } else {
+        setFetchFailed(true)
+      }
+    } catch (err) {
+      console.error("No se pudo leer la información del video de YouTube:", err)
+      setFetchFailed(true)
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  return (
+    <>
+      <Field label="Enlace de YouTube">
+        <TextInput
+          value={credit.externalUrl || ""}
+          onChange={(e) => onFieldChange({ externalUrl: e.target.value })}
+          onBlur={handleUrlBlur}
+          placeholder="https://www.youtube.com/watch?v=..."
+        />
+        {fetching && <p className="mt-1 text-[11px] text-muted-foreground">Obteniendo datos del video...</p>}
+        {fetchFailed && (
+          <p className="mt-1 text-[11px] text-destructive">No se pudo leer el video — completa los datos manualmente.</p>
+        )}
+      </Field>
+
+      <Field label="Título de la canción">
+        <TextInput
+          value={credit.title}
+          onChange={(e) => onFieldChange({ title: e.target.value })}
+          placeholder="Se completa solo al pegar el enlace"
+        />
+      </Field>
+
+      <Field label="Artista principal">
+        <TextInput
+          value={credit.mainArtist}
+          onChange={(e) => onFieldChange({ mainArtist: e.target.value })}
+          placeholder="Se completa solo al pegar el enlace"
+        />
+      </Field>
     </>
   )
 }
