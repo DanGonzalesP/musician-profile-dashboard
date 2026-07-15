@@ -20,7 +20,7 @@ type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 // (profiles.unified_profile), se muestran todos los bloques juntos, pero
 // Hero, Single Destacado y Meta de Producción igual quedan forzados al
 // tope, en ese orden — ver más abajo.
-const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "catalog", "donation"];
+const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "catalog", "credits", "donation"];
 
 export default function PerfilPublicoPage() {
   return (

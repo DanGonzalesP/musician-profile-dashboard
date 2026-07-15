@@ -1,9 +1,18 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library, Users } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
-export type BlockType = "hero" | "single" | "crowdfunding" | "tracks" | "catalog" | "merch" | "service" | "donation"
+export type BlockType =
+  | "hero"
+  | "single"
+  | "crowdfunding"
+  | "tracks"
+  | "catalog"
+  | "credits"
+  | "merch"
+  | "service"
+  | "donation"
 
 export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
 
@@ -57,6 +66,20 @@ export type TracksData = {
 
 export type CatalogData = {
   albums: Album[]
+}
+
+export type CreditRole = "A" | "C" | "P" | "R" | "M" | "V" | "I"
+
+export type CreditItem = {
+  id: string
+  title: string
+  mainArtist: string
+  role: CreditRole
+  externalUrl?: string
+}
+
+export type CreditsData = {
+  credits: CreditItem[]
 }
 
 export type SingleData = {
@@ -129,6 +152,7 @@ export type BlockData =
   | CrowdfundingData
   | TracksData
   | CatalogData
+  | CreditsData
   | MerchData
   | ServiceData
   | DonationData
@@ -181,6 +205,13 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     label: "Catálogo de Lanzamientos",
     description: "Carrusel horizontal con tus álbumes, EPs y singles anteriores.",
     icon: Library,
+    category: "Music",
+  },
+  {
+    type: "credits",
+    label: "Créditos y Colaboraciones",
+    description: "Canciones de otros artistas en las que participaste, con tu rol exacto.",
+    icon: Users,
     category: "Music",
   },
   {
@@ -269,6 +300,8 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
     }
     case "catalog":
       return { albums: Array.isArray(content.albums) ? content.albums.map((a, i) => normalizeAlbum(a, i)) : [] }
+    case "credits":
+      return { credits: Array.isArray(content.credits) ? content.credits.map((c, i) => normalizeCreditItem(c, i)) : [] }
     case "single":
       return {
         title: String(content.title ?? ""),
@@ -350,6 +383,19 @@ function normalizeAlbum(raw: unknown, index: number): Album {
   }
 }
 
+const CREDIT_ROLES: CreditRole[] = ["A", "C", "P", "R", "M", "V", "I"]
+
+function normalizeCreditItem(raw: unknown, index: number): CreditItem {
+  const c = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(c.id ?? `credit-${index + 1}`),
+    title: String(c.title ?? ""),
+    mainArtist: String(c.mainArtist ?? ""),
+    role: CREDIT_ROLES.includes(c.role as CreditRole) ? (c.role as CreditRole) : "M",
+    externalUrl: c.externalUrl ? String(c.externalUrl) : undefined,
+  }
+}
+
 export function dbBlockToBlock(dbBlock: DbProfileBlock): Block {
   const type = dbBlock.block_type as BlockType
   return {
@@ -366,6 +412,8 @@ function defaultData(type: BlockType): BlockData {
       // "crowdfunding" — el carrusel público debe quedar vacío hasta que el
       // artista cargue su catálogo real.
       return { albums: [] }
+    case "credits":
+      return { credits: [] }
     case "crowdfunding":
       return {
         title: "",

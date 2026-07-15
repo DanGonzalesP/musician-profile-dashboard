@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, MerchData, ServiceData, DonationData, Album, Track, ReleaseType, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, CreditsData, CreditItem, CreditRole, MerchData, ServiceData, DonationData, Album, Track, ReleaseType, SocialLink, SocialPlatform } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
-import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react"
 
 function BackToPanelLink() {
   return (
@@ -95,6 +95,9 @@ export function BlockInspector({
         )}
         {block.type === "catalog" && (
           <CatalogFields data={block.data as CatalogData} onChange={update} blobRegistry={blobRegistry} />
+        )}
+        {block.type === "credits" && (
+          <CreditsFields data={block.data as CreditsData} onChange={update} />
         )}
         {block.type === "merch" && (
           <MerchFields
@@ -1359,6 +1362,159 @@ function CatalogFields({
         )}
         {albums.length === 0 && (
           <p className="text-[11px] italic text-muted-foreground">Añade tu primer álbum, EP o single para empezar.</p>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ─── CreditsFields — créditos y colaboraciones en canciones de otros artistas
+
+const CREDIT_ROLES: CreditRole[] = ["A", "C", "P", "R", "M", "V", "I"]
+
+const CREDIT_ROLE_LABELS: Record<CreditRole, string> = {
+  A: "Autor (Letra)",
+  C: "Compositor (Música)",
+  P: "Producción Musical",
+  R: "Arreglista",
+  M: "Músico de Sesión",
+  V: "Vocalista",
+  I: "Intérprete",
+}
+
+function CreditsFields({
+  data,
+  onChange,
+}: {
+  data: CreditsData
+  onChange: (d: CreditsData) => void
+}) {
+  const credits = data.credits || []
+
+  const updateCredits = (next: CreditItem[]) => onChange({ credits: next })
+
+  const addCredit = () => {
+    const newItem: CreditItem = {
+      id: `credit-${Date.now()}`,
+      title: "",
+      mainArtist: "",
+      role: "M",
+      externalUrl: "",
+    }
+    updateCredits([...credits, newItem])
+  }
+
+  const setCredit = (index: number, changes: Partial<CreditItem>) => {
+    updateCredits(credits.map((c, i) => (i === index ? { ...c, ...changes } : c)))
+  }
+
+  const removeCredit = (index: number) => {
+    updateCredits(credits.filter((_, i) => i !== index))
+  }
+
+  const moveCredit = (index: number, dir: -1 | 1) => {
+    const target = index + dir
+    if (target < 0 || target >= credits.length) return
+    const next = [...credits]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    updateCredits(next)
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Créditos</p>
+        <button
+          type="button"
+          onClick={addCredit}
+          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+        >
+          <Plus className="size-3" /> Agregar Crédito
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {credits.map((credit, index) => (
+          <div key={credit.id} className="space-y-2.5 rounded-lg border border-sidebar-border p-2.5 bg-background/50">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Crédito {index + 1}</span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => moveCredit(index, -1)}
+                  disabled={index === 0}
+                  className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                  title="Subir"
+                  aria-label="Subir crédito"
+                >
+                  <ArrowUp className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveCredit(index, 1)}
+                  disabled={index === credits.length - 1}
+                  className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                  title="Bajar"
+                  aria-label="Bajar crédito"
+                >
+                  <ArrowDown className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeCredit(index)}
+                  className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  title="Eliminar crédito"
+                  aria-label="Eliminar crédito"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <Field label="Título de la canción">
+              <TextInput
+                value={credit.title}
+                onChange={(e) => setCredit(index, { title: e.target.value })}
+                placeholder="Nombre de la canción"
+              />
+            </Field>
+
+            <Field label="Artista principal">
+              <TextInput
+                value={credit.mainArtist}
+                onChange={(e) => setCredit(index, { mainArtist: e.target.value })}
+                placeholder="Nombre del artista"
+              />
+            </Field>
+
+            <Field label="Tu rol">
+              <select
+                value={credit.role}
+                onChange={(e) => setCredit(index, { role: e.target.value as CreditRole })}
+                className={inputClass}
+              >
+                {CREDIT_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {CREDIT_ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Enlace externo (Spotify/YouTube, opcional)">
+              <TextInput
+                value={credit.externalUrl || ""}
+                onChange={(e) => setCredit(index, { externalUrl: e.target.value })}
+                placeholder="https://..."
+              />
+            </Field>
+          </div>
+        ))}
+
+        {credits.length === 0 && (
+          <p className="rounded-lg border border-dashed border-sidebar-border p-3 text-center text-xs text-muted-foreground">
+            Añade tu primer crédito para empezar.
+          </p>
         )}
       </div>
     </>
