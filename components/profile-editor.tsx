@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog } from "@/lib/catalog"
+import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
@@ -216,6 +217,11 @@ export function ProfileEditor() {
   // Slug de la página pública ya publicada (deriva de profiles.display_name)
   // — solo existe una vez que el artista publicó al menos una vez.
   const [publicSlug, setPublicSlug] = useState("")
+  // Rol efectivo del usuario sobre el perfil que se está editando ahora
+  // mismo — "owner" para el perfil personal o una banda propia, "admin"/
+  // "editor" para un miembro de banda. Controla qué puede tocar en el
+  // lienzo (ver bloqueo de bloques más abajo).
+  const [activeRole, setActiveRole] = useState<BandRole>("owner")
 
   /**
    * Registro de blob URLs → File real.
@@ -226,6 +232,10 @@ export function ProfileEditor() {
   // Id de perfil resuelto en la carga — el autoguardado de borrador lo reutiliza
   // para no repetir la consulta de auth en cada cambio.
   const profileIdRef = useRef<string | null>(null)
+  // true si profileIdRef apunta a una banda (no al perfil personal del
+  // usuario logueado) — handlePublish lo usa para no reescribir la fila
+  // `profiles` equivocada al hacer upsert.
+  const isBandRef = useRef(false)
   // Evita que el autoguardado de borrador (is_visible:false) sobrescriba,
   // en el ciclo inmediatamente siguiente, las filas que Publish acaba de
   // marcar como is_visible:true.
@@ -249,21 +259,53 @@ export function ProfileEditor() {
 
         if (profileError) throw profileError
 
-        const profileId = profile?.id ?? PROFILE_ID
+        let profileId = profile?.id ?? PROFILE_ID
+        let isBand = false
+        let effectiveDisplayName = profile?.display_name ?? ""
+        let role: BandRole = "owner"
+
+        // Punto 4: si el switcher tiene una banda seleccionada para este
+        // usuario, se edita esa banda en vez del perfil personal — siempre
+        // que el rol siga siendo válido (el dueño pudo haber quitado al
+        // usuario desde la última vez). Si ya no es válida, se limpia la
+        // selección y se cae de vuelta al perfil personal sin romper nada.
+        if (user) {
+          const selectedBandId = getActiveBandId(user.id)
+          if (selectedBandId) {
+            const bandRole = await getEffectiveBandRole(selectedBandId, user.id)
+            const { data: bandProfile } = bandRole
+              ? await supabase.from("profiles").select("id, display_name").eq("id", selectedBandId).maybeSingle()
+              : { data: null }
+
+            if (bandRole && bandProfile) {
+              profileId = bandProfile.id
+              effectiveDisplayName = bandProfile.display_name ?? ""
+              isBand = true
+              role = bandRole
+            } else {
+              setActiveBandId(user.id, null)
+            }
+          }
+        }
+
         profileIdRef.current = profileId
+        isBandRef.current = isBand
+        setActiveRole(role)
 
         // El link a compartir es el de la página pública real, no algo que
         // se pueda armar en el borrador — solo existe si el perfil ya tiene
         // un nombre publicado.
-        if (profile?.display_name) {
-          setPublicSlug(profile.display_name.trim().toLowerCase().replaceAll(" ", "-"))
+        if (effectiveDisplayName) {
+          setPublicSlug(effectiveDisplayName.trim().toLowerCase().replaceAll(" ", "-"))
+        } else {
+          setPublicSlug("")
         }
 
         // El borrador se consulta en una llamada aparte: si falla (ej. la
         // migración de draft_content todavía no corrió en Supabase) no debe
         // tumbar la carga de lo ya publicado — solo se ignora el borrador.
         let draft: { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] } | null = null
-        if (profile) {
+        if (profile || isBand) {
           const { data: draftRow, error: draftError } = await supabase
             .from("profiles")
             .select("draft_content")
@@ -415,37 +457,48 @@ export function ProfileEditor() {
       )
       setServices(publishServices)
 
-      // 3. Upsert del perfil — atado al usuario autenticado, con PROFILE_ID
-      // como fallback, para que cada cuenta publique y recupere lo suyo.
-      const { data: { user } } = await supabase.auth.getUser()
+      // 3. Resolver el id de perfil sobre el que se publica. Para una banda
+      // (Punto 4) la fila ya existe desde que se creó — no se toca ni se
+      // upsertea, solo se usa el id resuelto al cargar el editor. El upsert
+      // por user_id de acá abajo es SOLO para el perfil personal: si se
+      // reutilizara para una banda, el onConflict:"user_id" chocaría contra
+      // la fila personal del usuario (las bandas tienen user_id NULL) y le
+      // pisaría el nombre/bio a su propio perfil en vez de al de la banda.
+      let profileId: string
 
-      // No pisar el nombre/bio reales: si el perfil ya existe, se conservan
-      // tal cual. Solo en la primera publicación (perfil nuevo) se usa un
-      // valor derivado de la cuenta autenticada, nunca uno inventado.
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("display_name, bio")
-        .eq("user_id", user?.id ?? PROFILE_ID)
-        .maybeSingle()
+      if (isBandRef.current && profileIdRef.current) {
+        profileId = profileIdRef.current
+      } else {
+        const { data: { user } } = await supabase.auth.getUser()
 
-      const fallbackName =
-        user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || ""
+        // No pisar el nombre/bio reales: si el perfil ya existe, se conservan
+        // tal cual. Solo en la primera publicación (perfil nuevo) se usa un
+        // valor derivado de la cuenta autenticada, nunca uno inventado.
+        const { data: existingProfile } = await supabase
+          .from("profiles")
+          .select("display_name, bio")
+          .eq("user_id", user?.id ?? PROFILE_ID)
+          .maybeSingle()
 
-      const profilePayload = {
-        user_id: user?.id ?? PROFILE_ID,
-        display_name: existingProfile?.display_name || fallbackName,
-        bio: existingProfile?.bio || "",
+        const fallbackName =
+          user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || ""
+
+        const profilePayload = {
+          user_id: user?.id ?? PROFILE_ID,
+          display_name: existingProfile?.display_name || fallbackName,
+          bio: existingProfile?.bio || "",
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .upsert(profilePayload, { onConflict: "user_id" })
+          .select("id")
+          .single()
+
+        if (profileError) throw profileError
+
+        profileId = profile.id
       }
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .upsert(profilePayload, { onConflict: "user_id" })
-        .select("id")
-        .single()
-
-      if (profileError) throw profileError
-
-      const profileId = profile.id
 
       // 4. Eliminar bloques anteriores y reinsertar los actualizados
       const { error: deleteError } = await supabase
@@ -635,6 +688,7 @@ export function ProfileEditor() {
               onAdd={addBlock}
               onDragStart={(type) => setDragPayload({ kind: "new", type })}
               onDragEnd={() => setDragPayload(null)}
+              locked={activeRole === "editor"}
             />
           </div>
         </aside>
@@ -646,6 +700,16 @@ export function ProfileEditor() {
               <h1 className="text-lg font-semibold text-foreground">Vista en vivo</h1>
               <p className="text-xs text-muted-foreground">Así es como los fans verán tu página.</p>
             </div>
+            {activeRole === "editor" && (
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600">
+                Rol: Editor — solo fotos, redes y biografía
+              </span>
+            )}
+            {activeRole === "admin" && (
+              <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                Rol: Administrador Total
+              </span>
+            )}
           </div>
           <PreviewCanvas
             blocks={blocks}
@@ -657,6 +721,7 @@ export function ProfileEditor() {
             onDropAt={handleDropAt}
             onReorderStart={(index) => setDragPayload({ kind: "reorder", index })}
             onDragEnd={() => setDragPayload(null)}
+            activeRole={activeRole}
             products={products}
             services={services}
             shareUrl={publicSlug ? `${window.location.origin}/${publicSlug}` : undefined}

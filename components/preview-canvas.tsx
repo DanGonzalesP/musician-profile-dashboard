@@ -21,6 +21,9 @@ type Props = {
   shareUrl?: string
   albumCovers?: string[]
   creditsCount?: number
+  // Rol del Punto 4 sobre el perfil que se edita — "editor" solo puede abrir
+  // el bloque "hero"; el resto queda bloqueado (sin controles, no seleccionable).
+  activeRole?: "owner" | "admin" | "editor"
 }
 
 export function PreviewCanvas({
@@ -38,6 +41,7 @@ export function PreviewCanvas({
   shareUrl,
   albumCovers,
   creditsCount,
+  activeRole = "owner",
 }: Props) {
   const [dropIndex, setDropIndex] = useState<number | null>(null)
 
@@ -138,6 +142,7 @@ export function PreviewCanvas({
                     shareUrl={shareUrl}
                     albumCovers={albumCovers}
                     creditsCount={creditsCount}
+                    locked={activeRole === "editor" && block.type !== "hero"}
                   />
                   <Indicator index={i + 1} />
                 </div>

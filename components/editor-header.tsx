@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { ProfileSwitcher } from "@/components/profile-switcher"
 
 export function EditorHeader({
   blockCount,
@@ -22,8 +23,11 @@ export function EditorHeader({
 
   return (
     <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-3">
-      <div className="text-sm font-semibold">
-        Editor <span className="text-muted-foreground font-normal">({blockCount} bloques)</span>
+      <div className="flex items-center gap-3">
+        <div className="text-sm font-semibold">
+          Editor <span className="text-muted-foreground font-normal">({blockCount} bloques)</span>
+        </div>
+        <ProfileSwitcher />
       </div>
       <div className="flex gap-2">
         <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>

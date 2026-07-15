@@ -44,6 +44,7 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     { name: "Editor de Página", href: "/dashboard", icon: "🎨" },
     { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: "🌐" },
     { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: "📈" },
+    { name: "Mis Bandas", href: "/perfil/banda", icon: "🎸" },
     { name: "Notificaciones de Créditos", href: "/perfil/notificaciones", icon: "🔔" },
     { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: "📊" },
     { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: "👕" },

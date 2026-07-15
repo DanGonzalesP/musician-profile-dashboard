@@ -4,7 +4,7 @@ import type { Block } from "@/lib/blocks"
 import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { BlockRenderer } from "@/components/blocks/block-renderer"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
-import { GripVertical, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react"
+import { GripVertical, Pencil, Trash2, ArrowUp, ArrowDown, Lock } from "lucide-react"
 
 type Props = {
   block: Block
@@ -22,6 +22,9 @@ type Props = {
   shareUrl?: string
   albumCovers?: string[]
   creditsCount?: number
+  // Punto 4: true cuando el rol activo ("editor" de banda) no puede tocar
+  // este bloque — sin controles y sin poder abrir el inspector.
+  locked?: boolean
 }
 
 export function CanvasBlock({
@@ -40,69 +43,79 @@ export function CanvasBlock({
   shareUrl,
   albumCovers,
   creditsCount,
+  locked = false,
 }: Props) {
   const label = BLOCK_LIBRARY.find((b) => b.type === block.type)?.label ?? block.type
 
   return (
     <div
-      onClick={onSelect}
+      onClick={locked ? undefined : onSelect}
       className={`group relative rounded-2xl border p-1.5 transition-all ${
         selected
           ? "border-primary ring-2 ring-primary/30"
           : "border-transparent hover:border-border"
       }`}
     >
-      {/* Top control bar — appears on hover / selection */}
-      <div
-        className={`absolute -top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-popover px-1 py-1 shadow-lg transition-opacity ${
-          selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        }`}
-      >
-        <button
-          type="button"
-          draggable
-          onDragStart={(e) => {
-            e.stopPropagation()
-            onDragStart()
-          }}
-          onDragEnd={onDragEnd}
-          onClick={(e) => e.stopPropagation()}
-          title="Arrastrar para reordenar"
-          aria-label="Arrastrar para reordenar bloque"
-          className="flex size-7 cursor-grab items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
+      {/* Top control bar — appears on hover / selection. Bloqueada (Punto 4,
+          rol "editor"): se reemplaza por una etiqueta de solo-lectura, sin
+          ningún control de edición/orden/borrado. */}
+      {locked ? (
+        <div className="absolute -top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-popover px-2.5 py-1 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+          <Lock className="size-3 text-muted-foreground" />
+          <span className="text-[11px] font-medium text-muted-foreground">{label} — solo lectura</span>
+        </div>
+      ) : (
+        <div
+          className={`absolute -top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-popover px-1 py-1 shadow-lg transition-opacity ${
+            selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
         >
-          <GripVertical className="size-4" />
-        </button>
-        <span className="px-1.5 text-[11px] font-medium text-muted-foreground">{label}</span>
-        <div className="mx-0.5 h-4 w-px bg-border" />
-        <ControlButton
-          disabled={index === 0}
-          onClick={() => onMove(-1)}
-          title="Subir"
-          label="Subir bloque"
-        >
-          <ArrowUp className="size-4" />
-        </ControlButton>
-        <ControlButton
-          disabled={index === total - 1}
-          onClick={() => onMove(1)}
-          title="Bajar"
-          label="Bajar bloque"
-        >
-          <ArrowDown className="size-4" />
-        </ControlButton>
-        <ControlButton onClick={onSelect} title="Editar" label="Editar bloque">
-          <Pencil className="size-4" />
-        </ControlButton>
-        <ControlButton
-          onClick={onDelete}
-          title="Eliminar"
-          label="Eliminar bloque"
-          className="text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-        >
-          <Trash2 className="size-4" />
-        </ControlButton>
-      </div>
+          <button
+            type="button"
+            draggable
+            onDragStart={(e) => {
+              e.stopPropagation()
+              onDragStart()
+            }}
+            onDragEnd={onDragEnd}
+            onClick={(e) => e.stopPropagation()}
+            title="Arrastrar para reordenar"
+            aria-label="Arrastrar para reordenar bloque"
+            className="flex size-7 cursor-grab items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
+          >
+            <GripVertical className="size-4" />
+          </button>
+          <span className="px-1.5 text-[11px] font-medium text-muted-foreground">{label}</span>
+          <div className="mx-0.5 h-4 w-px bg-border" />
+          <ControlButton
+            disabled={index === 0}
+            onClick={() => onMove(-1)}
+            title="Subir"
+            label="Subir bloque"
+          >
+            <ArrowUp className="size-4" />
+          </ControlButton>
+          <ControlButton
+            disabled={index === total - 1}
+            onClick={() => onMove(1)}
+            title="Bajar"
+            label="Bajar bloque"
+          >
+            <ArrowDown className="size-4" />
+          </ControlButton>
+          <ControlButton onClick={onSelect} title="Editar" label="Editar bloque">
+            <Pencil className="size-4" />
+          </ControlButton>
+          <ControlButton
+            onClick={onDelete}
+            title="Eliminar"
+            label="Eliminar bloque"
+            className="text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+          >
+            <Trash2 className="size-4" />
+          </ControlButton>
+        </div>
+      )}
 
       {/* Live preview content (non-interactive selection surface, salvo
           "tracks", "single" y "catalog" que necesitan el mini-reproductor,

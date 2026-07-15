@@ -16,14 +16,26 @@ type Props = {
   onAdd: (type: BlockType) => void
   onDragStart: (type: BlockType) => void
   onDragEnd: () => void
+  // true para el rol "Editor" de banda — solo puede tocar el bloque "hero"
+  // ya existente, no agregar bloques nuevos (ver Punto 4).
+  locked?: boolean
 }
 
-export function BlockLibrary({ onAdd, onDragStart, onDragEnd }: Props) {
+export function BlockLibrary({ onAdd, onDragStart, onDragEnd, locked = false }: Props) {
   const [open, setOpen] = useState<Record<string, boolean>>({
     Layout: true,
     Music: true,
     Commerce: true,
   })
+
+  if (locked) {
+    return (
+      <div className="rounded-xl border border-dashed border-sidebar-border p-4 text-center text-xs leading-relaxed text-muted-foreground">
+        Tu rol de <span className="font-medium text-foreground">Editor</span> no permite agregar ni reordenar
+        bloques — solo puedes modificar fotos, redes sociales y biografía en el bloque principal.
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-2">
