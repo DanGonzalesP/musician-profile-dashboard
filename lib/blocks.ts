@@ -288,21 +288,18 @@ function defaultData(type: BlockType): BlockData {
               {
                 title: "Neon Horizon",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
                 description:
                   "Ejemplo de descripción: cuenta aquí en qué te inspiraste para esta canción — un lugar, una persona, una noche en particular. Este texto aparece mientras el fan la está escuchando. Reemplázalo por la historia real de tu pista.",
               },
               {
                 title: "Silica Waves",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
                 description:
                   "Otro ejemplo de descripción por pista: cada canción del álbum puede tener su propio texto, distinto al de las demás.",
               },
               {
                 title: "Fractal Dream",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
                 description: "Descripción de ejemplo — bórrala y escribe la tuya desde el editor.",
               },
             ],
@@ -316,13 +313,11 @@ function defaultData(type: BlockType): BlockData {
               {
                 title: "Velocity Zero",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
                 description: "Este es un segundo álbum de ejemplo: el carrusel puede mostrar tantos álbumes como quieras.",
               },
               {
                 title: "Prism Shift",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
                 description: "Sube tu propio audio en el editor y esta pista de muestra desaparecerá.",
               },
             ],
@@ -336,19 +331,16 @@ function defaultData(type: BlockType): BlockData {
               {
                 title: "Static Bloom",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
                 description: "Un tercer álbum de ejemplo, para ver cómo se ve el carrusel con varias portadas.",
               },
               {
                 title: "Afterglow",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
                 description: "Cada álbum puede tener el número de canciones que quieras.",
               },
               {
                 title: "Low Tide",
                 duration: "",
-                audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
                 description: "Descripción de ejemplo — reemplázala por la historia real de tu canción.",
               },
             ],

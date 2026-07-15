@@ -216,8 +216,15 @@ function AudioUploader({
     // Solo aceptamos .mp3: formatos pesados como .wav/.flac saturarían el
     // almacenamiento, así que se rechazan aquí mismo, antes de registrar
     // el archivo o generar ningún blob URL.
-    const ext = file.name.split(".").pop()?.toLowerCase()
-    if (ext !== "mp3") {
+    // La validación por nombre de archivo sola era demasiado estricta: un
+    // nombre con espacios al final, mayúsculas, o sin extensión visible (el
+    // navegador a veces la omite al venir de un recorte/exportación) hacía
+    // que un .mp3 real fuera rechazado. Ahora también se acepta si el
+    // navegador reporta un MIME de audio mp3, aunque el nombre no sea claro.
+    const rawName = file.name.trim()
+    const ext = rawName.includes(".") ? rawName.split(".").pop()?.toLowerCase().trim() : ""
+    const mimeIsMp3 = /mpeg|mp3/i.test(file.type)
+    if (ext !== "mp3" && !mimeIsMp3) {
       setError("Solo se aceptan archivos .mp3. Sube un audio optimizado para la web.")
       e.target.value = ""
       return
@@ -267,7 +274,7 @@ function AudioUploader({
         }`}
       >
         <Music className="size-3.5 text-muted-foreground" />
-        <span>{hasAudio ? "Cambiar audio" : "Subir audio (.mp3)"}</span>
+        <span>Subir audio (.mp3)</span>
         <input type="file" accept=".mp3,audio/mpeg" onChange={handleFileChange} className="hidden" />
       </label>
     </div>
