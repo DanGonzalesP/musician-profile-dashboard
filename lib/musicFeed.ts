@@ -23,10 +23,13 @@ export interface FeedTrackRow {
   profiles: { display_name: string } | null;
 }
 
+const VALID_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".aac", ".wav"];
+
 export function validateMp3Url(url: string): boolean {
   try {
     const parsedUrl = new URL(url);
-    return parsedUrl.pathname.toLowerCase().endsWith(".mp3");
+    const pathname = parsedUrl.pathname.toLowerCase();
+    return VALID_AUDIO_EXTENSIONS.some((ext) => pathname.endsWith(ext));
   } catch (error) {
     return false;
   }

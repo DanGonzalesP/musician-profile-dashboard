@@ -371,6 +371,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
               ? ({
                   animationDuration: `${cycleSeconds}s`,
                   animationPlayState: carouselPaused ? "paused" : "running",
+                  animationDirection: "reverse",
                   "--marquee-shift": `${marqueeShiftPercent}%`,
                 } as React.CSSProperties)
               : {
