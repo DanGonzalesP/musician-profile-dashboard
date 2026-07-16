@@ -1,7 +1,14 @@
+-- OBSOLETO: la app ya no sube imágenes ni audio a Supabase Storage — se
+-- migró a Cloudflare R2 (ver lib/r2.ts, app/api/upload-url/route.ts) porque
+-- el plan Free de Supabase fija un límite global de 50MB no configurable,
+-- sin importar el file_size_limit del bucket. Este script queda como
+-- referencia histórica del bucket "assets", que ahora solo se usa para
+-- archivos subidos antes de la migración (ver supabase/migrate_to_r2.md).
+--
 -- El error "The object exceeded the maximum allowed size" al subir un .wav
--- no viene del código de la app (components/profile-editor.tsx sube el
+-- no venía del código de la app (components/profile-editor.tsx subía el
 -- archivo directo del navegador a Supabase Storage vía supabase.storage
--- .upload(), sin pasar por ninguna API route de Next.js) — viene del
+-- .upload(), sin pasar por ninguna API route de Next.js) — venía del
 -- file_size_limit configurado en el bucket "assets" de Supabase Storage.
 -- Por defecto Supabase deja ese límite bajo (a veces 50MB o menos según el
 -- plan), insuficiente para un .wav sin comprimir.

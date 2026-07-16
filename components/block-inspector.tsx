@@ -213,10 +213,11 @@ function ImageUploader({
 
 // ─── AudioUploader — blob URL inmediata para pistas ───────────────────────
 
-// Debe coincidir con el file_size_limit configurado en el bucket "assets" de
-// Supabase Storage (ver supabase/increase_audio_upload_limit.sql). Validar
-// acá evita que el usuario espere el hasheo SHA-256 de un archivo grande
-// para recién enterarse en el upload de que el servidor lo va a rechazar.
+// Tope generoso sobre el archivo ORIGINAL (antes de comprimir) — un wav de
+// varios minutos en alta resolución puede pesar bastante. lib/audio-transcode
+// lo comprime a mp3 antes de subirlo a R2, así que este límite es solo para
+// evitar que alguien suba un archivo absurdamente grande y trabe el
+// navegador transcodificando.
 const MAX_AUDIO_FILE_SIZE_MB = 100
 const MAX_AUDIO_FILE_SIZE_BYTES = MAX_AUDIO_FILE_SIZE_MB * 1024 * 1024
 
@@ -237,11 +238,11 @@ function AudioUploader({
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
 
-    // Aceptamos .mp3, .aac/.m4a y .wav. AAC es el formato nativo de Storage
-    // para esa extensión — no hace falta transcodificar, es tan liviano como
-    // el mp3 y se reproduce nativo en <audio>/<iframe> de todos los
-    // navegadores modernos. WAV pesa más al no estar comprimido, pero se
-    // acepta igual porque es un formato de entrega habitual entre músicos.
+    // Aceptamos mp3/aac/m4a (ya comprimidos, se suben tal cual) y además
+    // cualquier formato de audio sin comprimir habitual entre músicos (wav,
+    // flac, aiff, ogg) — lib/audio-transcode los convierte a mp3 en el
+    // navegador antes de subir, así que no hace falta pedirle al usuario que
+    // exporte en un formato "óptimo para la web": suba lo que tenga.
     // La validación por nombre de archivo sola era demasiado estricta: un
     // nombre con espacios al final, mayúsculas, o sin extensión visible (el
     // navegador a veces la omite al venir de un recorte/exportación) hacía
@@ -249,10 +250,10 @@ function AudioUploader({
     // navegador reporta un MIME de audio compatible, aunque el nombre no sea claro.
     const rawName = file.name.trim()
     const ext = rawName.includes(".") ? rawName.split(".").pop()?.toLowerCase().trim() : ""
-    const ACCEPTED_EXTS = new Set(["mp3", "aac", "m4a", "wav"])
-    const mimeIsAccepted = /mpeg|mp3|aac|mp4|wav|wave/i.test(file.type)
+    const ACCEPTED_EXTS = new Set(["mp3", "aac", "m4a", "wav", "flac", "aiff", "aif", "ogg"])
+    const mimeIsAccepted = /mpeg|mp3|aac|mp4|wav|wave|flac|aiff|ogg/i.test(file.type)
     if (!ACCEPTED_EXTS.has(ext ?? "") && !mimeIsAccepted) {
-      setError("Solo se aceptan archivos .mp3, .aac/.m4a o .wav. Sube un audio optimizado para la web.")
+      setError("Formato no reconocido. Subí un archivo de audio (.mp3, .wav, .flac, .aiff, .aac, .ogg).")
       e.target.value = ""
       return
     }
@@ -307,14 +308,19 @@ function AudioUploader({
         }`}
       >
         <Music className="size-3.5 text-muted-foreground" />
-        <span>Subir audio (.mp3, .aac, .wav)</span>
+        <span>Subir audio (mp3, wav, flac, aiff, aac, ogg)</span>
         <input
           type="file"
-          accept=".mp3,.aac,.m4a,.wav,audio/mpeg,audio/aac,audio/mp4,audio/wav,audio/x-wav"
+          accept=".mp3,.aac,.m4a,.wav,.flac,.aiff,.aif,.ogg,audio/mpeg,audio/aac,audio/mp4,audio/wav,audio/x-wav,audio/flac,audio/aiff,audio/ogg"
           onChange={handleFileChange}
           className="hidden"
         />
       </label>
+      {!hasAudio && (
+        <p className="text-[11px] text-muted-foreground">
+          Si subís un formato sin comprimir (wav, flac, aiff), se convierte automáticamente a mp3 al publicar.
+        </p>
+      )}
     </div>
   )
 }

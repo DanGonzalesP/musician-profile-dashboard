@@ -11,6 +11,7 @@ import { BlockInspector } from "@/components/block-inspector"
 import { Layers } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import imageCompression from "browser-image-compression"
+import { ensureCompressedAudio } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
 import { ProfileSkeleton } from "@/components/blocks/skeletons"
 
@@ -124,35 +125,41 @@ async function compressImage(file: File): Promise<File> {
 }
 
 /**
- * Sube un File a Supabase Storage y devuelve la URL pública permanente.
+ * Sube un File a Cloudflare R2 (vía URL firmada, ver app/api/upload-url) y
+ * devuelve la URL pública permanente. El archivo va directo del navegador a
+ * R2 — este helper solo pide la URL firmada, no reenvía el archivo por
+ * ningún servidor propio.
  */
 async function uploadFileToStorage(file: File, folder: "images" | "audio"): Promise<string> {
   const uploadFile = folder === "images" ? await compressImage(file) : file
   const ext = (uploadFile.name.split(".").pop() ?? "bin").toLowerCase()
-  const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
   const contentType =
     folder === "audio"
       ? AUDIO_MIME_TYPES[ext] ?? "audio/mpeg"
       : IMAGE_MIME_TYPES[ext] ?? uploadFile.type ?? "image/webp"
 
-  // El SDK de Supabase sube los File/Blob envueltos en FormData, donde el
-  // navegador usa el `.type` propio del objeto — la opción `contentType` del
-  // SDK se ignora en ese caso. Por eso reconstruimos el archivo con el tipo
-  // correcto ya asignado, en vez de confiar en esa opción.
   const uploadBody =
     uploadFile.type === contentType ? uploadFile : new File([uploadFile], uploadFile.name, { type: contentType })
 
-  const { error: uploadError } = await supabase.storage.from("assets").upload(fileName, uploadBody, {
-    upsert: false,
-    contentType,
+  const presignRes = await fetch("/api/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ folder, extension: ext, contentType }),
   })
+  if (!presignRes.ok) {
+    const body = await presignRes.json().catch(() => ({}))
+    throw new Error(body.error ?? "No se pudo iniciar la subida del archivo.")
+  }
+  const { uploadUrl, publicUrl } = (await presignRes.json()) as { uploadUrl: string; publicUrl: string }
 
-  if (uploadError) throw uploadError
+  const putRes = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: uploadBody,
+  })
+  if (!putRes.ok) throw new Error("No se pudo subir el archivo al almacenamiento.")
 
-  const { data } = supabase.storage.from("assets").getPublicUrl(fileName)
-  if (!data?.publicUrl) throw new Error("No se pudo obtener la URL pública del archivo subido.")
-
-  return data.publicUrl
+  return publicUrl
 }
 
 /**
@@ -176,7 +183,10 @@ async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Pro
   // confiable: si el navegador la validó como .mp3, es audio.
   const ext = (file.name.split(".").pop() ?? "").toLowerCase()
   const folder: "images" | "audio" = ext in AUDIO_MIME_TYPES ? "audio" : "images"
-  const permanentUrl = await uploadFileToStorage(file, folder)
+  // Cualquier audio que no sea ya mp3/aac/m4a (ej. wav, flac, aiff) se
+  // transcodifica en el navegador antes de subir — ver lib/audio-transcode.
+  const fileToUpload = folder === "audio" ? await ensureCompressedAudio(file) : file
+  const permanentUrl = await uploadFileToStorage(fileToUpload, folder)
   URL.revokeObjectURL(url)
   blobRegistry.delete(url)
   return permanentUrl
