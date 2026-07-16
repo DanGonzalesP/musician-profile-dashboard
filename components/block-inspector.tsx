@@ -213,6 +213,13 @@ function ImageUploader({
 
 // ─── AudioUploader — blob URL inmediata para pistas ───────────────────────
 
+// Debe coincidir con el file_size_limit configurado en el bucket "assets" de
+// Supabase Storage (ver supabase/increase_audio_upload_limit.sql). Validar
+// acá evita que el usuario espere el hasheo SHA-256 de un archivo grande
+// para recién enterarse en el upload de que el servidor lo va a rechazar.
+const MAX_AUDIO_FILE_SIZE_MB = 100
+const MAX_AUDIO_FILE_SIZE_BYTES = MAX_AUDIO_FILE_SIZE_MB * 1024 * 1024
+
 function AudioUploader({
   onUploadReady,
   currentAudioUrl,
@@ -246,6 +253,12 @@ function AudioUploader({
     const mimeIsAccepted = /mpeg|mp3|aac|mp4|wav|wave/i.test(file.type)
     if (!ACCEPTED_EXTS.has(ext ?? "") && !mimeIsAccepted) {
       setError("Solo se aceptan archivos .mp3, .aac/.m4a o .wav. Sube un audio optimizado para la web.")
+      e.target.value = ""
+      return
+    }
+
+    if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+      setError(`El archivo pesa ${(file.size / (1024 * 1024)).toFixed(1)}MB. El máximo permitido es ${MAX_AUDIO_FILE_SIZE_MB}MB.`)
       e.target.value = ""
       return
     }
