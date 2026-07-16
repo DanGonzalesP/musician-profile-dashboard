@@ -68,11 +68,17 @@ async function migrateOneFile(fileUrl: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ folder, extension: ext, contentType }),
   })
-  if (!presignRes.ok) throw new Error("No se pudo generar la URL de subida a R2")
+  if (!presignRes.ok) {
+    const bodyText = await presignRes.text().catch(() => "")
+    throw new Error(`No se pudo generar la URL de subida a R2 (HTTP ${presignRes.status}): ${bodyText.slice(0, 300)}`)
+  }
   const { uploadUrl, publicUrl } = (await presignRes.json()) as { uploadUrl: string; publicUrl: string }
 
   const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: blob })
-  if (!putRes.ok) throw new Error("No se pudo subir el archivo a R2")
+  if (!putRes.ok) {
+    const bodyText = await putRes.text().catch(() => "")
+    throw new Error(`No se pudo subir el archivo a R2 (HTTP ${putRes.status}): ${bodyText.slice(0, 300)}`)
+  }
 
   return publicUrl
 }
