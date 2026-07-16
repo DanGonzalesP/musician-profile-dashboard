@@ -137,8 +137,8 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
     return (
       <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
         <div className="flex items-center gap-4">
-          <div className="flex size-16 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border sm:size-20">
-            <Disc3 className="size-6 text-muted-foreground" />
+          <div className="flex size-24 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border sm:size-28">
+            <Disc3 className="size-8 text-muted-foreground" />
           </div>
 
           <div className="min-w-0 flex-1">
@@ -168,7 +168,7 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
       <div className="flex items-center gap-4">
-        <div className="relative flex size-16 shrink-0 items-center justify-center sm:size-20">
+        <div className="relative flex size-24 shrink-0 items-center justify-center sm:size-28">
           <div
             aria-hidden
             className={`absolute inset-0 rounded-full blur-lg transition-opacity duration-500 ${
@@ -192,7 +192,7 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
             <img
               src={data.cover}
               alt={t("single_cover_alt")}
-              className="size-6 rounded-full border-2 border-black/70 object-cover sm:size-7"
+              className="size-20 rounded-full border-2 border-black/70 object-cover sm:size-24"
             />
           </div>
         </div>
@@ -203,26 +203,21 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
             {t("single_eyebrow")}
           </span>
 
-          <h3 className="mt-0.5 truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
-            {data.title}
-          </h3>
-
-          {(data.genre || data.year || data.description) && (
-            <div className="mt-1 flex items-baseline justify-between gap-3">
-              {(data.genre || data.year) ? (
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {[data.genre, data.year].filter(Boolean).join(" • ")}
-                </span>
-              ) : (
-                <span />
-              )}
-              {data.description && (
-                <p className="min-w-0 flex-1 truncate text-right text-xs leading-relaxed text-muted-foreground">
-                  {data.description}
-                </p>
-              )}
-            </div>
-          )}
+          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+            <h3 className="truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+              {data.title}
+            </h3>
+            {(data.genre || data.year) && (
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {[data.genre, data.year].filter(Boolean).join(" • ")}
+              </span>
+            )}
+            {data.description && (
+              <span className="min-w-0 truncate text-xs leading-relaxed text-muted-foreground">
+                — {data.description}
+              </span>
+            )}
+          </div>
 
           <div className="mt-2 flex items-center gap-2.5">
             <button
