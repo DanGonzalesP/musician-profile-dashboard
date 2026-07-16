@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist_Mono, Plus_Jakarta_Sans, Unbounded } from 'next/font/google'
 import './globals.css'
 import { ThemeScript } from '@/components/theme-script'
+import { LocaleProvider } from '@/components/locale-provider'
 
 const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta' })
 const unbounded = Unbounded({ subsets: ['latin'], variable: '--font-unbounded' })
@@ -51,7 +52,7 @@ export default function RootLayout({
         <ThemeScript />
       </head>
       <body className="font-sans antialiased">
-        {children}
+        <LocaleProvider>{children}</LocaleProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

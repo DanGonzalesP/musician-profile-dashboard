@@ -8,8 +8,7 @@ import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/ca
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
-import { LocaleProvider, useLocale } from "@/components/locale-provider";
-import { LanguageSwitcher } from "@/components/language-switcher";
+import { useLocale } from "@/components/locale-provider";
 import { Store, Home } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
@@ -23,11 +22,7 @@ type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "catalog", "credits", "donation"];
 
 export default function PerfilPublicoPage() {
-  return (
-    <LocaleProvider>
-      <PerfilPublicoContent />
-    </LocaleProvider>
-  );
+  return <PerfilPublicoContent />;
 }
 
 function PerfilPublicoContent() {
@@ -197,9 +192,6 @@ function PerfilPublicoContent() {
     <div className="min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8">
       <AudioReactiveBackground />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 animate-fade-in">
-        <div className="flex justify-end">
-          <LanguageSwitcher />
-        </div>
         {unifiedProfile
           ? (
             <>

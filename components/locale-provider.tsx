@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useMemo, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import { type Locale, translate } from "@/lib/i18n"
 
 type LocaleContextValue = {
@@ -11,8 +11,23 @@ type LocaleContextValue = {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
 
+const LOCALE_STORAGE_KEY = "amplitude:locale"
+
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>("es")
+  const [locale, setLocaleState] = useState<Locale>("es")
+
+  // El default de servidor/primer render siempre es "es" (para que no haya
+  // desajuste de hidratación); una vez montado en el cliente, se lee la
+  // preferencia guardada y se aplica.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY)
+    if (stored === "es" || stored === "en") setLocaleState(stored)
+  }, [])
+
+  const setLocale = (next: Locale) => {
+    setLocaleState(next)
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, next)
+  }
 
   const value = useMemo<LocaleContextValue>(
     () => ({
@@ -27,10 +42,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Fuera de LocaleProvider (ej. dentro del Dashboard/editor o /perfil/preview)
- * cae a español fijo — el selector de idioma solo vive en la vista pública,
- * así que los mismos componentes de bloque siguen funcionando sin cambios
- * ahí donde no hay proveedor.
+ * LocaleProvider ahora envuelve toda la app desde app/layout.tsx, así que en
+ * la práctica siempre hay contexto disponible. Este fallback a español fijo
+ * se mantiene solo por seguridad para cualquier render aislado (tests,
+ * storybook, etc.) que no pase por el layout raíz.
  */
 export function useLocale(): LocaleContextValue {
   const ctx = useContext(LocaleContext)

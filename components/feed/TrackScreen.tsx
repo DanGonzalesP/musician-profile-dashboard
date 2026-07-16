@@ -3,6 +3,7 @@
 
 import { forwardRef } from "react";
 import type { FeedTrack } from "@/lib/musicFeed";
+import { useLocale } from "@/components/locale-provider";
 import VinylCover from "./VinylCover";
 import PlaybackControls from "./PlaybackControls";
 import MarqueeText from "./MarqueeText";
@@ -21,20 +22,11 @@ interface TrackScreenProps {
 }
 
 const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackScreen(
-  {
-    track,
-    isSample,
-    isActive,
-    isPlaying,
-    currentTime,
-    duration,
-    isLiked,
-    onTogglePlay,
-    onSeek,
-    onToggleLike,
-  },
+  { track, isSample, isActive, isPlaying, currentTime, duration, isLiked, onTogglePlay, onSeek, onToggleLike },
   ref
 ) {
+  const { t } = useLocale();
+
   return (
     <section
       ref={ref}
@@ -51,23 +43,15 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
       <div className="flex w-full max-w-sm flex-col items-center gap-6 sm:max-w-md">
         {isSample && (
           <span className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
-            Contenido de muestra
+            {t("feed_sample_badge")}
           </span>
         )}
 
-        <VinylCover
-          coverImageUrl={track.coverImageUrl}
-          isActive={isActive}
-          isPlaying={isPlaying}
-          onTap={onTogglePlay}
-        />
+        <VinylCover coverImageUrl={track.coverImageUrl} isActive={isActive} isPlaying={isPlaying} onTap={onTogglePlay} />
 
         <div className="w-full text-center">
           <MarqueeText text={track.title} className="text-xl font-bold text-foreground sm:text-2xl" />
-          <MarqueeText
-            text={track.artistName}
-            className="mt-1 text-sm font-medium text-primary sm:text-base"
-          />
+          <MarqueeText text={track.artistName} className="mt-1 text-sm font-medium text-primary sm:text-base" />
         </div>
 
         <PlaybackControls
