@@ -499,6 +499,23 @@ function extractAudioDuration(url: string): Promise<number> {
   })
 }
 
+/**
+ * Duración de un audio recién subido (blob URL). Si el File real todavía
+ * está en blobRegistry, se mide con ffmpeg (exacto — ver
+ * lib/audio-transcode: <audio>.duration en el navegador puede errar por
+ * varios segundos en mp3 con bitrate variable). Si no está disponible, cae
+ * al método del navegador sobre la blob URL como antes.
+ */
+async function resolveUploadedDuration(url: string, blobRegistry: BlobRegistry): Promise<number> {
+  const file = blobRegistry.current.get(url)
+  if (file) {
+    const { getAccurateAudioDuration } = await import("@/lib/audio-transcode")
+    const accurate = await getAccurateAudioDuration(file)
+    if (accurate !== null) return accurate
+  }
+  return extractAudioDuration(url)
+}
+
 function formatDuration(seconds: number): string {
   if (!isFinite(seconds) || isNaN(seconds)) return ""
   const m = Math.floor(seconds / 60)
@@ -525,7 +542,7 @@ function SingleFields({
     // sola actualización para no pisar el estado con una copia vieja.
     let duration = ""
     try {
-      duration = formatDuration(await extractAudioDuration(url))
+      duration = formatDuration(await resolveUploadedDuration(url, blobRegistry))
     } catch {
       // Sin metadata legible: se deja vacío, el artista puede escribirla luego.
     }
@@ -830,7 +847,7 @@ function TracksFields({
     // recién guardada — eso causaba que el audio "desapareciera" tras subirlo.
     let duration = ""
     try {
-      duration = formatDuration(await extractAudioDuration(url))
+      duration = formatDuration(await resolveUploadedDuration(url, blobRegistry))
     } catch {
       // Si el navegador no puede leer la metadata, se deja la duración vacía
       // y el artista puede escribirla manualmente.
@@ -1174,7 +1191,7 @@ function CatalogFields({
   const handleAudioUploaded = async (albumIndex: number, trackIndex: number, url: string, fileHash: string) => {
     let duration = ""
     try {
-      duration = formatDuration(await extractAudioDuration(url))
+      duration = formatDuration(await resolveUploadedDuration(url, blobRegistry))
     } catch {
       // Sin metadata legible: se deja vacío, el artista puede escribirla manualmente.
     }

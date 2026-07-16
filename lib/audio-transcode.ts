@@ -11,7 +11,10 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg"
 import { fetchFile, toBlobURL } from "@ffmpeg/util"
 
-export const COMPRESSED_AUDIO_EXTS = new Set(["mp3", "aac", "m4a"])
+// "mpeg"/"mp2" cubren archivos como "cancion.mp3.mpeg" — el navegador a
+// veces les asigna esa extensión al descargarlos/re-guardarlos, pero el
+// contenido sigue siendo mp3 comprimido: no hay que retranscodificarlos.
+export const COMPRESSED_AUDIO_EXTS = new Set(["mp3", "aac", "m4a", "mpeg", "mp2"])
 
 let ffmpegSingleton: FFmpeg | null = null
 let loadPromise: Promise<FFmpeg> | null = null
@@ -66,5 +69,45 @@ export async function ensureCompressedAudio(
     // fetchFile/writeFile), deleteFile tira error — no debe tapar el error real.
     await ffmpeg.deleteFile(inputName).catch(() => {})
     await ffmpeg.deleteFile(outputName).catch(() => {})
+  }
+}
+
+/**
+ * Duración exacta leída de los metadatos reales del archivo (vía ffmpeg),
+ * en vez de <audio>.duration en el navegador — para mp3 con bitrate
+ * variable o tags ID3, Chrome estima esa duración buscando cerca del final
+ * del archivo y puede errar por varios segundos. ffmpeg lee el header real.
+ */
+export async function getAccurateAudioDuration(file: File): Promise<number | null> {
+  const ffmpeg = await getFFmpeg()
+  const ext = (file.name.split(".").pop() ?? "bin").toLowerCase()
+  const inputName = `probe.${ext}`
+
+  let durationSeconds: number | null = null
+  const parseLog = ({ message }: { message: string }) => {
+    const match = message.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/)
+    if (match) {
+      const [, h, m, s] = match
+      durationSeconds = Number(h) * 3600 + Number(m) * 60 + Number(s)
+    }
+  }
+
+  ffmpeg.on("log", parseLog)
+  try {
+    await ffmpeg.writeFile(inputName, await fetchFile(file))
+    try {
+      // "-f null -" descarta la salida: solo interesa el log de metadata
+      // que ffmpeg imprime al abrir el archivo, no hace falta re-codificar.
+      await ffmpeg.exec(["-i", inputName, "-f", "null", "-"])
+    } catch {
+      // Algunos archivos hacen que ffmpeg termine con código de error
+      // igual habiendo logueado el Duration antes — no es un fallo real acá.
+    }
+    return durationSeconds
+  } catch {
+    return null
+  } finally {
+    ffmpeg.off("log", parseLog)
+    await ffmpeg.deleteFile(inputName).catch(() => {})
   }
 }
