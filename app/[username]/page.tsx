@@ -10,7 +10,7 @@ import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, Home, ArrowLeft, LayoutDashboard, Sparkles, GalleryHorizontalEnd, Video, type LucideIcon } from "lucide-react";
+import { Store, Home, ArrowLeft, LayoutDashboard, Sparkles, GalleryHorizontalEnd, Users, Video, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 type TabKey = "main" | "legado" | "publicaciones" | "embeds" | "store";
@@ -44,6 +44,7 @@ function PerfilPublicoContent() {
   const [activeTab, setActiveTab] = useState<TabKey>("main");
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
+  const [isBand, setIsBand] = useState(false);
 
   useEffect(() => {
     setShareUrl(window.location.href);
@@ -75,7 +76,7 @@ function PerfilPublicoContent() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id, unified_profile, user_id")
+          .select("id, unified_profile, user_id, profile_type")
           .ilike("display_name", displayNameSlug)
           .maybeSingle();
 
@@ -93,6 +94,7 @@ function PerfilPublicoContent() {
 
         setUnifiedProfile(Boolean(profile.unified_profile));
         setOwnerUserId(profile.user_id ?? null);
+        setIsBand(profile.profile_type === "band");
 
         // Cargar bloques del perfil
         const { data: dbBlocks, error: blocksError } = await supabase
@@ -256,7 +258,17 @@ function PerfilPublicoContent() {
         {/* El bloque hero (foto de perfil + portada) siempre va primero —
             la barra de tabs y el resto del contenido se acomodan debajo,
             nunca encima de él. */}
-        {heroBlock && renderBlock(heroBlock)}
+        {heroBlock && (
+          <div className="relative">
+            {renderBlock(heroBlock)}
+            {isBand && (
+              <span className="absolute left-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-black/60 px-3 py-1 text-xs font-semibold text-primary backdrop-blur">
+                <Users className="size-3.5" />
+                {t("profile_band_badge")}
+              </span>
+            )}
+          </div>
+        )}
 
         {unifiedProfile
           ? (

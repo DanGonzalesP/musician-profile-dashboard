@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ExternalLink, LayoutDashboard, LogOut, Sparkles, Users } from "lucide-react";
+import { ChevronDown, ExternalLink, LayoutDashboard, Loader2, LogOut, Sparkles, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import { supabase } from "@/lib/supabase";
 import { setActiveBandId, type MyProfileOption } from "@/lib/bands";
@@ -19,6 +19,7 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
   const { t } = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [switchingBandId, setSwitchingBandId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const name = personalDisplayName || t("feed_menu_my_profile_fallback");
@@ -45,8 +46,8 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
   }, [open]);
 
   const handleSwitchToBand = (bandId: string) => {
+    setSwitchingBandId(bandId);
     setActiveBandId(userId, bandId);
-    setOpen(false);
     if (window.location.pathname === "/dashboard") {
       window.location.reload();
     } else {
@@ -116,17 +117,27 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
               <p className="px-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {t("feed_menu_bands_title")}
               </p>
-              {bands.map((band) => (
-                <button
-                  key={band.id}
-                  type="button"
-                  onClick={() => handleSwitchToBand(band.id)}
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent/40"
-                >
-                  <Users className="size-4 text-muted-foreground" />
-                  <span className="truncate">{t("feed_menu_switch_to", { name: band.displayName })}</span>
-                </button>
-              ))}
+              {bands.map((band) => {
+                const isSwitching = switchingBandId === band.id;
+                return (
+                  <button
+                    key={band.id}
+                    type="button"
+                    disabled={switchingBandId !== null}
+                    onClick={() => handleSwitchToBand(band.id)}
+                    className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent/40 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {isSwitching ? (
+                      <Loader2 className="size-4 animate-spin text-primary" />
+                    ) : (
+                      <Users className="size-4 text-muted-foreground" />
+                    )}
+                    <span className="truncate">
+                      {isSwitching ? t("feed_menu_switching") : t("feed_menu_switch_to", { name: band.displayName })}
+                    </span>
+                  </button>
+                );
+              })}
               <Link
                 href="/perfil/banda"
                 onClick={() => setOpen(false)}

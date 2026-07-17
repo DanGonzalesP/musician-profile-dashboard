@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { fetchMyProfiles, getActiveBandId, setActiveBandId, type MyProfileOption } from "@/lib/bands"
-import { Mic2, Users } from "lucide-react"
+import { Loader2, Mic2, Users } from "lucide-react"
 
 const ROLE_LABELS: Record<MyProfileOption["role"], string> = {
   owner: "Propietario",
@@ -23,6 +23,7 @@ export function ProfileSwitcher() {
   const [options, setOptions] = useState<MyProfileOption[]>([])
   const [activeId, setActiveId] = useState<string>("")
   const [loading, setLoading] = useState(true)
+  const [switching, setSwitching] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -51,6 +52,7 @@ export function ProfileSwitcher() {
 
   const handleChange = (id: string) => {
     setActiveId(id)
+    setSwitching(true)
     const selected = options.find((p) => p.id === id)
     setActiveBandId(userId, selected?.isBand ? id : null)
     window.location.reload()
@@ -58,16 +60,19 @@ export function ProfileSwitcher() {
 
   return (
     <div className="flex items-center gap-1.5 rounded-full border border-sidebar-border bg-background/60 px-2 py-1">
-      {options.find((p) => p.id === activeId)?.isBand ? (
+      {switching ? (
+        <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+      ) : options.find((p) => p.id === activeId)?.isBand ? (
         <Users className="size-3.5 shrink-0 text-primary" />
       ) : (
         <Mic2 className="size-3.5 shrink-0 text-primary" />
       )}
       <select
         value={activeId}
+        disabled={switching}
         onChange={(e) => handleChange(e.target.value)}
         aria-label="Cambiar entre tu perfil personal y tus bandas"
-        className="bg-transparent text-xs font-medium text-foreground outline-none"
+        className="bg-transparent text-xs font-medium text-foreground outline-none disabled:cursor-wait disabled:opacity-60"
       >
         {options.map((p) => (
           <option key={p.id} value={p.id}>

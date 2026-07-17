@@ -16,6 +16,7 @@ export const dictionaries: Record<Locale, Dict> = {
     tab_publicaciones: "Publicaciones",
     tab_embeds: "Embeds",
     tab_store: "Merch y Servicios",
+    profile_band_badge: "Banda",
     common_close: "Cerrar",
 
     hero_share: "Compartir perfil",
@@ -135,6 +136,7 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_menu_artist_panel: "Panel de Artista",
     feed_menu_bands_title: "Mis bandas",
     feed_menu_switch_to: "Cambiar a {name}",
+    feed_menu_switching: "Cambiando...",
     feed_menu_manage_bands: "Gestionar bandas",
     feed_menu_create_band_title: "Crea tu página de banda",
     feed_menu_create_band_subtitle: "Como una página de negocio: varios integrantes, un solo perfil.",
@@ -166,6 +168,7 @@ export const dictionaries: Record<Locale, Dict> = {
     tab_publicaciones: "Posts",
     tab_embeds: "Embeds",
     tab_store: "Merch & Services",
+    profile_band_badge: "Band",
     common_close: "Close",
 
     hero_share: "Share profile",
@@ -285,6 +288,7 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_menu_artist_panel: "Artist Dashboard",
     feed_menu_bands_title: "My bands",
     feed_menu_switch_to: "Switch to {name}",
+    feed_menu_switching: "Switching...",
     feed_menu_manage_bands: "Manage bands",
     feed_menu_create_band_title: "Create your band page",
     feed_menu_create_band_subtitle: "Like a business page: multiple members, one profile.",

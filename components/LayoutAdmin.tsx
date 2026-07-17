@@ -3,8 +3,25 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  BarChart3,
+  Bell,
+  Briefcase,
+  Globe,
+  LogOut,
+  Music,
+  Package,
+  Palette,
+  Scale,
+  Settings,
+  Shirt,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PROFILE_ID } from "@/lib/blocks";
+import { Logo } from "@/components/logo";
 
 export default function LayoutAdmin({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -40,17 +57,18 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     cargarPerfil();
   }, []);
 
-  const enlaces = [
-    { name: "Editor de Página", href: "/dashboard", icon: "🎨" },
-    { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: "🌐" },
-    { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: "📈" },
-    { name: "Notificaciones de Créditos", href: "/perfil/notificaciones", icon: "🔔" },
-    { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: "📊" },
-    { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: "👕" },
-    { name: "Gestionar Servicios", href: "/perfil/admin-servicios", icon: "💼" },
-    { name: "Feed de Música", href: "/perfil/admin-musica", icon: "🎵" },
-    { name: "Herramientas Legales", href: "/perfil/legal", icon: "⚖️" },
-    { name: "Configurar Perfil", href: "/perfil/config", icon: "⚙" },
+  const enlaces: { name: string; href: string; icon: LucideIcon }[] = [
+    { name: "Editor de Página", href: "/dashboard", icon: Palette },
+    { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: Globe },
+    { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: BarChart3 },
+    { name: "Mis Bandas", href: "/perfil/banda", icon: Users },
+    { name: "Notificaciones de Créditos", href: "/perfil/notificaciones", icon: Bell },
+    { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: Package },
+    { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: Shirt },
+    { name: "Gestionar Servicios", href: "/perfil/admin-servicios", icon: Briefcase },
+    { name: "Feed de Música", href: "/perfil/admin-musica", icon: Music },
+    { name: "Herramientas Legales", href: "/perfil/legal", icon: Scale },
+    { name: "Configurar Perfil", href: "/perfil/config", icon: Settings },
   ];
 
   const cerrarSesion = async () => {
@@ -59,32 +77,38 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col md:flex-row">
-      <aside className="w-full md:w-64 bg-zinc-950 border-r border-zinc-800 p-6 flex flex-col justify-between shrink-0">
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
+      <aside className="glass-panel w-full shrink-0 border-b border-sidebar-border p-6 flex flex-col justify-between md:w-64 md:border-b-0 md:border-r">
         <div className="space-y-6">
           <Link
             href="/"
-            className="inline-flex items-center space-x-2 text-xs font-medium text-zinc-500 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            <span>⬅️</span>
-            <span>Volver al Feed</span>
+            <ArrowLeft className="size-3.5" />
+            Volver al Feed
           </Link>
-          <div>
-            <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Panel Artista</h2>
-            <p className="text-lg font-semibold text-white mt-1">@{publicSlug || "artista"}</p>
+          <div className="space-y-3">
+            <Logo showWordmark={false} markClassName="size-8" />
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Panel Artista</h2>
+              <p className="mt-1 text-lg font-semibold text-foreground">@{publicSlug || "artista"}</p>
+            </div>
           </div>
           <nav className="space-y-1">
             {enlaces.map((enlace) => {
               const activo = pathname === enlace.href;
+              const Icon = enlace.icon;
               return (
                 <Link
                   key={enlace.href}
                   href={enlace.href}
-                  className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    activo ? "bg-amber-500 text-zinc-950 font-bold" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                  className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                    activo
+                      ? "bg-primary text-primary-foreground font-bold"
+                      : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                   }`}
                 >
-                  <span>{enlace.icon}</span>
+                  <Icon className="size-4 shrink-0" />
                   <span>{enlace.name}</span>
                 </Link>
               );
@@ -93,13 +117,13 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
         </div>
         <button
           onClick={cerrarSesion}
-          className="mt-6 w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-950/30 hover:text-red-300 transition-colors border border-transparent hover:border-red-900/30"
+          className="mt-6 flex w-full items-center gap-3 rounded-lg border border-transparent px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:border-destructive/30 hover:bg-destructive/10"
         >
-          <span>🚪</span>
+          <LogOut className="size-4" />
           <span>Cerrar Sesión</span>
         </button>
       </aside>
-      <main className="flex-1 bg-zinc-900/40 overflow-y-auto">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-card/20">{children}</main>
     </div>
   );
 }
