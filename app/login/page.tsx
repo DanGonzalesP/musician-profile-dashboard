@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/components/locale-provider";
+import { LogoMark } from "@/components/logo";
 
 export default function LoginPage() {
   return (
@@ -66,9 +67,7 @@ function LoginForm() {
 
         <div className="w-full rounded-2xl border border-border bg-card p-6 shadow-xl space-y-6">
           <header className="text-center">
-            <div className="mx-auto size-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl mb-2">
-              D
-            </div>
+            <LogoMark className="mx-auto mb-2 size-10" />
             <h2 className="text-xl font-bold">
               {isRegistering ? t("auth_register_title") : t("auth_login_title")}
             </h2>

@@ -317,7 +317,7 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
   },
   {
     type: "legado",
-    label: "Legado",
+    label: "Bitácora",
     description: "Tu historia, trayectoria e integrantes — el CV de un músico, sin verse como uno.",
     icon: Sparkles,
     category: "Perfil",

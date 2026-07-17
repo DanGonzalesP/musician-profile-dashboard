@@ -11,8 +11,8 @@ type Dict = Record<string, string>
  */
 export const dictionaries: Record<Locale, Dict> = {
   es: {
-    tab_home: "Inicio",
-    tab_legado: "Legado",
+    tab_home: "Legado",
+    tab_legado: "Bitácora",
     tab_publicaciones: "Publicaciones",
     tab_embeds: "Embeds",
     tab_store: "Merch y Servicios",
@@ -161,8 +161,8 @@ export const dictionaries: Record<Locale, Dict> = {
     auth_toggle_to_register: "¿No tienes cuenta? Regístrate aquí",
   },
   en: {
-    tab_home: "Home",
-    tab_legado: "Legacy",
+    tab_home: "Legacy",
+    tab_legado: "Logbook",
     tab_publicaciones: "Posts",
     tab_embeds: "Embeds",
     tab_store: "Merch & Services",

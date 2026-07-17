@@ -10,18 +10,18 @@ import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, Home, ArrowLeft, Sparkles, GalleryHorizontalEnd, Video, type LucideIcon } from "lucide-react";
+import { Store, Home, ArrowLeft, LayoutDashboard, Sparkles, GalleryHorizontalEnd, Video, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 type TabKey = "main" | "legado" | "publicaciones" | "embeds" | "store";
 
 // Perfil "separado" (default): Hero, Single Destacado, Meta de Producción,
-// Track List y Donaciones viven en la pestaña "Inicio". Legado,
-// Publicaciones y Embeds son pestañas propias — cada una solo aparece si el
-// artista tiene al menos un bloque de ese tipo. Merch y Servicios quedan en
-// "Tienda", al final. Si el artista activa "Unificar perfil"
-// (profiles.unified_profile), se muestran todos los bloques juntos en
-// position_index, sin pestañas.
+// Track List y Donaciones viven en la pestaña "Legado" (el catálogo de
+// canciones). Bitácora (historia/trayectoria), Publicaciones y Embeds son
+// pestañas propias — cada una solo aparece si el artista tiene al menos un
+// bloque de ese tipo. Merch y Servicios quedan en "Tienda", al final. Si el
+// artista activa "Unificar perfil" (profiles.unified_profile), se muestran
+// todos los bloques juntos en position_index, sin pestañas.
 const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "catalog", "credits", "donation"];
 const EXTRA_TAB_TYPES: BlockType[] = ["legado", "publicaciones", "embeds"];
 
@@ -42,9 +42,17 @@ function PerfilPublicoContent() {
   const [shareUrl, setShareUrl] = useState("");
   const [unifiedProfile, setUnifiedProfile] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("main");
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setShareUrl(window.location.href);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setViewerUserId(data.user?.id ?? null);
+    });
   }, []);
 
   useEffect(() => {
@@ -67,7 +75,7 @@ function PerfilPublicoContent() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id, unified_profile")
+          .select("id, unified_profile, user_id")
           .ilike("display_name", displayNameSlug)
           .maybeSingle();
 
@@ -84,6 +92,7 @@ function PerfilPublicoContent() {
         }
 
         setUnifiedProfile(Boolean(profile.unified_profile));
+        setOwnerUserId(profile.user_id ?? null);
 
         // Cargar bloques del perfil
         const { data: dbBlocks, error: blocksError } = await supabase
@@ -139,6 +148,20 @@ function PerfilPublicoContent() {
       {t("auth_back_to_feed")}
     </Link>
   );
+
+  // Solo el dueño del perfil lo ve — cierra el loop que abre "Vista previa"
+  // en el editor: esa vista abre esta misma página pública en una pestaña
+  // nueva, y hasta ahora no había forma de volver al panel desde ahí.
+  const isOwner = Boolean(ownerUserId && viewerUserId && ownerUserId === viewerUserId);
+  const editPanelButton = isOwner ? (
+    <Link
+      href="/perfil/dashboard"
+      className="fixed right-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
+    >
+      <LayoutDashboard className="size-3.5" />
+      Volver a panel de edición
+    </Link>
+  ) : null;
 
   // UI States
   if (state === "loading") {
@@ -228,6 +251,7 @@ function PerfilPublicoContent() {
     <div className="min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8">
       <AudioReactiveBackground />
       {backToFeedButton}
+      {editPanelButton}
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 animate-fade-in">
         {/* El bloque hero (foto de perfil + portada) siempre va primero —
             la barra de tabs y el resto del contenido se acomodan debajo,
@@ -243,7 +267,7 @@ function PerfilPublicoContent() {
           : (
             <>
               {showTabBar && (
-                <div className="sticky top-2 z-20 flex gap-6 overflow-x-auto rounded-xl border border-border bg-card/95 px-4 shadow-lg backdrop-blur [&::-webkit-scrollbar]:hidden">
+                <div className="sticky top-2 z-20 flex w-full overflow-x-auto rounded-xl border border-border bg-card/95 px-2 shadow-lg backdrop-blur [&::-webkit-scrollbar]:hidden">
                   {tabs.map((tab) => {
                     const Icon = tab.icon;
                     return (
@@ -251,7 +275,7 @@ function PerfilPublicoContent() {
                         key={tab.key}
                         type="button"
                         onClick={() => setActiveTab(tab.key)}
-                        className={`flex shrink-0 items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
+                        className={`flex flex-1 min-w-fit items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
                           activeTab === tab.key
                             ? "border-primary text-foreground"
                             : "border-transparent text-muted-foreground hover:text-foreground"
