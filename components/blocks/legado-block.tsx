@@ -248,7 +248,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
       {data.headline ? (
         <Reveal>
           <div className="gradient-border relative rounded-2xl bg-card/40 p-6 sm:p-10">
-            <Eyebrow icon={Sparkles}>Bitácora</Eyebrow>
+            <Eyebrow icon={Sparkles}>Trayectoria</Eyebrow>
             <Quote className="mt-4 size-8 text-primary/40 sm:size-10" />
             <p className="mt-2 max-w-3xl text-balance font-display text-2xl font-bold leading-tight text-foreground sm:text-4xl">
               {data.headline}

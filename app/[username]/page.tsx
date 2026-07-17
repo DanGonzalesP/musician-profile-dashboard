@@ -17,7 +17,7 @@ type TabKey = "main" | "legado" | "publicaciones" | "embeds" | "store";
 
 // Perfil "separado" (default): Hero, Single Destacado, Meta de Producción,
 // Track List y Donaciones viven en la pestaña "Legado" (el catálogo de
-// canciones). Bitácora (historia/trayectoria), Publicaciones y Embeds son
+// canciones). Trayectoria (historia/carrera), Publicaciones y Embeds son
 // pestañas propias — cada una solo aparece si el artista tiene al menos un
 // bloque de ese tipo. Merch y Servicios quedan en "Tienda", al final. Si el
 // artista activa "Unificar perfil" (profiles.unified_profile), se muestran
@@ -155,7 +155,7 @@ function PerfilPublicoContent() {
   const isOwner = Boolean(ownerUserId && viewerUserId && ownerUserId === viewerUserId);
   const editPanelButton = isOwner ? (
     <Link
-      href="/perfil/dashboard"
+      href="/dashboard"
       className="fixed right-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
     >
       <LayoutDashboard className="size-3.5" />

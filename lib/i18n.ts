@@ -12,7 +12,7 @@ type Dict = Record<string, string>
 export const dictionaries: Record<Locale, Dict> = {
   es: {
     tab_home: "Legado",
-    tab_legado: "Bitácora",
+    tab_legado: "Trayectoria",
     tab_publicaciones: "Publicaciones",
     tab_embeds: "Embeds",
     tab_store: "Merch y Servicios",
@@ -143,8 +143,8 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_menu_my_profile_fallback: "Mi perfil",
 
     auth_back_to_feed: "Volver al feed",
-    auth_register_title: "Crea tu cuenta en Décima",
-    auth_login_title: "Bienvenido a Décima",
+    auth_register_title: "Crea tu cuenta en décima",
+    auth_login_title: "Bienvenido a décima",
     auth_register_subtitle: "Empieza a construir tu perfil de artista hoy.",
     auth_login_subtitle: "Ingresa para gestionar tu música y productos.",
     auth_email_label: "Correo Electrónico",
@@ -162,7 +162,7 @@ export const dictionaries: Record<Locale, Dict> = {
   },
   en: {
     tab_home: "Legacy",
-    tab_legado: "Logbook",
+    tab_legado: "Trajectory",
     tab_publicaciones: "Posts",
     tab_embeds: "Embeds",
     tab_store: "Merch & Services",
@@ -293,8 +293,8 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_menu_my_profile_fallback: "My profile",
 
     auth_back_to_feed: "Back to feed",
-    auth_register_title: "Create your Décima account",
-    auth_login_title: "Welcome to Décima",
+    auth_register_title: "Create your décima account",
+    auth_login_title: "Welcome to décima",
     auth_register_subtitle: "Start building your artist profile today.",
     auth_login_subtitle: "Sign in to manage your music and products.",
     auth_email_label: "Email",

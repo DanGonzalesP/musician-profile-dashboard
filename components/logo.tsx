@@ -16,14 +16,14 @@ function NoteGlyph({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 0 48 60"
-      className={cn("h-[1.3em] w-auto shrink-0 self-end text-primary", className)}
+      viewBox="0 0 44 60"
+      className={cn("h-[1.55em] w-auto shrink-0 self-end text-primary", className)}
       style={{ filter: "drop-shadow(0 0 8px color-mix(in oklch, var(--primary) 60%, transparent))" }}
       fill="currentColor"
     >
-      <rect x="22" y="2" width="8" height="48" rx="4" />
-      <ellipse cx="14" cy="48" rx="13" ry="10" transform="rotate(-15 14 48)" />
-      <path d="M30,2 C43,5 48,17 44,28 C41,21 35,15 30,17 Z" />
+      <rect x="25" y="2" width="8" height="48" rx="4" />
+      <ellipse cx="15" cy="48" rx="14" ry="11" transform="rotate(-8 15 48)" />
+      <path d="M33,2 C42,5 44,15 41,25 C38,19 34,14 33,15 Z" />
     </svg>
   )
 }
@@ -60,8 +60,8 @@ export function Logo({
   }
 
   return (
-    <span className={cn("inline-flex items-end gap-0.5", className)}>
-      <NoteGlyph className={markClassName} />
+    <span className={cn("inline-flex items-end", className)}>
+      <NoteGlyph className={cn("-mr-1", markClassName)} />
       <span className="font-display text-lg font-semibold leading-none tracking-tight text-foreground">
         écima
       </span>
