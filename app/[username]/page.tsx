@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { type Block, type BlockType, type TracksData, type CreditsData, dbBlockToBlock, isKnownBlockType } from "@/lib/blocks";
@@ -9,7 +10,7 @@ import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, Home } from "lucide-react";
+import { Store, Home, ArrowLeft } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 
@@ -126,10 +127,21 @@ function PerfilPublicoContent() {
     return () => controller.abort();
   }, [username]);
 
+  const backToFeedButton = (
+    <Link
+      href="/"
+      className="fixed left-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
+    >
+      <ArrowLeft className="size-3.5" />
+      {t("auth_back_to_feed")}
+    </Link>
+  );
+
   // UI States
   if (state === "loading") {
     return (
       <div className="min-h-screen bg-background text-foreground px-4 py-6 sm:px-6 sm:py-8">
+        {backToFeedButton}
         <main className="mx-auto max-w-4xl">
           <ProfileSkeleton />
         </main>
@@ -140,6 +152,7 @@ function PerfilPublicoContent() {
   if (state === "error") {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        {backToFeedButton}
         <div className="text-center">
           <p className="text-sm font-semibold text-destructive">
             {errorMessage || "Artista no encontrado."}
@@ -152,6 +165,7 @@ function PerfilPublicoContent() {
   if (state === "empty") {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        {backToFeedButton}
         <div className="text-center">
           <p className="text-lg font-semibold text-foreground">
             No hay contenido disponible todavía.
@@ -191,6 +205,7 @@ function PerfilPublicoContent() {
   return (
     <div className="min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8">
       <AudioReactiveBackground />
+      {backToFeedButton}
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 animate-fade-in">
         {unifiedProfile
           ? (

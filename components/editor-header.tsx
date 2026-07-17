@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ProfileSwitcher } from "@/components/profile-switcher"
@@ -30,6 +31,13 @@ export function EditorHeader({
         <ProfileSwitcher />
       </div>
       <div className="flex gap-2">
+        <Link
+          href="/"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+        >
+          <ArrowLeft className="size-3.5" />
+          Volver al Feed
+        </Link>
         <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
           Panel Admin
         </Link>

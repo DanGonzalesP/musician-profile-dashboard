@@ -40,6 +40,8 @@ export const dictionaries: Record<Locale, Dict> = {
     catalog_open_aria: "Abrir lista de canciones",
     catalog_play_aria: "Reproducir",
     catalog_pause_aria: "Pausar",
+    catalog_scroll_prev_aria: "Ver discos anteriores",
+    catalog_scroll_next_aria: "Ver discos siguientes",
 
     credits_eyebrow: "Créditos y Colaboraciones",
     credits_empty: "Todavía no hay créditos registrados.",
@@ -185,6 +187,8 @@ export const dictionaries: Record<Locale, Dict> = {
     catalog_open_aria: "Open track list",
     catalog_play_aria: "Play",
     catalog_pause_aria: "Pause",
+    catalog_scroll_prev_aria: "View previous releases",
+    catalog_scroll_next_aria: "View next releases",
 
     credits_eyebrow: "Credits & Collaborations",
     credits_empty: "No credits registered yet.",

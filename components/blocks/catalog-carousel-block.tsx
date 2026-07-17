@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Library, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Library, Pause, Play } from "lucide-react";
 import type { Album, CatalogData } from "@/lib/blocks";
 import { useLocale } from "@/components/locale-provider";
 import { setActiveAudio } from "@/lib/audio-bus";
 import { claimNowPlaying, releaseNowPlaying } from "@/lib/now-playing";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -29,6 +30,15 @@ export function CatalogCarouselBlock({ data }: { data: CatalogData }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [openAlbumId, setOpenAlbumId] = useState<string | null>(null);
+
+  const {
+    ref: carouselRef,
+    isDragging,
+    canScrollLeft,
+    canScrollRight,
+    scrollByPage,
+    handlers: carouselHandlers,
+  } = useDragScroll<HTMLDivElement>();
 
   const stopAndClear = () => {
     const audio = audioRef.current;
@@ -180,10 +190,35 @@ export function CatalogCarouselBlock({ data }: { data: CatalogData }) {
         {t("catalog_eyebrow")}
       </span>
 
-      <div
-        className="mt-4 flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
-        style={{ scrollbarWidth: "none" }}
-      >
+      <div className="relative mt-4">
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scrollByPage("left")}
+            aria-label={t("catalog_scroll_prev_aria")}
+            className="absolute left-1 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card/80 text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/60"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+        )}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scrollByPage("right")}
+            aria-label={t("catalog_scroll_next_aria")}
+            className="absolute right-1 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card/80 text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/60"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        )}
+        <div
+          ref={carouselRef}
+          {...carouselHandlers}
+          className={`flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden ${
+            isDragging ? "cursor-grabbing select-none" : "cursor-grab"
+          }`}
+          style={{ scrollbarWidth: "none" }}
+        >
         {data.albums.map((album) => {
           const isSingle = album.releaseType === "single";
           const singleKey = trackKey(album.id, 0);
@@ -239,6 +274,7 @@ export function CatalogCarouselBlock({ data }: { data: CatalogData }) {
             </button>
           );
         })}
+        </div>
       </div>
 
       {openAlbum && (

@@ -62,6 +62,13 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-black text-white flex flex-col md:flex-row">
       <aside className="w-full md:w-64 bg-zinc-950 border-r border-zinc-800 p-6 flex flex-col justify-between shrink-0">
         <div className="space-y-6">
+          <Link
+            href="/"
+            className="inline-flex items-center space-x-2 text-xs font-medium text-zinc-500 hover:text-white transition-colors"
+          >
+            <span>⬅️</span>
+            <span>Volver al Feed</span>
+          </Link>
           <div>
             <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Panel Artista</h2>
             <p className="text-lg font-semibold text-white mt-1">@{publicSlug || "artista"}</p>
