@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLocale } from "@/components/locale-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { Logo } from "@/components/logo";
 import ProfileMenu from "./ProfileMenu";
 import { supabase } from "@/lib/supabase";
 import { fetchMyProfiles, type MyProfileOption } from "@/lib/bands";
@@ -58,11 +59,8 @@ export default function FeedHeader() {
 
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-linear-to-b from-background/90 to-transparent px-6 py-4">
-      <div className="pointer-events-auto flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-          D
-        </div>
-        <span className="font-display text-lg font-semibold text-foreground">Décima</span>
+      <div className="pointer-events-auto">
+        <Logo />
       </div>
 
       <div className="pointer-events-auto flex items-center gap-3">

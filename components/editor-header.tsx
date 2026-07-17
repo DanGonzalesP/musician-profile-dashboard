@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ProfileSwitcher } from "@/components/profile-switcher"
+import { Logo } from "@/components/logo"
 
 export function EditorHeader({
   blockCount,
@@ -23,8 +24,10 @@ export function EditorHeader({
   const previewHref = publicSlug ? `/${publicSlug}` : "/perfil/preview"
 
   return (
-    <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-3">
-      <div className="flex items-center gap-3">
+    <header className="glass-panel sticky top-0 z-20 flex items-center justify-between border-b border-sidebar-border px-4 py-3">
+      <div className="flex items-center gap-4">
+        <Logo showWordmark={false} markClassName="size-7" />
+        <div className="h-5 w-px bg-sidebar-border" aria-hidden="true" />
         <div className="text-sm font-semibold">
           Editor <span className="text-muted-foreground font-normal">({blockCount} bloques)</span>
         </div>

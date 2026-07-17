@@ -4,11 +4,12 @@ import { useState } from "react"
 import { BLOCK_LIBRARY, type BlockType } from "@/lib/blocks"
 import { ChevronDown, Plus, GripVertical } from "lucide-react"
 
-const CATEGORIES = ["Layout", "Music", "Commerce"] as const
+const CATEGORIES = ["Layout", "Music", "Perfil", "Commerce"] as const
 
 const CATEGORY_LABELS: Record<(typeof CATEGORIES)[number], string> = {
   Layout: "Diseño",
   Music: "Música",
+  Perfil: "Perfil",
   Commerce: "Comercio",
 }
 
@@ -43,7 +44,7 @@ export function BlockLibrary({ onAdd, onDragStart, onDragEnd, locked = false }: 
         const blocks = BLOCK_LIBRARY.filter((b) => b.category === category)
         const isOpen = open[category]
         return (
-          <div key={category} className="rounded-xl border border-sidebar-border bg-background/30">
+          <div key={category} className="glass-panel rounded-xl border border-sidebar-border/60">
             <button
               type="button"
               onClick={() => setOpen((s) => ({ ...s, [category]: !s[category] }))}
@@ -66,7 +67,7 @@ export function BlockLibrary({ onAdd, onDragStart, onDragEnd, locked = false }: 
                       draggable
                       onDragStart={() => onDragStart(block.type)}
                       onDragEnd={onDragEnd}
-                      className="group relative flex cursor-grab items-start gap-3 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-3 transition-colors hover:border-primary/50 hover:bg-sidebar-accent active:cursor-grabbing"
+                      className="gradient-border gradient-border-static group relative flex cursor-grab items-start gap-3 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-3 opacity-90 transition-opacity duration-200 hover:bg-sidebar-accent hover:opacity-100 active:cursor-grabbing"
                     >
                       <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
                         <Icon className="size-5" />

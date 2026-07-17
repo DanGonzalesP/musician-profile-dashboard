@@ -1,6 +1,6 @@
 "use client"
 
-import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, CreditsData, MerchData, ServiceData, DonationData } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, CreditsData, MerchData, ServiceData, DonationData, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
 import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { HeroBlock } from "./hero-block"
 import { FeaturedSingleBlock } from "./featured-single-block"
@@ -11,6 +11,9 @@ import { CreditsBlock } from "./credits-block"
 import { MerchBlock } from "./merch-block"
 import { ServiceBlock } from "./service-block"
 import { DonationBlock } from "./donation-block"
+import { LegadoBlock } from "./legado-block"
+import { PublicacionesBlock } from "./publicaciones-block"
+import { EmbedsBlock } from "./embeds-block"
 
 export function BlockRenderer({
   block,
@@ -46,6 +49,12 @@ export function BlockRenderer({
       return <ServiceBlock data={block.data as ServiceData} services={services} />
     case "donation":
       return <DonationBlock data={block.data as DonationData} />
+    case "legado":
+      return <LegadoBlock data={block.data as LegadoData} />
+    case "publicaciones":
+      return <PublicacionesBlock data={block.data as PublicacionesData} />
+    case "embeds":
+      return <EmbedsBlock data={block.data as EmbedsData} />
     default:
       return (
         <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">

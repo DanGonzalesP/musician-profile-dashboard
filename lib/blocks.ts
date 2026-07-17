@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library, Users } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library, Users, Sparkles, GalleryHorizontalEnd, Video } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -13,6 +13,9 @@ export type BlockType =
   | "merch"
   | "service"
   | "donation"
+  | "legado"
+  | "publicaciones"
+  | "embeds"
 
 export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
 
@@ -149,6 +152,80 @@ export type DonationData = {
   deadline: string
 }
 
+// ─── Bloque "legado" — trayectoria del artista (reemplaza al "CV" genérico) ─
+// Presentacional: la bio larga, hitos de carrera (tarjetas 3D tilt),
+// integrantes de banda (flip cards, vacío si es solista) e imágenes de
+// referencia (fotos de prensa/shows). No tiene límite estricto de "tier
+// gratuito" como Publicaciones — es contenido de portafolio/CV, no un feed.
+
+export type LegadoMilestone = {
+  id: string
+  year: string
+  title: string
+  description: string
+  image?: string
+}
+
+export type LegadoMember = {
+  id: string
+  name: string
+  role: string
+  photo?: string
+  bio?: string
+}
+
+export type LegadoData = {
+  headline: string
+  bio: string
+  genres: string[]
+  influences: string[]
+  timeline: LegadoMilestone[]
+  members: LegadoMember[]
+  gallery: string[]
+}
+
+// ─── Bloque "publicaciones" — galería de fotos/videos, tier gratuito ───────
+// PUBLICACIONES_MAX_ITEMS es el límite duro de la versión gratuita (el
+// artista elige sus mejores elementos). Un futuro tier pago solo necesita
+// subir esta constante — no hay lógica de límite hardcodeada en otro lado.
+
+export const PUBLICACIONES_MAX_ITEMS = 9
+
+export type PublicacionItem = {
+  id: string
+  type: "image" | "video"
+  url: string
+  // Miniatura del video — si no se sube una propia, el bloque público debe
+  // resolver un frame o mostrar un ícono de reproducción sobre fondo sólido.
+  thumbnail?: string
+  caption?: string
+}
+
+export type PublicacionesData = {
+  items: PublicacionItem[]
+}
+
+// ─── Bloque "embeds" — YouTube (iframe real, puede traer anuncios) y
+// TikTok (tarjeta propia con miniatura opcional subida por el artista +
+// botón "Ver en TikTok", sin script embed.tiktok.com de terceros) ──────────
+
+export type EmbedPlatform = "youtube" | "tiktok"
+
+export type EmbedItem = {
+  id: string
+  platform: EmbedPlatform
+  url: string
+  title?: string
+  // Solo se usa para "tiktok" — TikTok no se embebe en vivo, así que la
+  // miniatura de la tarjeta la sube el propio artista (mismo ImageUploader
+  // que el resto del editor).
+  thumbnail?: string
+}
+
+export type EmbedsData = {
+  items: EmbedItem[]
+}
+
 export type LicenseSongOption = { id: string; label: string }
 
 /**
@@ -177,6 +254,9 @@ export type BlockData =
   | MerchData
   | ServiceData
   | DonationData
+  | LegadoData
+  | PublicacionesData
+  | EmbedsData
 
 export type Block = {
   id: string
@@ -189,7 +269,7 @@ export type BlockDefinition = {
   label: string
   description: string
   icon: LucideIcon
-  category: "Layout" | "Music" | "Commerce"
+  category: "Layout" | "Music" | "Perfil" | "Commerce"
 }
 
 export const BLOCK_LIBRARY: BlockDefinition[] = [
@@ -234,6 +314,27 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     description: "Canciones de otros artistas en las que participaste, con tu rol exacto.",
     icon: Users,
     category: "Music",
+  },
+  {
+    type: "legado",
+    label: "Legado",
+    description: "Tu historia, trayectoria e integrantes — el CV de un músico, sin verse como uno.",
+    icon: Sparkles,
+    category: "Perfil",
+  },
+  {
+    type: "publicaciones",
+    label: "Publicaciones",
+    description: "Hasta 9 fotos y videos, tus mejores momentos.",
+    icon: GalleryHorizontalEnd,
+    category: "Perfil",
+  },
+  {
+    type: "embeds",
+    label: "Embeds",
+    description: "Enlaces de YouTube y TikTok que ya publicaste en otras plataformas.",
+    icon: Video,
+    category: "Perfil",
   },
   {
     type: "merch",
@@ -364,6 +465,26 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         currentAmount: String(content.currentAmount ?? "0"),
         deadline: content.deadline ? String(content.deadline) : "",
       }
+    case "legado":
+      return {
+        headline: String(content.headline ?? ""),
+        bio: String(content.bio ?? ""),
+        genres: Array.isArray(content.genres) ? content.genres.map(String) : [],
+        influences: Array.isArray(content.influences) ? content.influences.map(String) : [],
+        timeline: Array.isArray(content.timeline) ? content.timeline.map((m, i) => normalizeLegadoMilestone(m, i)) : [],
+        members: Array.isArray(content.members) ? content.members.map((m, i) => normalizeLegadoMember(m, i)) : [],
+        gallery: Array.isArray(content.gallery) ? content.gallery.map(String) : [],
+      }
+    case "publicaciones":
+      return {
+        items: Array.isArray(content.items)
+          ? content.items.map((p, i) => normalizePublicacionItem(p, i)).slice(0, PUBLICACIONES_MAX_ITEMS)
+          : [],
+      }
+    case "embeds":
+      return {
+        items: Array.isArray(content.items) ? content.items.map((e, i) => normalizeEmbedItem(e, i)) : [],
+      }
   }
 }
 
@@ -428,6 +549,54 @@ function normalizeCreditItem(raw: unknown, index: number): CreditItem {
     requestId: c.requestId ? String(c.requestId) : undefined,
     ownerProfileId: c.ownerProfileId ? String(c.ownerProfileId) : undefined,
     songKey: c.songKey ? String(c.songKey) : undefined,
+  }
+}
+
+function normalizeLegadoMilestone(raw: unknown, index: number): LegadoMilestone {
+  const m = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(m.id ?? `milestone-${index + 1}`),
+    year: String(m.year ?? ""),
+    title: String(m.title ?? ""),
+    description: String(m.description ?? ""),
+    image: m.image ? String(m.image) : undefined,
+  }
+}
+
+function normalizeLegadoMember(raw: unknown, index: number): LegadoMember {
+  const m = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(m.id ?? `member-${index + 1}`),
+    name: String(m.name ?? ""),
+    role: String(m.role ?? ""),
+    photo: m.photo ? String(m.photo) : undefined,
+    bio: m.bio ? String(m.bio) : undefined,
+  }
+}
+
+const PUBLICACION_TYPES = ["image", "video"] as const
+
+function normalizePublicacionItem(raw: unknown, index: number): PublicacionItem {
+  const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(p.id ?? `publicacion-${index + 1}`),
+    type: PUBLICACION_TYPES.includes(p.type as (typeof PUBLICACION_TYPES)[number]) ? (p.type as "image" | "video") : "image",
+    url: String(p.url ?? ""),
+    thumbnail: p.thumbnail ? String(p.thumbnail) : undefined,
+    caption: p.caption ? String(p.caption) : undefined,
+  }
+}
+
+const EMBED_PLATFORMS: EmbedPlatform[] = ["youtube", "tiktok"]
+
+function normalizeEmbedItem(raw: unknown, index: number): EmbedItem {
+  const e = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(e.id ?? `embed-${index + 1}`),
+    platform: EMBED_PLATFORMS.includes(e.platform as EmbedPlatform) ? (e.platform as EmbedPlatform) : "youtube",
+    url: String(e.url ?? ""),
+    title: e.title ? String(e.title) : undefined,
+    thumbnail: e.thumbnail ? String(e.thumbnail) : undefined,
   }
 }
 
@@ -574,5 +743,19 @@ function defaultData(type: BlockType): BlockData {
         currentAmount: "0",
         deadline: "",
       }
+    case "legado":
+      return {
+        headline: "",
+        bio: "",
+        genres: [],
+        influences: [],
+        timeline: [],
+        members: [],
+        gallery: [],
+      }
+    case "publicaciones":
+      return { items: [] }
+    case "embeds":
+      return { items: [] }
   }
 }

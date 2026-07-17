@@ -686,8 +686,8 @@ export function ProfileEditor() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left — block library */}
-        <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar sm:w-72 lg:w-80">
-          <div className="flex items-center gap-2 border-b border-sidebar-border px-4 py-3">
+        <aside className="glass-panel flex w-64 shrink-0 flex-col border-r border-sidebar-border/60 sm:w-72 lg:w-80">
+          <div className="flex items-center gap-2 border-b border-sidebar-border/60 px-4 py-3">
             <Layers className="size-4 text-primary" />
             <h2 className="text-sm font-semibold text-foreground">Bloques</h2>
           </div>
@@ -753,7 +753,7 @@ export function ProfileEditor() {
               onClick={() => setSelectedId(null)}
               aria-hidden="true"
             />
-            <aside className="fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-sidebar-border bg-sidebar xl:static xl:z-auto xl:w-80 xl:max-w-none">
+            <aside className="glass-panel fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-sidebar-border/60 xl:static xl:z-auto xl:w-80 xl:max-w-none">
               <BlockInspector
                 block={selectedBlock}
                 onChange={updateBlock}

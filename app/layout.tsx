@@ -10,8 +10,8 @@ const unbounded = Unbounded({ subsets: ['latin'], variable: '--font-unbounded' }
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'Amplitude — Profile Studio',
-  description: 'Design your public artist profile with a modular, drag-and-drop block editor.',
+  title: 'Décima — Perfil de Artista',
+  description: 'Construye tu perfil de artista: discografía, trayectoria y publicaciones, con un editor modular de bloques.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: '#211d18',
+  themeColor: '#0a0a0a',
 }
 
 export default function RootLayout({

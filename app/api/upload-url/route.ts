@@ -8,7 +8,7 @@ import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 // con la URL que devolvemos acá. Por eso este endpoint solo recibe metadata
 // (nombre/tipo de archivo), nunca el archivo en sí, y no hay límite de
 // tamaño de body que ajustar en Next.js/Vercel para esto.
-const ALLOWED_FOLDERS = new Set(["images", "audio"])
+const ALLOWED_FOLDERS = new Set(["images", "audio", "video"])
 
 export async function POST(request: Request) {
   try {

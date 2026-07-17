@@ -10,17 +10,20 @@ import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, Home, ArrowLeft } from "lucide-react";
+import { Store, Home, ArrowLeft, Sparkles, GalleryHorizontalEnd, Video, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
+type TabKey = "main" | "legado" | "publicaciones" | "embeds" | "store";
 
 // Perfil "separado" (default): Hero, Single Destacado, Meta de Producción,
-// Track List y Donaciones viven en la página principal; Merch y Servicios
-// quedan en su propia pestaña. Si el artista activa "Unificar perfil"
-// (profiles.unified_profile), se muestran todos los bloques juntos, pero
-// Hero, Single Destacado y Meta de Producción igual quedan forzados al
-// tope, en ese orden — ver más abajo.
+// Track List y Donaciones viven en la pestaña "Inicio". Legado,
+// Publicaciones y Embeds son pestañas propias — cada una solo aparece si el
+// artista tiene al menos un bloque de ese tipo. Merch y Servicios quedan en
+// "Tienda", al final. Si el artista activa "Unificar perfil"
+// (profiles.unified_profile), se muestran todos los bloques juntos en
+// position_index, sin pestañas.
 const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "catalog", "credits", "donation"];
+const EXTRA_TAB_TYPES: BlockType[] = ["legado", "publicaciones", "embeds"];
 
 export default function PerfilPublicoPage() {
   return <PerfilPublicoContent />;
@@ -38,7 +41,7 @@ function PerfilPublicoContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState("");
   const [unifiedProfile, setUnifiedProfile] = useState(false);
-  const [activeTab, setActiveTab] = useState<"main" | "store">("main");
+  const [activeTab, setActiveTab] = useState<TabKey>("main");
 
   useEffect(() => {
     setShareUrl(window.location.href);
@@ -186,9 +189,28 @@ function PerfilPublicoContent() {
   // position_index desde la consulta) — nunca se fuerza un tipo de bloque
   // a una posición fija, para que el orden del editor/dashboard se respete
   // tal cual en el perfil público.
-  const mainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type));
-  const storeBlocks = blocks.filter((b) => !MAIN_BLOCK_TYPES.includes(b.type));
-  const showStoreTab = !unifiedProfile && storeBlocks.length > 0;
+  const heroBlock = blocks.find((b) => b.type === "hero");
+  const mainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type) && b.type !== "hero");
+  const legadoBlocks = blocks.filter((b) => b.type === "legado");
+  const publicacionesBlocks = blocks.filter((b) => b.type === "publicaciones");
+  const embedsBlocks = blocks.filter((b) => b.type === "embeds");
+  const storeBlocks = blocks.filter(
+    (b) => !MAIN_BLOCK_TYPES.includes(b.type) && !EXTRA_TAB_TYPES.includes(b.type)
+  );
+
+  // Cada pestaña extra (Legado/Publicaciones/Embeds/Tienda) solo existe si
+  // el artista tiene contenido de ese tipo — "Inicio" siempre está presente.
+  const tabs: { key: TabKey; label: string; icon: LucideIcon; blocks: Block[] }[] = [
+    { key: "main", label: t("tab_home"), icon: Home, blocks: mainBlocks },
+    ...(legadoBlocks.length > 0 ? [{ key: "legado" as const, label: t("tab_legado"), icon: Sparkles, blocks: legadoBlocks }] : []),
+    ...(publicacionesBlocks.length > 0
+      ? [{ key: "publicaciones" as const, label: t("tab_publicaciones"), icon: GalleryHorizontalEnd, blocks: publicacionesBlocks }]
+      : []),
+    ...(embedsBlocks.length > 0 ? [{ key: "embeds" as const, label: t("tab_embeds"), icon: Video, blocks: embedsBlocks }] : []),
+    ...(storeBlocks.length > 0 ? [{ key: "store" as const, label: t("tab_store"), icon: Store, blocks: storeBlocks }] : []),
+  ];
+  const showTabBar = !unifiedProfile && tabs.length > 1;
+  const activeBlocks = tabs.find((tab) => tab.key === activeTab)?.blocks ?? mainBlocks;
 
   const renderBlock = (block: Block) => (
     <BlockRenderer
@@ -207,43 +229,42 @@ function PerfilPublicoContent() {
       <AudioReactiveBackground />
       {backToFeedButton}
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 animate-fade-in">
+        {/* El bloque hero (foto de perfil + portada) siempre va primero —
+            la barra de tabs y el resto del contenido se acomodan debajo,
+            nunca encima de él. */}
+        {heroBlock && renderBlock(heroBlock)}
+
         {unifiedProfile
           ? (
             <>
-              {blocks.map(renderBlock)}
+              {blocks.filter((b) => b.type !== "hero").map(renderBlock)}
             </>
           )
           : (
             <>
-              {showStoreTab && (
-                <div className="sticky top-2 z-20 flex gap-6 rounded-xl border border-border bg-card/95 px-4 shadow-lg backdrop-blur">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("main")}
-                    className={`flex items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
-                      activeTab === "main"
-                        ? "border-primary text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Home className="size-4" />
-                    {t("tab_home")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("store")}
-                    className={`flex items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
-                      activeTab === "store"
-                        ? "border-primary text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Store className="size-4" />
-                    {t("tab_store")}
-                  </button>
+              {showTabBar && (
+                <div className="sticky top-2 z-20 flex gap-6 overflow-x-auto rounded-xl border border-border bg-card/95 px-4 shadow-lg backdrop-blur [&::-webkit-scrollbar]:hidden">
+                  {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`flex shrink-0 items-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
+                          activeTab === tab.key
+                            ? "border-primary text-foreground"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="size-4" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
-              {(activeTab === "store" ? storeBlocks : mainBlocks).map(renderBlock)}
+              {activeBlocks.map(renderBlock)}
             </>
           )}
       </main>

@@ -2,13 +2,16 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, DonationData, Album, Track, ReleaseType, SocialLink, SocialPlatform } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CatalogData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, DonationData, Album, Track, ReleaseType, SocialLink, SocialPlatform, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchYoutubeMetadata } from "@/lib/youtube"
 import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft, ArrowUp, ArrowDown, Search } from "lucide-react"
+import { LegadoFields } from "@/components/inspector/legado-fields"
+import { PublicacionesFields } from "@/components/inspector/publicaciones-fields"
+import { EmbedsFields } from "@/components/inspector/embeds-fields"
 
 function BackToPanelLink() {
   return (
@@ -21,7 +24,7 @@ function BackToPanelLink() {
   )
 }
 
-type BlobRegistry = React.MutableRefObject<Map<string, File>>
+export type BlobRegistry = React.MutableRefObject<Map<string, File>>
 
 type Props = {
   block: Block | null
@@ -68,8 +71,8 @@ export function BlockInspector({
   const update = (data: Block["data"]) => onChange(block.id, data)
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-foreground">
-      <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
+    <div className="flex h-full flex-col text-foreground">
+      <div className="gradient-border relative flex items-center justify-between border-b border-sidebar-border/60 bg-sidebar/80 px-4 py-3 backdrop-blur-md">
         <div>
           <BackToPanelLink />
           <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary">Editando</p>
@@ -85,7 +88,7 @@ export function BlockInspector({
         </button>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-4">
+      <div className="flex-1 space-y-6 overflow-y-auto bg-sidebar/40 p-4">
         {block.type === "hero" && (
           <HeroFields data={block.data as HeroData} onChange={update} blobRegistry={blobRegistry} />
         )}
@@ -124,6 +127,15 @@ export function BlockInspector({
         {block.type === "donation" && (
           <DonationFields data={block.data as DonationData} onChange={update} />
         )}
+        {block.type === "legado" && (
+          <LegadoFields data={block.data as LegadoData} onChange={update} blobRegistry={blobRegistry} />
+        )}
+        {block.type === "publicaciones" && (
+          <PublicacionesFields data={block.data as PublicacionesData} onChange={update} blobRegistry={blobRegistry} />
+        )}
+        {block.type === "embeds" && (
+          <EmbedsFields data={block.data as EmbedsData} onChange={update} blobRegistry={blobRegistry} />
+        )}
       </div>
 
       <div className="border-t border-sidebar-border p-4 bg-sidebar">
@@ -142,7 +154,7 @@ export function BlockInspector({
 
 // ─── Shared UI primitives ──────────────────────────────────────────────────
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="block space-y-1.5">
       <span className="block text-xs font-medium text-muted-foreground">{label}</span>
@@ -151,16 +163,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const inputClass =
+export const inputClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground"
 
-function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input type="text" {...props} className={inputClass} />
 }
 
 // ─── ImageUploader — usa blob URL para preview inmediato ──────────────────
 
-function ImageUploader({
+export function ImageUploader({
   onUploadReady,
   currentImageUrl,
   blobRegistry,
