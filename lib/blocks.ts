@@ -387,7 +387,11 @@ type DbProfileBlock = {
   content: unknown
 }
 
-export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
+export function normalizeBlockData(
+  type: BlockType,
+  raw: unknown,
+  opts?: { isBand?: boolean }
+): BlockData {
   const content = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
 
   switch (type) {
@@ -475,12 +479,14 @@ export function normalizeBlockData(type: BlockType, raw: unknown): BlockData {
         members: Array.isArray(content.members) ? content.members.map((m, i) => normalizeLegadoMember(m, i)) : [],
         gallery: Array.isArray(content.gallery) ? content.gallery.map(String) : [],
       }
-    case "publicaciones":
-      return {
-        items: Array.isArray(content.items)
-          ? content.items.map((p, i) => normalizePublicacionItem(p, i)).slice(0, PUBLICACIONES_MAX_ITEMS)
-          : [],
-      }
+    case "publicaciones": {
+      const normalized = Array.isArray(content.items)
+        ? content.items.map((p, i) => normalizePublicacionItem(p, i))
+        : []
+      // Los perfiles de banda ("página de empresa") no tienen el tope
+      // gratuito de PUBLICACIONES_MAX_ITEMS — el resto de los perfiles sí.
+      return { items: opts?.isBand ? normalized : normalized.slice(0, PUBLICACIONES_MAX_ITEMS) }
+    }
     case "embeds":
       return {
         items: Array.isArray(content.items) ? content.items.map((e, i) => normalizeEmbedItem(e, i)) : [],
@@ -600,12 +606,12 @@ function normalizeEmbedItem(raw: unknown, index: number): EmbedItem {
   }
 }
 
-export function dbBlockToBlock(dbBlock: DbProfileBlock): Block {
+export function dbBlockToBlock(dbBlock: DbProfileBlock, opts?: { isBand?: boolean }): Block {
   const type = dbBlock.block_type as BlockType
   return {
     id: `${type}-${dbBlock.id}`,
     type,
-    data: normalizeBlockData(type, dbBlock.content),
+    data: normalizeBlockData(type, dbBlock.content, opts),
   }
 }
 

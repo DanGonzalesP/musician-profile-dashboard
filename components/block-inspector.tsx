@@ -37,6 +37,7 @@ type Props = {
   services: CatalogService[]
   onServicesChange: (services: CatalogService[]) => void
   profileId?: string | null
+  isBand?: boolean
 }
 
 export function BlockInspector({
@@ -50,6 +51,7 @@ export function BlockInspector({
   services,
   onServicesChange,
   profileId,
+  isBand = false,
 }: Props) {
   if (!block) {
     return (
@@ -131,7 +133,12 @@ export function BlockInspector({
           <LegadoFields data={block.data as LegadoData} onChange={update} blobRegistry={blobRegistry} />
         )}
         {block.type === "publicaciones" && (
-          <PublicacionesFields data={block.data as PublicacionesData} onChange={update} blobRegistry={blobRegistry} />
+          <PublicacionesFields
+            data={block.data as PublicacionesData}
+            onChange={update}
+            blobRegistry={blobRegistry}
+            isBand={isBand}
+          />
         )}
         {block.type === "embeds" && (
           <EmbedsFields data={block.data as EmbedsData} onChange={update} blobRegistry={blobRegistry} />

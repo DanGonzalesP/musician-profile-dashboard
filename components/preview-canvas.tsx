@@ -80,19 +80,7 @@ export function PreviewCanvas({
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      {/* Browser-style profile frame */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-border bg-background/60 px-4 py-2.5">
-          <div className="flex gap-1.5">
-            <span className="size-2.5 rounded-full bg-destructive/70" />
-            <span className="size-2.5 rounded-full bg-primary/70" />
-            <span className="size-2.5 rounded-full bg-chart-2/70" />
-          </div>
-          <div className="mx-auto flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-            amplitude.fm/<span className="text-foreground">nova-reyes</span>
-          </div>
-        </div>
-
         <div
           className="min-h-[70vh] space-y-0 p-3 sm:p-4"
           onDragOver={(e) => {

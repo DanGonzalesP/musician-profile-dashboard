@@ -8,7 +8,7 @@ import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
 import { BlockInspector } from "@/components/block-inspector"
-import { Layers } from "lucide-react"
+import { Layers, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio } from "@/lib/audio-transcode"
@@ -222,6 +222,9 @@ export function ProfileEditor() {
   const [services, setServices] = useState<CatalogService[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dragPayload, setDragPayload] = useState<DragPayload>(null)
+  // Drawer de "Bloques" en mobile/tablet (< xl) — el aside se vuelve un
+  // overlay a pantalla completa en vez de compartir espacio con el lienzo.
+  const [mobileBlocksOpen, setMobileBlocksOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [loading, setLoading] = useState(true)
   // Slug de la página pública ya publicada (deriva de profiles.display_name)
@@ -348,7 +351,11 @@ export function ProfileEditor() {
           if (error) throw error
 
           if (dbBlocks && dbBlocks.length > 0) {
-            setBlocks(dbBlocks.filter((b) => isKnownBlockType(b.block_type)).map(dbBlockToBlock))
+            setBlocks(
+              dbBlocks
+                .filter((b) => isKnownBlockType(b.block_type))
+                .map((b) => dbBlockToBlock(b, { isBand }))
+            )
           } else {
             setBlocks([
               createBlock("hero"),
@@ -682,21 +689,50 @@ export function ProfileEditor() {
         onPublish={handlePublish}
         isPublishing={publishing}
         publicSlug={publicSlug}
+        activeRole={activeRole}
+        mobileBlocksOpen={mobileBlocksOpen}
+        onToggleBlocks={() => setMobileBlocksOpen((v) => !v)}
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left — block library */}
-        <aside className="glass-panel flex w-64 shrink-0 flex-col border-r border-sidebar-border/60 sm:w-72 lg:w-80">
-          <div className="flex items-center gap-2 border-b border-sidebar-border/60 px-4 py-3">
-            <Layers className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Bloques</h2>
+        {/* Left — block library. En mobile/tablet (< xl) es un overlay a
+            pantalla completa que se abre desde el botón "Bloques" del
+            header; desde xl comparte espacio con el lienzo como siempre. */}
+        {mobileBlocksOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-background/70 xl:hidden"
+            onClick={() => setMobileBlocksOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        <aside
+          className={`glass-panel fixed inset-y-0 left-0 z-40 w-full max-w-xs flex-col border-r border-sidebar-border/60 xl:static xl:z-auto xl:flex xl:w-80 xl:max-w-none ${
+            mobileBlocksOpen ? "flex" : "hidden"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-sidebar-border/60 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Layers className="size-4 text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Bloques</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileBlocksOpen(false)}
+              aria-label="Cerrar panel de bloques"
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground xl:hidden"
+            >
+              <X className="size-4" />
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
               Arrastra un bloque a tu perfil, o presiona el botón de más para agregarlo.
             </p>
             <BlockLibrary
-              onAdd={addBlock}
+              onAdd={(type) => {
+                addBlock(type)
+                setMobileBlocksOpen(false)
+              }}
               onDragStart={(type) => setDragPayload({ kind: "new", type })}
               onDragEnd={() => setDragPayload(null)}
               locked={activeRole === "editor"}
@@ -706,22 +742,6 @@ export function ProfileEditor() {
 
         {/* Center — live preview canvas */}
         <main className="relative flex-1 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklch,var(--primary)_8%,transparent),transparent_60%)] p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto mb-5 flex max-w-2xl items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-foreground">Vista en vivo</h1>
-              <p className="text-xs text-muted-foreground">Así es como los fans verán tu página.</p>
-            </div>
-            {activeRole === "editor" && (
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600">
-                Rol: Editor — solo fotos, redes y biografía
-              </span>
-            )}
-            {activeRole === "admin" && (
-              <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-                Rol: Administrador Total
-              </span>
-            )}
-          </div>
           <PreviewCanvas
             blocks={blocks}
             selectedId={selectedId}
@@ -765,6 +785,7 @@ export function ProfileEditor() {
                 services={services}
                 onServicesChange={setServices}
                 profileId={profileIdRef.current}
+                isBand={isBandRef.current}
               />
             </aside>
           </>

@@ -80,13 +80,15 @@ export function PublicacionesFields({
   data,
   onChange,
   blobRegistry,
+  isBand = false,
 }: {
   data: PublicacionesData
   onChange: (d: PublicacionesData) => void
   blobRegistry: BlobRegistry
+  isBand?: boolean
 }) {
   const items = data.items
-  const atLimit = items.length >= PUBLICACIONES_MAX_ITEMS
+  const atLimit = !isBand && items.length >= PUBLICACIONES_MAX_ITEMS
 
   const addItem = () => {
     if (atLimit) return
@@ -107,7 +109,7 @@ export function PublicacionesFields({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {items.length} / {PUBLICACIONES_MAX_ITEMS} publicaciones
+          {isBand ? `${items.length} publicaciones` : `${items.length} / ${PUBLICACIONES_MAX_ITEMS} publicaciones`}
         </p>
         <button
           type="button"

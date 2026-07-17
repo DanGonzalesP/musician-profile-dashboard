@@ -15,7 +15,7 @@ import {
   type BandMember,
   type PendingInvite,
 } from "@/lib/bands";
-import { Loader2, Plus, Trash2, Check, X as XIcon, Pencil } from "lucide-react";
+import { Loader2, Plus, Trash2, Check, X as XIcon, Pencil, Sparkles, Users } from "lucide-react";
 
 type OwnedBand = { id: string; displayName: string };
 
@@ -111,7 +111,7 @@ export default function BandaPage() {
   if (loading) {
     return (
       <LayoutAdmin>
-        <div className="flex items-center justify-center p-12 text-zinc-400">
+        <div className="flex items-center justify-center p-12 text-muted-foreground">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
       </LayoutAdmin>
@@ -120,45 +120,52 @@ export default function BandaPage() {
 
   return (
     <LayoutAdmin>
-      <div className="p-8 max-w-4xl mx-auto space-y-8">
-        <header className="border-b border-zinc-800 pb-4">
-          <h1 className="text-2xl font-bold text-white">Mis Bandas</h1>
-          <p className="text-zinc-400 text-xs mt-1">
-            Crea páginas de banda, invita colaboradores y gestiona sus roles de edición.
+      <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-8">
+        <header className="gradient-border relative rounded-2xl bg-card/40 p-6 sm:p-8">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Sparkles className="size-3.5" />
+            Página de empresa
+          </span>
+          <h1 className="mt-3 font-display text-2xl font-bold text-foreground sm:text-3xl">Tus bandas</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Como una página de negocio: varios integrantes, un solo perfil, gestionado en equipo. Crea la página
+            de tu banda, invita a tus compañeros con un rol y edítenla juntos desde el mismo editor de bloques.
           </p>
         </header>
 
         {errorMessage && (
-          <div className="p-4 rounded-md border bg-red-500/10 border-red-500/20 text-red-400 text-sm">{errorMessage}</div>
+          <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+            {errorMessage}
+          </div>
         )}
 
         {pendingInvites.length > 0 && (
           <section className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Invitaciones recibidas ({pendingInvites.length})
             </h2>
             <div className="space-y-3">
               {pendingInvites.map((inv) => (
                 <div
                   key={inv.membershipId}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border bg-card/60 p-4"
                 >
-                  <p className="text-sm text-zinc-300">
-                    <span className="font-semibold text-white">{inv.bandDisplayName}</span> te invitó como{" "}
-                    <span className="font-medium text-amber-400">{ROLE_LABELS[inv.role]}</span>
+                  <p className="text-sm text-foreground/90">
+                    <span className="font-semibold text-foreground">{inv.bandDisplayName}</span> te invitó como{" "}
+                    <span className="font-medium text-primary">{ROLE_LABELS[inv.role]}</span>
                   </p>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => handleInviteResponse(inv.membershipId, "accepted")}
-                      className="flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-zinc-950 text-xs font-bold px-3 py-2 transition-colors"
+                      className="flex items-center gap-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold px-3 py-2 transition-opacity"
                     >
                       <Check className="size-3.5" /> Aceptar
                     </button>
                     <button
                       type="button"
                       onClick={() => handleInviteResponse(inv.membershipId, "declined")}
-                      className="flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-red-950/40 border border-zinc-800 text-zinc-300 text-xs font-bold px-3 py-2 transition-colors"
+                      className="flex items-center gap-1.5 rounded-lg bg-card hover:bg-destructive/10 border border-border text-muted-foreground hover:text-destructive text-xs font-bold px-3 py-2 transition-colors"
                     >
                       <XIcon className="size-3.5" /> Rechazar
                     </button>
@@ -170,32 +177,34 @@ export default function BandaPage() {
         )}
 
         <section className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Crear página de banda</h2>
-          <div className="flex gap-2 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-            <input
-              type="text"
-              value={newBandName}
-              onChange={(e) => setNewBandName(e.target.value)}
-              placeholder="Nombre de la banda"
-              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-            />
-            <button
-              type="button"
-              disabled={creating || !newBandName.trim()}
-              onClick={handleCreateBand}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-bold px-4 py-2 transition-colors disabled:opacity-50"
-            >
-              <Plus className="size-3.5" /> {creating ? "Creando..." : "Crear Banda"}
-            </button>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Crear página de banda</h2>
+          <div className="gradient-border rounded-xl bg-card/40 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={newBandName}
+                onChange={(e) => setNewBandName(e.target.value)}
+                placeholder="Nombre de la banda o proyecto"
+                className="flex-1 rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <button
+                type="button"
+                disabled={creating || !newBandName.trim()}
+                onClick={handleCreateBand}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold px-4 py-2.5 transition-opacity disabled:opacity-50"
+              >
+                <Plus className="size-3.5" /> {creating ? "Creando..." : "Crear página de banda"}
+              </button>
+            </div>
           </div>
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Tus bandas ({ownedBands.length})
           </h2>
           {ownedBands.length === 0 ? (
-            <p className="text-zinc-500 text-sm text-center py-8 bg-zinc-950 rounded-xl border border-zinc-800">
+            <p className="text-muted-foreground text-sm text-center py-10 bg-card/40 rounded-xl border border-dashed border-border">
               Todavía no creaste ninguna página de banda.
             </p>
           ) : (
@@ -258,14 +267,26 @@ function BandCard({
     }
   };
 
+  const activeCount = members.filter((m) => m.status === "accepted").length;
+
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold text-white">{band.displayName}</h3>
+    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6 space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-card to-background text-primary">
+            <Users className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate font-display text-base font-bold text-foreground">{band.displayName}</h3>
+            <p className="text-xs text-muted-foreground">
+              {activeCount} {activeCount === 1 ? "integrante activo" : "integrantes activos"}
+            </p>
+          </div>
+        </div>
         <button
           type="button"
           onClick={onEdit}
-          className="flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-bold px-3 py-2 transition-colors"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold px-3 py-2 transition-opacity"
         >
           <Pencil className="size-3.5" /> Editar página
         </button>
@@ -273,21 +294,21 @@ function BandCard({
 
       <div className="space-y-2">
         {members.length === 0 ? (
-          <p className="text-xs text-zinc-500">Todavía no invitaste a nadie.</p>
+          <p className="text-xs text-muted-foreground">Todavía no invitaste a nadie.</p>
         ) : (
           members.map((m) => (
-            <div key={m.membershipId} className="flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 px-3 py-2">
+            <div key={m.membershipId} className="flex items-center justify-between gap-2 rounded-lg bg-background/50 border border-border/60 px-3 py-2">
               <div className="min-w-0">
-                <p className="text-sm text-white truncate">{m.displayName}</p>
-                <p className="text-[11px] text-zinc-500">
+                <p className="text-sm text-foreground truncate">{m.displayName}</p>
+                <p className="text-[11px] text-muted-foreground">
                   {ROLE_LABELS[m.role]} —{" "}
                   <span
                     className={
                       m.status === "accepted"
-                        ? "text-emerald-400"
+                        ? "text-primary"
                         : m.status === "declined"
-                          ? "text-red-400"
-                          : "text-amber-400"
+                          ? "text-destructive"
+                          : "text-muted-foreground"
                     }
                   >
                     {m.status === "accepted" ? "Activo" : m.status === "declined" ? "Rechazada" : "Pendiente"}
@@ -297,7 +318,7 @@ function BandCard({
               <button
                 type="button"
                 onClick={() => handleRemove(m.membershipId)}
-                className="flex size-7 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-950/40 hover:text-red-400 transition-colors shrink-0"
+                className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
                 title="Quitar miembro"
                 aria-label="Quitar miembro"
               >
@@ -308,18 +329,18 @@ function BandCard({
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-zinc-800">
+      <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-border">
         <input
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="@usuario a invitar"
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+          className="flex-1 rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as "admin" | "editor")}
-          className="bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+          className="rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
         >
           <option value="editor">Editor / Community Manager</option>
           <option value="admin">Administrador Total</option>
@@ -328,7 +349,7 @@ function BandCard({
           type="button"
           disabled={inviting || !username.trim()}
           onClick={handleInvite}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 text-xs font-bold px-4 py-2 transition-colors disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold px-4 py-2.5 transition-opacity disabled:opacity-50"
         >
           <Plus className="size-3.5" /> {inviting ? "Invitando..." : "Invitar"}
         </button>

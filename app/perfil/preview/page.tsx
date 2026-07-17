@@ -67,7 +67,7 @@ export default function PerfilPreviewPage() {
           const validDbBlocks = (dbBlocks ?? []).filter((b) => isKnownBlockType(b.block_type));
           setBlocks(
             validDbBlocks.length > 0
-              ? validDbBlocks.map(dbBlockToBlock)
+              ? validDbBlocks.map((b) => dbBlockToBlock(b))
               : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
           );
 

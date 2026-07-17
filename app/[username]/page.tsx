@@ -110,7 +110,10 @@ function PerfilPublicoContent() {
           throw new Error(`Error al cargar bloques: ${blocksError.message}`);
         }
 
-        const parsedBlocks = (dbBlocks ?? []).filter((b) => isKnownBlockType(b.block_type)).map(dbBlockToBlock);
+        const isBandProfile = profile.profile_type === "band";
+        const parsedBlocks = (dbBlocks ?? [])
+          .filter((b) => isKnownBlockType(b.block_type))
+          .map((b) => dbBlockToBlock(b, { isBand: isBandProfile }));
 
         const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profile.id);
 
@@ -170,7 +173,7 @@ function PerfilPublicoContent() {
     return (
       <div className="min-h-screen bg-background text-foreground px-4 py-6 sm:px-6 sm:py-8">
         {backToFeedButton}
-        <main className="mx-auto max-w-4xl">
+        <main className="mx-auto max-w-6xl">
           <ProfileSkeleton />
         </main>
       </div>
@@ -254,7 +257,7 @@ function PerfilPublicoContent() {
       <AudioReactiveBackground />
       {backToFeedButton}
       {editPanelButton}
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 animate-fade-in">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 animate-fade-in">
         {/* El bloque hero (foto de perfil + portada) siempre va primero —
             la barra de tabs y el resto del contenido se acomodan debajo,
             nunca encima de él. */}

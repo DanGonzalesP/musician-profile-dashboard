@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { GalleryHorizontalEnd, Play, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, GalleryHorizontalEnd, Play, X } from "lucide-react"
 import { PUBLICACIONES_MAX_ITEMS, type PublicacionesData, type PublicacionItem } from "@/lib/blocks"
+import { useDragScroll } from "@/hooks/use-drag-scroll"
 
 const containerVariants = {
   hidden: {},
@@ -23,10 +24,33 @@ const tileVariants = {
   },
 }
 
+// PUBLICACIONES_MAX_ITEMS también define el tamaño de cada "página" del
+// carrusel (grilla 3x3 = 9). Los perfiles de banda pueden tener más de 9
+// publicaciones (ver lib/blocks.ts normalizeBlockData) — recién ahí aparece
+// la navegación tipo carrusel, paginando de a 9.
+const PAGE_SIZE = PUBLICACIONES_MAX_ITEMS
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const pages: T[][] = []
+  for (let i = 0; i < items.length; i += size) pages.push(items.slice(i, i + size))
+  return pages
+}
+
 export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
-  const items = data.items.slice(0, PUBLICACIONES_MAX_ITEMS)
+  const items = data.items
+  const pages = useMemo(() => chunk(items, PAGE_SIZE), [items])
+  const isCarousel = pages.length > 1
   const [lightboxItem, setLightboxItem] = useState<PublicacionItem | null>(null)
   const [playingId, setPlayingId] = useState<string | null>(null)
+
+  const {
+    ref: carouselRef,
+    isDragging,
+    canScrollLeft,
+    canScrollRight,
+    scrollByPage,
+    handlers: carouselHandlers,
+  } = useDragScroll<HTMLDivElement>()
 
   useEffect(() => {
     if (!lightboxItem) return
@@ -36,6 +60,28 @@ export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [lightboxItem])
+
+  const renderPage = (pageItems: PublicacionItem[], key: string | number) => (
+    <motion.div
+      key={key}
+      className={`grid grid-cols-3 gap-2 sm:gap-3 ${isCarousel ? "w-full shrink-0 snap-start" : ""}`}
+      variants={containerVariants}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true }}
+    >
+      {pageItems.map((item) => (
+        <motion.div key={item.id} variants={tileVariants}>
+          <PublicacionTile
+            item={item}
+            isPlaying={playingId === item.id}
+            onPlay={() => setPlayingId(item.id)}
+            onOpenLightbox={() => setLightboxItem(item)}
+          />
+        </motion.div>
+      ))}
+    </motion.div>
+  )
 
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
@@ -48,25 +94,41 @@ export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
         <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
           Todavía no hay publicaciones.
         </div>
+      ) : isCarousel ? (
+        <div className="relative">
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => scrollByPage("left")}
+              aria-label="Publicaciones anteriores"
+              className="absolute left-1 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card/80 text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/60"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+          )}
+          {canScrollRight && (
+            <button
+              type="button"
+              onClick={() => scrollByPage("right")}
+              aria-label="Siguientes publicaciones"
+              className="absolute right-1 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card/80 text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/60"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          )}
+          <div
+            ref={carouselRef}
+            {...carouselHandlers}
+            style={{ scrollbarWidth: "none", scrollSnapType: "x mandatory" }}
+            className={`flex gap-4 overflow-x-auto [&::-webkit-scrollbar]:hidden ${
+              isDragging ? "cursor-grabbing select-none" : "cursor-grab"
+            }`}
+          >
+            {pages.map((pageItems, i) => renderPage(pageItems, i))}
+          </div>
+        </div>
       ) : (
-        <motion.div
-          className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3"
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-        >
-          {items.map((item) => (
-            <motion.div key={item.id} variants={tileVariants}>
-              <PublicacionTile
-                item={item}
-                isPlaying={playingId === item.id}
-                onPlay={() => setPlayingId(item.id)}
-                onOpenLightbox={() => setLightboxItem(item)}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
+        renderPage(items, "single")
       )}
 
       {lightboxItem && (

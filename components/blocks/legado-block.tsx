@@ -1,13 +1,7 @@
 "use client"
 
-import { useRef, useState, type MouseEvent, type ReactNode } from "react"
-import {
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-  useTransform,
-} from "framer-motion"
+import { useState, type ReactNode } from "react"
+import { motion, useReducedMotion } from "framer-motion"
 import {
   Calendar,
   Disc3,
@@ -18,59 +12,6 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { LegadoData, LegadoMember, LegadoMilestone } from "@/lib/blocks"
-
-// ---------------------------------------------------------------------------
-// Tilt 3D — usado en las tarjetas de la trayectoria
-// ---------------------------------------------------------------------------
-
-function TiltCard({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className?: string
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  const reduceMotion = useReducedMotion()
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
-  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [8, -8]), {
-    stiffness: 300,
-    damping: 30,
-  })
-  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-8, 8]), {
-    stiffness: 300,
-    damping: 30,
-  })
-
-  function handleMouseMove(e: MouseEvent<HTMLDivElement>) {
-    if (reduceMotion || !ref.current) return
-    const rect = ref.current.getBoundingClientRect()
-    x.set((e.clientX - rect.left) / rect.width - 0.5)
-    y.set((e.clientY - rect.top) / rect.height - 0.5)
-  }
-
-  function handleMouseLeave() {
-    x.set(0)
-    y.set(0)
-  }
-
-  return (
-    <motion.div
-      ref={ref}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={
-        reduceMotion
-          ? undefined
-          : { rotateX, rotateY, transformPerspective: 800 }
-      }
-      className={className}
-    >
-      {children}
-    </motion.div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Scroll reveal — fade + translateY al entrar en viewport, una sola vez
@@ -142,32 +83,56 @@ function ImageOrPlaceholder({
 }
 
 // ---------------------------------------------------------------------------
-// Tarjeta de hito de trayectoria
+// Fila de hito de trayectoria — timeline horizontal (imagen + texto lado a
+// lado). Desde md: alterna de lado sobre una línea central para aprovechar
+// el ancho completo de la página; debajo de md: una sola columna, pero cada
+// hito sigue siendo una fila (imagen a la izquierda, texto a la derecha).
 // ---------------------------------------------------------------------------
 
-function MilestoneCard({ milestone }: { milestone: LegadoMilestone }) {
-  return (
-    <TiltCard className="h-full">
-      <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
-        {milestone.image ? (
-          <ImageOrPlaceholder
-            src={milestone.image}
-            alt={milestone.title}
-            className="mb-4 h-36 w-full rounded-xl"
-          />
-        ) : null}
-        <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+function MilestoneRow({ milestone, index }: { milestone: LegadoMilestone; index: number }) {
+  const reversed = index % 2 === 1
+
+  const content = (
+    <div
+      className={`flex flex-1 flex-row items-center gap-4 sm:gap-6 ${
+        reversed ? "md:flex-row-reverse" : ""
+      }`}
+    >
+      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border sm:h-32 sm:w-32 md:h-40 md:w-40">
+        <ImageOrPlaceholder src={milestone.image} alt={milestone.title} className="h-full w-full" />
+      </div>
+      <div className={`min-w-0 flex-1 ${reversed ? "md:text-right" : ""}`}>
+        <span
+          className={`mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary ${
+            reversed ? "md:flex-row-reverse" : ""
+          }`}
+        >
           <Calendar className="size-3.5" />
           {milestone.year}
         </span>
-        <h3 className="font-display text-lg font-bold leading-snug text-foreground">
+        <h3 className="font-display text-lg font-bold leading-snug text-foreground sm:text-xl">
           {milestone.title}
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           {milestone.description}
         </p>
       </div>
-    </TiltCard>
+    </div>
+  )
+
+  // En mobile el spacer queda oculto (display:none) y no afecta el layout —
+  // solo importa el orden en desktop, donde define de qué lado cae cada hito.
+  const spacer = <div className="hidden md:block md:flex-1" aria-hidden="true" />
+
+  return (
+    <div className="relative flex md:items-center md:gap-8">
+      <span
+        aria-hidden="true"
+        className="absolute left-1/2 top-1/2 hidden size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background md:block"
+      />
+      {reversed ? spacer : content}
+      {reversed ? content : spacer}
+    </div>
   )
 }
 
@@ -313,12 +278,18 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
           <Reveal>
             <Eyebrow icon={Calendar}>Trayectoria</Eyebrow>
           </Reveal>
-          <div className="relative mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {data.timeline.map((milestone, i) => (
-              <Reveal key={milestone.id} delay={Math.min(i * 0.08, 0.4)}>
-                <MilestoneCard milestone={milestone} />
-              </Reveal>
-            ))}
+          <div className="relative mt-6">
+            <div
+              aria-hidden="true"
+              className="absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 bg-border md:block"
+            />
+            <div className="flex flex-col gap-10 md:gap-14">
+              {data.timeline.map((milestone, i) => (
+                <Reveal key={milestone.id} delay={Math.min(i * 0.08, 0.4)}>
+                  <MilestoneRow milestone={milestone} index={i} />
+                </Reveal>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
