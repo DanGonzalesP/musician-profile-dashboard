@@ -7,6 +7,7 @@ import { PROFILE_ID } from "@/lib/blocks";
 import LayoutAdmin from "@/components/LayoutAdmin";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Loader2 } from "lucide-react";
+import { MUSICIAN_CATEGORIES, isMusicianCategory, type MusicianCategory } from "@/lib/musician-categories";
 
 export default function ConfigPerfilPage() {
   const [loading, setLoading] = useState(true);
@@ -14,6 +15,7 @@ export default function ConfigPerfilPage() {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [unifiedProfile, setUnifiedProfile] = useState(false);
+  const [musicianCategory, setMusicianCategory] = useState<MusicianCategory | null>(null);
   const [guardado, setGuardado] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
   const router = useRouter();
@@ -43,6 +45,18 @@ export default function ConfigPerfilPage() {
         setDisplayName(profile.display_name || "");
         setBio(profile.bio || "");
         setUnifiedProfile(Boolean(profile.unified_profile));
+
+        // La categoría se consulta aparte: si la migración
+        // profiles_musician_category.sql no corrió todavía, este select
+        // falla sin arrastrar al resto de la configuración.
+        const { data: categoryRow } = await supabase
+          .from("profiles")
+          .select("musician_category")
+          .eq("id", profile.id)
+          .maybeSingle();
+        if (categoryRow && isMusicianCategory(categoryRow.musician_category)) {
+          setMusicianCategory(categoryRow.musician_category);
+        }
       } else {
         setProfileId(PROFILE_ID);
       }
@@ -66,10 +80,24 @@ export default function ConfigPerfilPage() {
 
     if (error) {
       setErrorMensaje(error.message);
-    } else {
-      setGuardado(true);
-      setTimeout(() => setGuardado(false), 2000);
+      return;
     }
+
+    // Update aparte por la misma razón que la carga: si la columna todavía
+    // no existe en Supabase, no debe bloquear el guardado del resto.
+    const { error: categoryError } = await supabase
+      .from("profiles")
+      .update({ musician_category: musicianCategory })
+      .eq("id", profileId);
+    if (categoryError) {
+      setErrorMensaje(
+        "El perfil se guardó, pero la categoría no: falta correr supabase/profiles_musician_category.sql."
+      );
+      return;
+    }
+
+    setGuardado(true);
+    setTimeout(() => setGuardado(false), 2000);
   };
 
   if (loading) {
@@ -119,6 +147,36 @@ export default function ConfigPerfilPage() {
               className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500 resize-none"
               placeholder="Escribe algo sobre ti..."
             />
+          </div>
+
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">¿Qué tipo de músico eres?</label>
+            <p className="text-[11px] text-zinc-500 mb-2">
+              Define en qué categoría te encuentran cuando filtran el feed principal.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {MUSICIAN_CATEGORIES.map((cat) => {
+                const selected = musicianCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setMusicianCategory(selected ? null : cat.id)}
+                    aria-pressed={selected}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      selected
+                        ? "border-primary/60 bg-primary/10"
+                        : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"
+                    }`}
+                  >
+                    <p className={`text-sm font-semibold ${selected ? "text-primary" : "text-white"}`}>
+                      {cat.label}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-zinc-400">{cat.description}</p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4">

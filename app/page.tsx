@@ -1,6 +1,6 @@
 import { fetchAllPublicFeed } from "@/lib/musicFeed";
 import { SAMPLE_FEED_TRACKS } from "@/lib/feed/sampleTracks";
-import FeedContainer from "@/components/feed/FeedContainer";
+import FeedExperience from "@/components/feed/FeedExperience";
 import FeedHeader from "@/components/feed/FeedHeader";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 
@@ -21,7 +21,7 @@ export default async function HomePage() {
     <main className="relative h-dvh w-full text-foreground">
       <AudioReactiveBackground />
       <FeedHeader />
-      <FeedContainer tracks={tracks} isSampleFeed={isSampleFeed} />
+      <FeedExperience tracks={tracks} isSampleFeed={isSampleFeed} />
     </main>
   );
 }

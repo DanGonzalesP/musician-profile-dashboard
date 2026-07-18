@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { isMusicianCategory, type MusicianCategory } from "@/lib/musician-categories";
 
 export interface FeedTrack {
   id: string;
@@ -8,6 +9,9 @@ export interface FeedTrack {
   coverImageUrl?: string;
   durationSeconds?: number;
   artistName: string;
+  // Categoría profesional del autor de la pista (filtro del feed). Ausente
+  // si el perfil no eligió una todavía.
+  category?: MusicianCategory;
   createdAt: string;
 }
 
@@ -20,7 +24,7 @@ export interface FeedTrackRow {
   cover_image_url: string | null;
   duration_seconds: number | null;
   created_at: string;
-  profiles: { display_name: string } | null;
+  profiles: { display_name: string; musician_category?: string | null } | null;
 }
 
 const VALID_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".aac", ".wav"];
@@ -36,6 +40,7 @@ export function validateMp3Url(url: string): boolean {
 }
 
 function mapRowToTrack(row: FeedTrackRow): FeedTrack {
+  const rawCategory = row.profiles?.musician_category;
   return {
     id: row.id,
     profileId: row.profile_id,
@@ -44,6 +49,7 @@ function mapRowToTrack(row: FeedTrackRow): FeedTrack {
     coverImageUrl: row.cover_image_url || undefined,
     durationSeconds: row.duration_seconds || undefined,
     artistName: row.profiles?.display_name || "Artista Desconocido",
+    category: isMusicianCategory(rawCategory) ? rawCategory : undefined,
     createdAt: row.created_at,
   };
 }
@@ -63,7 +69,22 @@ export async function fetchMusicFeed(profileId: string): Promise<FeedTrack[]> {
 }
 
 export async function fetchAllPublicFeed(limit: number = 50): Promise<FeedTrack[]> {
+  // Primer intento con la categoría del autor (para el filtro del feed). Si
+  // la migración profiles_musician_category.sql todavía no corrió en
+  // Supabase, la columna no existe y el select fallaría — se reintenta sin
+  // ella para no tumbar el feed completo.
   const { data, error } = await supabase
+    .from("music_feed")
+    .select(`
+      id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
+      profiles ( display_name, musician_category )
+    `)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (!error) return (data as unknown as FeedTrackRow[]).map(mapRowToTrack);
+
+  const { data: fallbackData, error: fallbackError } = await supabase
     .from("music_feed")
     .select(`
       id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
@@ -72,8 +93,8 @@ export async function fetchAllPublicFeed(limit: number = 50): Promise<FeedTrack[
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw error;
-  return (data as unknown as FeedTrackRow[]).map(mapRowToTrack);
+  if (fallbackError) throw fallbackError;
+  return (fallbackData as unknown as FeedTrackRow[]).map(mapRowToTrack);
 }
 
 export async function addTrackToFeed(

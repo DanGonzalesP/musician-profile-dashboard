@@ -61,7 +61,7 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     { name: "Editor de Página", href: "/dashboard", icon: Palette },
     { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: Globe },
     { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: BarChart3 },
-    { name: "Mis Bandas", href: "/perfil/banda", icon: Users },
+    { name: "Grupos Musicales", href: "/perfil/banda", icon: Users },
     { name: "Notificaciones de Créditos", href: "/perfil/notificaciones", icon: Bell },
     { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: Package },
     { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: Shirt },

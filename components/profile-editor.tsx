@@ -665,7 +665,7 @@ export function ProfileEditor() {
           </div>
         </header>
         <div className="flex flex-1 overflow-hidden">
-          <aside className="hidden w-64 shrink-0 flex-col gap-2 border-r border-sidebar-border bg-sidebar p-3 sm:flex sm:w-72 lg:w-80">
+          <aside className="hidden w-64 shrink-0 flex-col gap-2 border-r border-sidebar-border bg-sidebar p-3 sm:flex">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
             ))}
@@ -706,7 +706,7 @@ export function ProfileEditor() {
           />
         )}
         <aside
-          className={`glass-panel fixed inset-y-0 left-0 z-40 w-full max-w-xs flex-col border-r border-sidebar-border/60 xl:static xl:z-auto xl:flex xl:w-80 xl:max-w-none ${
+          className={`glass-panel fixed inset-y-0 left-0 z-40 w-full max-w-xs flex-col border-r border-sidebar-border/60 xl:static xl:z-auto xl:flex xl:w-64 xl:max-w-none ${
             mobileBlocksOpen ? "flex" : "hidden"
           }`}
         >
@@ -725,9 +725,6 @@ export function ProfileEditor() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
-            <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-              Arrastra un bloque a tu perfil, o presiona el botón de más para agregarlo.
-            </p>
             <BlockLibrary
               onAdd={(type) => {
                 addBlock(type)
@@ -773,7 +770,7 @@ export function ProfileEditor() {
               onClick={() => setSelectedId(null)}
               aria-hidden="true"
             />
-            <aside className="glass-panel fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-sidebar-border/60 xl:static xl:z-auto xl:w-80 xl:max-w-none">
+            <aside className="glass-panel fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-sidebar-border/60 xl:static xl:z-auto xl:w-96 xl:max-w-none 2xl:w-[27rem]">
               <BlockInspector
                 block={selectedBlock}
                 onChange={updateBlock}

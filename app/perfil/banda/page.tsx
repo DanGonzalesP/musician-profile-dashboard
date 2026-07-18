@@ -1,112 +1,98 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import LayoutAdmin from "@/components/LayoutAdmin";
+// Lista "Mis grupos musicales" + invitaciones recibidas. La CREACIÓN vive en
+// el asistente propio (/grupo/nuevo, estilo "crear página de empresa") y la
+// GESTIÓN de cada grupo en su panel (/grupo/[id]) — esta página solo lista.
+
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
+import LayoutAdmin from "@/components/LayoutAdmin"
 import {
-  createBand,
   fetchBandMembers,
   fetchMyPendingInvites,
-  inviteMember,
-  removeMember,
   respondToInvite,
   setActiveBandId,
-  type BandMember,
   type PendingInvite,
-} from "@/lib/bands";
-import { Loader2, Plus, Trash2, Check, X as XIcon, Pencil, Sparkles, Users } from "lucide-react";
+} from "@/lib/bands"
+import { ArrowRight, Check, Loader2, Pencil, Plus, Sparkles, Users, X as XIcon } from "lucide-react"
 
-type OwnedBand = { id: string; displayName: string };
+type OwnedGroup = { id: string; displayName: string; activeMembers: number }
 
 const ROLE_LABELS: Record<"admin" | "editor", string> = {
-  admin: "Administrador Total",
-  editor: "Editor / Community Manager",
-};
+  admin: "Administrador",
+  editor: "Editor",
+}
 
-export default function BandaPage() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [ownedBands, setOwnedBands] = useState<OwnedBand[]>([]);
-  const [membersByBand, setMembersByBand] = useState<Record<string, BandMember[]>>({});
-  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
-  const [newBandName, setNewBandName] = useState("");
-  const [creating, setCreating] = useState(false);
-  const router = useRouter();
+export default function GruposPage() {
+  const [userId, setUserId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState("")
+  const [ownedGroups, setOwnedGroups] = useState<OwnedGroup[]>([])
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
+  const router = useRouter()
 
   async function reload(currentUserId: string) {
-    const { data: bands, error: bandsError } = await supabase
+    const { data: groups, error: groupsError } = await supabase
       .from("profiles")
       .select("id, display_name")
       .eq("owner_user_id", currentUserId)
-      .eq("profile_type", "band");
+      .eq("profile_type", "band")
 
-    if (bandsError) {
-      setErrorMessage(bandsError.message);
-      return;
+    if (groupsError) {
+      setErrorMessage(groupsError.message)
+      return
     }
 
-    const owned = (bands ?? []).map((b) => ({ id: b.id as string, displayName: (b.display_name as string) || "Banda sin nombre" }));
-    setOwnedBands(owned);
-
-    const membersEntries = await Promise.all(
-      owned.map(async (b) => [b.id, await fetchBandMembers(b.id)] as const)
-    );
-    setMembersByBand(Object.fromEntries(membersEntries));
-
-    setPendingInvites(await fetchMyPendingInvites(currentUserId));
+    const owned = await Promise.all(
+      (groups ?? []).map(async (g) => {
+        const members = await fetchBandMembers(g.id as string)
+        return {
+          id: g.id as string,
+          displayName: (g.display_name as string) || "Grupo sin nombre",
+          activeMembers: members.filter((m) => m.status === "accepted").length,
+        }
+      })
+    )
+    setOwnedGroups(owned)
+    setPendingInvites(await fetchMyPendingInvites(currentUserId))
   }
 
   useEffect(() => {
     async function init() {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) {
-        router.push("/login");
-        return;
+        router.push("/login")
+        return
       }
-      setUserId(user.id);
+      setUserId(user.id)
       try {
-        await reload(user.id);
+        await reload(user.id)
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : "No se pudo cargar la información de bandas.");
+        setErrorMessage(err instanceof Error ? err.message : "No se pudo cargar la información de tus grupos.")
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-    init();
-  }, [router]);
-
-  const handleCreateBand = async () => {
-    if (!userId || !newBandName.trim()) return;
-    setCreating(true);
-    setErrorMessage("");
-    try {
-      await createBand(userId, newBandName.trim());
-      setNewBandName("");
-      await reload(userId);
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "No se pudo crear la banda.");
-    } finally {
-      setCreating(false);
-    }
-  };
+    init()
+  }, [router])
 
   const handleInviteResponse = async (membershipId: string, decision: "accepted" | "declined") => {
-    if (!userId) return;
+    if (!userId) return
     try {
-      await respondToInvite(membershipId, decision);
-      await reload(userId);
+      await respondToInvite(membershipId, decision)
+      await reload(userId)
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "No se pudo responder la invitación.");
+      setErrorMessage(err instanceof Error ? err.message : "No se pudo responder la invitación.")
     }
-  };
+  }
 
-  const handleEditBand = (bandId: string) => {
-    if (!userId) return;
-    setActiveBandId(userId, bandId);
-    router.push("/dashboard");
-  };
+  const handleEditContent = (groupId: string) => {
+    if (!userId) return
+    setActiveBandId(userId, groupId)
+    router.push("/dashboard")
+  }
 
   if (loading) {
     return (
@@ -115,7 +101,7 @@ export default function BandaPage() {
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
       </LayoutAdmin>
-    );
+    )
   }
 
   return (
@@ -126,11 +112,19 @@ export default function BandaPage() {
             <Sparkles className="size-3.5" />
             Página de empresa
           </span>
-          <h1 className="mt-3 font-display text-2xl font-bold text-foreground sm:text-3xl">Tus bandas</h1>
+          <h1 className="mt-3 font-display text-2xl font-bold text-foreground sm:text-3xl">
+            Tus grupos musicales
+          </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Como una página de negocio: varios integrantes, un solo perfil, gestionado en equipo. Crea la página
-            de tu banda, invita a tus compañeros con un rol y edítenla juntos desde el mismo editor de bloques.
+            Como una página de negocio: varios integrantes, un solo perfil, gestionado en equipo. Crea la
+            página de tu grupo, invita a tus compañeros con un rol y edítenla juntos.
           </p>
+          <Link
+            href="/grupo/nuevo"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-4" /> Crear grupo musical
+          </Link>
         </header>
 
         {errorMessage && (
@@ -176,184 +170,61 @@ export default function BandaPage() {
           </section>
         )}
 
-        <section className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Crear página de banda</h2>
-          <div className="gradient-border rounded-xl bg-card/40 p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                value={newBandName}
-                onChange={(e) => setNewBandName(e.target.value)}
-                placeholder="Nombre de la banda o proyecto"
-                className="flex-1 rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-              <button
-                type="button"
-                disabled={creating || !newBandName.trim()}
-                onClick={handleCreateBand}
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold px-4 py-2.5 transition-opacity disabled:opacity-50"
-              >
-                <Plus className="size-3.5" /> {creating ? "Creando..." : "Crear página de banda"}
-              </button>
-            </div>
-          </div>
-        </section>
-
         <section className="space-y-4">
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Tus bandas ({ownedBands.length})
+            Tus grupos ({ownedGroups.length})
           </h2>
-          {ownedBands.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-10 bg-card/40 rounded-xl border border-dashed border-border">
-              Todavía no creaste ninguna página de banda.
-            </p>
+          {ownedGroups.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card/40 py-10 text-center">
+              <p className="text-sm text-muted-foreground">Todavía no creaste ningún grupo musical.</p>
+              <Link
+                href="/grupo/nuevo"
+                className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+              >
+                Crear el primero <ArrowRight className="size-4" />
+              </Link>
+            </div>
           ) : (
-            <div className="space-y-4">
-              {ownedBands.map((band) => (
-                <BandCard
-                  key={band.id}
-                  band={band}
-                  members={membersByBand[band.id] ?? []}
-                  onEdit={() => handleEditBand(band.id)}
-                  onChanged={() => userId && reload(userId)}
-                  onError={setErrorMessage}
-                />
+            <div className="grid gap-4 sm:grid-cols-2">
+              {ownedGroups.map((group) => (
+                <div
+                  key={group.id}
+                  className="gradient-border gradient-border-static relative rounded-2xl bg-card/40 p-5"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/25 via-card to-background font-display text-lg font-bold text-primary">
+                      {group.displayName.charAt(0).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="truncate font-display text-base font-bold text-foreground">
+                        {group.displayName}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {group.activeMembers + 1} integrante{group.activeMembers === 0 ? "" : "s"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Link
+                      href={`/grupo/${group.id}`}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition-opacity hover:opacity-90"
+                    >
+                      <Users className="size-3.5" /> Panel del grupo
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleEditContent(group.id)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-foreground transition-colors hover:bg-accent/40"
+                    >
+                      <Pencil className="size-3.5" /> Editar página
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </section>
       </div>
     </LayoutAdmin>
-  );
-}
-
-function BandCard({
-  band,
-  members,
-  onEdit,
-  onChanged,
-  onError,
-}: {
-  band: OwnedBand;
-  members: BandMember[];
-  onEdit: () => void;
-  onChanged: () => void;
-  onError: (message: string) => void;
-}) {
-  const [username, setUsername] = useState("");
-  const [role, setRole] = useState<"admin" | "editor">("editor");
-  const [inviting, setInviting] = useState(false);
-
-  const handleInvite = async () => {
-    if (!username.trim()) return;
-    setInviting(true);
-    try {
-      await inviteMember(band.id, username, role);
-      setUsername("");
-      onChanged();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "No se pudo enviar la invitación.");
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const handleRemove = async (membershipId: string) => {
-    try {
-      await removeMember(membershipId);
-      onChanged();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "No se pudo quitar al miembro.");
-    }
-  };
-
-  const activeCount = members.filter((m) => m.status === "accepted").length;
-
-  return (
-    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6 space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-card to-background text-primary">
-            <Users className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <h3 className="truncate font-display text-base font-bold text-foreground">{band.displayName}</h3>
-            <p className="text-xs text-muted-foreground">
-              {activeCount} {activeCount === 1 ? "integrante activo" : "integrantes activos"}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold px-3 py-2 transition-opacity"
-        >
-          <Pencil className="size-3.5" /> Editar página
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        {members.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Todavía no invitaste a nadie.</p>
-        ) : (
-          members.map((m) => (
-            <div key={m.membershipId} className="flex items-center justify-between gap-2 rounded-lg bg-background/50 border border-border/60 px-3 py-2">
-              <div className="min-w-0">
-                <p className="text-sm text-foreground truncate">{m.displayName}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {ROLE_LABELS[m.role]} —{" "}
-                  <span
-                    className={
-                      m.status === "accepted"
-                        ? "text-primary"
-                        : m.status === "declined"
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                    }
-                  >
-                    {m.status === "accepted" ? "Activo" : m.status === "declined" ? "Rechazada" : "Pendiente"}
-                  </span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleRemove(m.membershipId)}
-                className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
-                title="Quitar miembro"
-                aria-label="Quitar miembro"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-border">
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="@usuario a invitar"
-          className="flex-1 rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as "admin" | "editor")}
-          className="rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-        >
-          <option value="editor">Editor / Community Manager</option>
-          <option value="admin">Administrador Total</option>
-        </select>
-        <button
-          type="button"
-          disabled={inviting || !username.trim()}
-          onClick={handleInvite}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold px-4 py-2.5 transition-opacity disabled:opacity-50"
-        >
-          <Plus className="size-3.5" /> {inviting ? "Invitando..." : "Invitar"}
-        </button>
-      </div>
-    </div>
-  );
+  )
 }

@@ -71,7 +71,7 @@ export function EditorHeader({
         </Link>
         <Link href="/perfil/banda" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
           <Users className="size-3.5" />
-          Bandas
+          Grupos
         </Link>
         <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
           Panel Admin

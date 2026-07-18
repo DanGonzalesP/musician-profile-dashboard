@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Plus, Trash2, X } from "lucide-react"
-import type { LegadoData, LegadoMember, LegadoMilestone } from "@/lib/blocks"
+import type { LegadoData, LegadoMilestone } from "@/lib/blocks"
 import { Field, TextInput, inputClass, ImageUploader, type BlobRegistry } from "@/components/block-inspector"
 
 // ─── Editor de listas de texto simples (géneros / influencias) ────────────
@@ -155,84 +155,6 @@ function TimelineFields({
   )
 }
 
-// ─── Integrantes de banda ───────────────────────────────────────────────
-
-function MembersFields({
-  members,
-  onChange,
-  blobRegistry,
-}: {
-  members: LegadoMember[]
-  onChange: (members: LegadoMember[]) => void
-  blobRegistry: BlobRegistry
-}) {
-  const addMember = () => {
-    onChange([...members, { id: `member-${Date.now()}`, name: "", role: "", photo: "", bio: "" }])
-  }
-
-  const setMember = (index: number, changes: Partial<LegadoMember>) => {
-    onChange(members.map((m, i) => (i === index ? { ...m, ...changes } : m)))
-  }
-
-  const removeMember = (index: number) => {
-    onChange(members.filter((_, i) => i !== index))
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Integrantes — dejar vacío si sos solista
-        </p>
-        <button
-          type="button"
-          onClick={addMember}
-          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-        >
-          <Plus className="size-3" /> Agregar integrante
-        </button>
-      </div>
-
-      {members.map((member, index) => (
-        <div key={member.id} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <TextInput
-              value={member.name}
-              onChange={(e) => setMember(index, { name: e.target.value })}
-              placeholder="Nombre"
-            />
-            <button
-              type="button"
-              onClick={() => removeMember(index)}
-              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              title="Eliminar integrante"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-          <TextInput
-            value={member.role}
-            onChange={(e) => setMember(index, { role: e.target.value })}
-            placeholder="Rol, ej. Baterista"
-          />
-          <ImageUploader
-            currentImageUrl={member.photo}
-            onUploadReady={(url) => setMember(index, { photo: url })}
-            blobRegistry={blobRegistry}
-          />
-          <textarea
-            value={member.bio || ""}
-            onChange={(e) => setMember(index, { bio: e.target.value })}
-            rows={2}
-            className={inputClass}
-            placeholder="Bio corta (aparece al voltear la tarjeta)"
-          />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ─── Galería de referencia ──────────────────────────────────────────────
 
 function GalleryFields({
@@ -332,11 +254,6 @@ export function LegadoFields({
       <TimelineFields
         timeline={data.timeline}
         onChange={(timeline) => onChange({ ...data, timeline })}
-        blobRegistry={blobRegistry}
-      />
-      <MembersFields
-        members={data.members}
-        onChange={(members) => onChange({ ...data, members })}
         blobRegistry={blobRegistry}
       />
       <GalleryFields

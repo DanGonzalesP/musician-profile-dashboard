@@ -93,7 +93,7 @@ export async function fetchMyProfiles(userId: string): Promise<MyProfileOption[]
     .eq("profile_type", "band")
 
   for (const band of ownedBands ?? []) {
-    options.push({ id: band.id, displayName: band.display_name || "Banda sin nombre", isBand: true, role: "owner" })
+    options.push({ id: band.id, displayName: band.display_name || "Grupo sin nombre", isBand: true, role: "owner" })
   }
 
   const { data: memberships } = await supabase
@@ -104,7 +104,7 @@ export async function fetchMyProfiles(userId: string): Promise<MyProfileOption[]
 
   for (const m of (memberships ?? []) as unknown as { role: BandRole; profiles: { id: string; display_name: string | null } | null }[]) {
     if (!m.profiles) continue
-    options.push({ id: m.profiles.id, displayName: m.profiles.display_name || "Banda sin nombre", isBand: true, role: m.role })
+    options.push({ id: m.profiles.id, displayName: m.profiles.display_name || "Grupo sin nombre", isBand: true, role: m.role })
   }
 
   return options
@@ -188,7 +188,7 @@ export async function fetchMyPendingInvites(userId: string): Promise<PendingInvi
     return {
       membershipId: r.id,
       bandProfileId: r.band_profile_id,
-      bandDisplayName: r.profiles?.display_name || "Banda sin nombre",
+      bandDisplayName: r.profiles?.display_name || "Grupo sin nombre",
       role: r.role,
     }
   })

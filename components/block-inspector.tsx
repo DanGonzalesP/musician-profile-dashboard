@@ -214,16 +214,18 @@ export function ImageUploader({
 
   const displayUrl = localPreview || currentImageUrl
 
+  // Fila horizontal (miniatura + botón) en vez de apilar la vista previa
+  // arriba del botón — el inspector aprovecha el ancho y se acorta el scroll.
   return (
-    <div className="space-y-2">
+    <div className="flex items-stretch gap-2">
       {displayUrl && (
-        <div className="relative h-20 w-full overflow-hidden rounded-lg border border-sidebar-border bg-muted">
+        <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-sidebar-border bg-muted">
           <img src={displayUrl} alt="Vista previa" className="h-full w-full object-cover" />
         </div>
       )}
-      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
+      <label className="flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
         <Upload className="size-3.5 text-muted-foreground" />
-        <span>Subir imagen</span>
+        <span>{displayUrl ? "Cambiar imagen" : "Subir imagen"}</span>
         <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       </label>
     </div>

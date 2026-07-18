@@ -201,8 +201,17 @@ export type PublicacionItem = {
   caption?: string
 }
 
+// Las publicaciones se muestran en 3 filas tipo carrusel (3 elementos por
+// fila con el tope gratuito de 9); cada fila tiene su propio subtítulo
+// editable. PUBLICACIONES_ROWS fija cuántas filas hay.
+export const PUBLICACIONES_ROWS = 3
+
+export const PUBLICACIONES_DEFAULT_ROW_TITLES = ["Destacados", "En vivo", "Detrás de cámaras"]
+
 export type PublicacionesData = {
   items: PublicacionItem[]
+  // Subtítulo de cada fila del carrusel — siempre PUBLICACIONES_ROWS entradas.
+  rowTitles: string[]
 }
 
 // ─── Bloque "embeds" — YouTube (iframe real, puede traer anuncios) y
@@ -318,7 +327,7 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
   {
     type: "legado",
     label: "Trayectoria",
-    description: "Tu historia, trayectoria e integrantes — el CV de un músico, sin verse como uno.",
+    description: "Tu historia e hitos en un bento interactivo — la carta de presentación del músico.",
     icon: Sparkles,
     category: "Perfil",
   },
@@ -483,9 +492,12 @@ export function normalizeBlockData(
       const normalized = Array.isArray(content.items)
         ? content.items.map((p, i) => normalizePublicacionItem(p, i))
         : []
-      // Los perfiles de banda ("página de empresa") no tienen el tope
+      // Los perfiles de grupo ("página de empresa") no tienen el tope
       // gratuito de PUBLICACIONES_MAX_ITEMS — el resto de los perfiles sí.
-      return { items: opts?.isBand ? normalized : normalized.slice(0, PUBLICACIONES_MAX_ITEMS) }
+      return {
+        items: opts?.isBand ? normalized : normalized.slice(0, PUBLICACIONES_MAX_ITEMS),
+        rowTitles: normalizeRowTitles(content.rowTitles),
+      }
     }
     case "embeds":
       return {
@@ -578,6 +590,11 @@ function normalizeLegadoMember(raw: unknown, index: number): LegadoMember {
     photo: m.photo ? String(m.photo) : undefined,
     bio: m.bio ? String(m.bio) : undefined,
   }
+}
+
+function normalizeRowTitles(raw: unknown): string[] {
+  const titles = Array.isArray(raw) ? raw.map(String) : []
+  return PUBLICACIONES_DEFAULT_ROW_TITLES.map((fallback, i) => titles[i]?.trim() || fallback)
 }
 
 const PUBLICACION_TYPES = ["image", "video"] as const
@@ -760,7 +777,7 @@ function defaultData(type: BlockType): BlockData {
         gallery: [],
       }
     case "publicaciones":
-      return { items: [] }
+      return { items: [], rowTitles: [...PUBLICACIONES_DEFAULT_ROW_TITLES] }
     case "embeds":
       return { items: [] }
   }

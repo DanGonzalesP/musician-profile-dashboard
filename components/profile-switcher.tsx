@@ -71,7 +71,7 @@ export function ProfileSwitcher() {
         value={activeId}
         disabled={switching}
         onChange={(e) => handleChange(e.target.value)}
-        aria-label="Cambiar entre tu perfil personal y tus bandas"
+        aria-label="Cambiar entre tu perfil personal y tus grupos musicales"
         className="bg-transparent text-xs font-medium text-foreground outline-none disabled:cursor-wait disabled:opacity-60"
       >
         {options.map((p) => (

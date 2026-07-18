@@ -2,7 +2,13 @@
 
 import { useState } from "react"
 import { Plus, Trash2, Upload, Video } from "lucide-react"
-import { PUBLICACIONES_MAX_ITEMS, type PublicacionesData, type PublicacionItem } from "@/lib/blocks"
+import {
+  PUBLICACIONES_DEFAULT_ROW_TITLES,
+  PUBLICACIONES_MAX_ITEMS,
+  PUBLICACIONES_ROWS,
+  type PublicacionesData,
+  type PublicacionItem,
+} from "@/lib/blocks"
 import { Field, TextInput, ImageUploader, type BlobRegistry } from "@/components/block-inspector"
 
 // ─── VideoUploader — mismo patrón que ImageUploader/AudioUploader, sin
@@ -88,25 +94,52 @@ export function PublicacionesFields({
   isBand?: boolean
 }) {
   const items = data.items
+  const rowTitles = data.rowTitles?.length ? data.rowTitles : [...PUBLICACIONES_DEFAULT_ROW_TITLES]
   const atLimit = !isBand && items.length >= PUBLICACIONES_MAX_ITEMS
 
   const addItem = () => {
     if (atLimit) return
     onChange({
+      ...data,
       items: [...items, { id: `pub-${Date.now()}`, type: "image", url: "", thumbnail: "", caption: "" }],
     })
   }
 
   const setItem = (index: number, changes: Partial<PublicacionItem>) => {
-    onChange({ items: items.map((it, i) => (i === index ? { ...it, ...changes } : it)) })
+    onChange({ ...data, items: items.map((it, i) => (i === index ? { ...it, ...changes } : it)) })
   }
 
   const removeItem = (index: number) => {
-    onChange({ items: items.filter((_, i) => i !== index) })
+    onChange({ ...data, items: items.filter((_, i) => i !== index) })
+  }
+
+  const setRowTitle = (rowIndex: number, title: string) => {
+    const next = [...rowTitles]
+    next[rowIndex] = title
+    onChange({ ...data, rowTitles: next })
   }
 
   return (
     <div className="space-y-2">
+      {/* Subtítulos de las 3 filas del carrusel público */}
+      <div className="space-y-1.5 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Subtítulos de las filas ({PUBLICACIONES_ROWS} carruseles de 3)
+        </p>
+        {Array.from({ length: PUBLICACIONES_ROWS }, (_, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-5 shrink-0 text-right text-[11px] font-bold text-primary/70">
+              {i + 1}.
+            </span>
+            <TextInput
+              value={rowTitles[i] ?? ""}
+              onChange={(e) => setRowTitle(i, e.target.value)}
+              placeholder={PUBLICACIONES_DEFAULT_ROW_TITLES[i]}
+            />
+          </div>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {isBand ? `${items.length} publicaciones` : `${items.length} / ${PUBLICACIONES_MAX_ITEMS} publicaciones`}

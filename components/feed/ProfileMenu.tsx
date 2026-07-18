@@ -148,7 +148,7 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
             </div>
           ) : (
             <Link
-              href="/perfil/banda"
+              href="/grupo/nuevo"
               onClick={() => setOpen(false)}
               className="flex flex-col gap-1.5 rounded-xl border border-primary/30 bg-primary/10 p-3 transition-colors hover:bg-primary/15"
             >
