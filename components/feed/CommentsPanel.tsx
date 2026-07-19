@@ -179,7 +179,9 @@ export default function CommentsPanel({
         aria-label={t("feed_comments_title")}
         className="hidden h-dvh w-80 shrink-0 flex-col border-l border-border/60 bg-background/95 backdrop-blur-2xl lg:flex xl:w-96"
       >
-        <header className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+        {/* pt-24 deja libre el espacio del header flotante (logo, iniciar
+            sesión / registrarse) que vive por encima de todo el feed. */}
+        <header className="flex items-center justify-between border-b border-border/60 px-5 pb-4 pt-24">
           <div className="min-w-0">
             <p className="flex items-center gap-2 text-sm font-bold text-foreground">
               <MessageCircle className="size-4 text-primary" />

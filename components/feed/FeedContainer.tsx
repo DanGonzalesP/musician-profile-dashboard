@@ -8,6 +8,7 @@ import { fetchCommentCounts } from "@/lib/track-comments";
 import TrackScreen from "./TrackScreen";
 import PostScreen from "./PostScreen";
 import CommentsPanel from "./CommentsPanel";
+import FeedScrollNav from "./FeedScrollNav";
 
 interface FeedContainerProps {
   items: FeedItem[];
@@ -149,42 +150,55 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
     setCommentCounts((prev) => ({ ...prev, [trackId]: count }));
   }, []);
 
+  const scrollToIndex = useCallback((index: number) => {
+    sectionRefs.current[index]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   return (
     <div className="flex h-dvh w-full">
-      <div
-        ref={containerRef}
-        className="h-dvh min-w-0 flex-1 snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth"
-      >
-        <audio ref={audioRef} preload="auto" />
-        {items.map((item, index) =>
-          item.kind === "track" ? (
-            <TrackScreen
-              key={item.id}
-              ref={registerSection(index)}
-              track={item.track}
-              isSample={isSampleFeed}
-              isActive={index === activeIndex}
-              isPlaying={index === activeIndex && isPlaying}
-              currentTime={index === activeIndex ? currentTime : 0}
-              duration={index === activeIndex ? duration : item.track.durationSeconds ?? 0}
-              isLiked={likedIds.has(item.id)}
-              commentCount={commentCounts[item.track.id] ?? 0}
-              onTogglePlay={togglePlay}
-              onSeek={seek}
-              onToggleLike={() => toggleLike(item.id)}
-              onOpenComments={() => setMobileCommentsOpen(true)}
-            />
-          ) : (
-            <PostScreen
-              key={item.id}
-              ref={registerSection(index)}
-              post={item.post}
-              isActive={index === activeIndex}
-              isLiked={likedIds.has(item.id)}
-              onToggleLike={() => toggleLike(item.id)}
-            />
-          )
-        )}
+      <div className="relative h-dvh min-w-0 flex-1">
+        <div
+          ref={containerRef}
+          className="h-dvh w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <audio ref={audioRef} preload="auto" />
+          {items.map((item, index) =>
+            item.kind === "track" ? (
+              <TrackScreen
+                key={item.id}
+                ref={registerSection(index)}
+                track={item.track}
+                isSample={isSampleFeed}
+                isActive={index === activeIndex}
+                isPlaying={index === activeIndex && isPlaying}
+                currentTime={index === activeIndex ? currentTime : 0}
+                duration={index === activeIndex ? duration : item.track.durationSeconds ?? 0}
+                isLiked={likedIds.has(item.id)}
+                commentCount={commentCounts[item.track.id] ?? 0}
+                onTogglePlay={togglePlay}
+                onSeek={seek}
+                onToggleLike={() => toggleLike(item.id)}
+                onOpenComments={() => setMobileCommentsOpen(true)}
+              />
+            ) : (
+              <PostScreen
+                key={item.id}
+                ref={registerSection(index)}
+                post={item.post}
+                isActive={index === activeIndex}
+                isLiked={likedIds.has(item.id)}
+                onToggleLike={() => toggleLike(item.id)}
+              />
+            )
+          )}
+        </div>
+
+        <FeedScrollNav
+          canGoPrev={activeIndex > 0}
+          canGoNext={activeIndex < items.length - 1}
+          onPrev={() => scrollToIndex(activeIndex - 1)}
+          onNext={() => scrollToIndex(activeIndex + 1)}
+        />
       </div>
 
       <CommentsPanel

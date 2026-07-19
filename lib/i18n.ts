@@ -141,6 +141,8 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_share_aria: "Compartir",
     feed_share_copied: "¡Link copiado!",
     feed_post_badge: "Publicación",
+    feed_scroll_prev_aria: "Contenido anterior",
+    feed_scroll_next_aria: "Siguiente contenido",
 
     feed_header_login: "Iniciar Sesión",
     feed_header_register: "Registrarse",
@@ -308,6 +310,8 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_share_aria: "Share",
     feed_share_copied: "Link copied!",
     feed_post_badge: "Post",
+    feed_scroll_prev_aria: "Previous content",
+    feed_scroll_next_aria: "Next content",
 
     feed_header_login: "Log In",
     feed_header_register: "Sign Up",
