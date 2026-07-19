@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/lib/server-auth";
 
 export async function POST(request: Request) {
   try {
+    // Solo usuarios autenticados: esta ruta consume créditos de la API de
+    // imágenes — sin este check cualquiera podría agotarlos.
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Inicia sesión para generar imágenes." }, { status: 401 });
+    }
+
     const { prompt } = await request.json();
 
-    if (!prompt) {
+    if (!prompt || typeof prompt !== "string") {
       return NextResponse.json({ error: "El prompt es requerido" }, { status: 400 });
+    }
+    if (prompt.length > 600) {
+      return NextResponse.json({ error: "El prompt es demasiado largo (máx. 600 caracteres)" }, { status: 400 });
     }
 
     // Llamada al modelo de IA generativa de imágenes
@@ -26,7 +37,7 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.error?.message || "Error al generar la imagen");
     }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
+import { getAuthenticatedUser } from "@/lib/server-auth"
 
 // Genera una URL firmada de subida directa a R2. El archivo NUNCA pasa por
 // este servidor/función serverless — el navegador hace el PUT directo a R2
@@ -10,12 +11,27 @@ import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 // tamaño de body que ajustar en Next.js/Vercel para esto.
 const ALLOWED_FOLDERS = new Set(["images", "audio", "video"])
 
+// Solo tipos de archivo multimedia — nunca HTML/JS/ejecutables, aunque el
+// bucket sea público: el navegador nunca debe interpretar una subida como
+// código.
+const ALLOWED_CONTENT_TYPES = /^(image|audio|video)\//
+
 export async function POST(request: Request) {
   try {
+    // Solo usuarios autenticados pueden pedir URLs de subida.
+    const user = await getAuthenticatedUser(request)
+    if (!user) {
+      return NextResponse.json({ error: "Inicia sesión para subir archivos." }, { status: 401 })
+    }
+
     const { folder, extension, contentType } = await request.json()
 
     if (!ALLOWED_FOLDERS.has(folder)) {
       return NextResponse.json({ error: "Carpeta de destino inválida" }, { status: 400 })
+    }
+
+    if (typeof contentType === "string" && contentType && !ALLOWED_CONTENT_TYPES.test(contentType)) {
+      return NextResponse.json({ error: "Tipo de archivo no permitido" }, { status: 400 })
     }
 
     const safeExt = String(extension ?? "bin")

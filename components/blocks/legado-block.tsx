@@ -1,25 +1,32 @@
 "use client"
 
-// Trayectoria — la carta de presentación del músico. Bento Grid que usa todo
-// el ancho disponible en desktop (nada de una sola columna vertical), con
-// tarjetas "3D depth": inclinación que sigue el cursor (rotateX/rotateY con
-// springs de framer-motion), capas internas en translateZ y un brillo (glare)
-// que persigue el mouse. La sección de integrantes ya no vive acá — eso es
-// del panel del grupo musical; esta sección es 100% el perfil del artista.
+// Trayectoria — el CV especializado del músico, sea cual sea su rubro.
+// Bento Grid que usa todo el ancho disponible en desktop, con tarjetas
+// "3D depth": inclinación que sigue el cursor (rotateX/rotateY con springs
+// de framer-motion), capas internas en translateZ y un brillo (glare) que
+// persigue el mouse. Secciones: manifiesto, biografía, géneros/influencias,
+// instrumentos y habilidades, cifras destacadas, hitos, formación, premios,
+// prensa, shows destacados y galería. Las fotos marcadas como "recorte"
+// (PNG sin fondo) flotan en 3D con sombra proyectada (.cutout-float).
 
 import { useState, type ReactNode } from "react"
 import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion"
 import {
   Calendar,
   Disc3,
+  GraduationCap,
+  Guitar,
   Heart,
   MapPin,
   Music2,
+  Newspaper,
   Quote,
   Sparkles,
+  Ticket,
+  Trophy,
   type LucideIcon,
 } from "lucide-react"
-import type { LegadoData, LegadoMilestone } from "@/lib/blocks"
+import type { LegadoData, LegadoGalleryItem, LegadoMilestone } from "@/lib/blocks"
 
 // ---------------------------------------------------------------------------
 // Reveal — fade + translateY al entrar en viewport, una sola vez
@@ -122,26 +129,52 @@ function Eyebrow({ icon: Icon, children }: { icon: LucideIcon; children: ReactNo
 }
 
 function GalleryDepthImage({
-  src,
+  item,
   alt,
   className = "",
 }: {
-  src: string
+  item: LegadoGalleryItem
   alt: string
   className?: string
 }) {
+  if (item.cutout) {
+    // Foto sin fondo: nada de marco — el recorte flota en el espacio 3D.
+    return (
+      <DepthCard className={className} intensity={12}>
+        <div className="flex size-full items-end justify-center p-2">
+          <img
+            src={item.url}
+            alt={item.caption || alt}
+            className="cutout-float max-h-full w-auto max-w-full object-contain"
+            style={{ transform: "translateZ(36px)" }}
+          />
+        </div>
+        {item.caption && (
+          <p className="pointer-events-none absolute inset-x-0 bottom-0 text-center text-xs text-muted-foreground">
+            {item.caption}
+          </p>
+        )}
+      </DepthCard>
+    )
+  }
+
   return (
     <DepthCard className={className}>
       <div className="relative size-full overflow-hidden rounded-3xl border border-border/70">
         <img
-          src={src}
-          alt={alt}
+          src={item.url}
+          alt={item.caption || alt}
           className="size-full object-cover transition-transform duration-500 group-hover/depth:scale-105"
         />
         <div
           aria-hidden="true"
           className="absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover/depth:opacity-100"
         />
+        {item.caption && (
+          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent p-3 text-xs text-foreground opacity-0 transition-opacity duration-300 group-hover/depth:opacity-100">
+            {item.caption}
+          </p>
+        )}
       </div>
     </DepthCard>
   )
@@ -211,12 +244,32 @@ function MilestoneCard({ milestone, index }: { milestone: LegadoMilestone; index
 }
 
 // ---------------------------------------------------------------------------
-// Componente principal — Bento Grid
+// Componente principal — Bento Grid + secciones del CV
 // ---------------------------------------------------------------------------
 
 export function LegadoBlock({ data }: { data: LegadoData }) {
+  const instruments = data.instruments ?? []
+  const stats = (data.stats ?? []).filter((s) => s.value || s.label)
+  const education = (data.education ?? []).filter((e) => e.title || e.institution)
+  const awards = (data.awards ?? []).filter((a) => a.title)
+  const press = (data.press ?? []).filter((p) => p.quote)
+  const shows = (data.shows ?? []).filter((s) => s.name || s.venue)
+  // Los borradores guardados antes del CV ampliado traen la galería como
+  // string[] — se normaliza al vuelo para no perder fotos.
+  const gallery = (data.gallery ?? [])
+    .map((g) => (typeof g === "string" ? ({ url: g } as LegadoGalleryItem) : g))
+    .filter((g) => g.url)
+
   const isEmpty =
-    !data.headline && !data.bio && data.timeline.length === 0 && data.gallery.length === 0
+    !data.headline &&
+    !data.bio &&
+    data.timeline.length === 0 &&
+    gallery.length === 0 &&
+    stats.length === 0 &&
+    education.length === 0 &&
+    awards.length === 0 &&
+    press.length === 0 &&
+    shows.length === 0
 
   if (isEmpty) {
     return (
@@ -226,8 +279,8 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
     )
   }
 
-  const [heroImage, secondImage, ...mosaicImages] = data.gallery
-  const hasTags = data.genres.length > 0 || data.influences.length > 0
+  const [heroImage, secondImage, ...mosaicImages] = gallery
+  const hasTags = data.genres.length > 0 || data.influences.length > 0 || instruments.length > 0
 
   return (
     <div className="flex flex-col gap-14 sm:gap-20">
@@ -261,7 +314,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
         {/* Foto principal de la galería */}
         {heroImage ? (
           <Reveal delay={0.08} className={`min-h-64 ${data.headline ? "md:col-span-5" : "md:col-span-7"}`}>
-            <GalleryDepthImage src={heroImage} alt="Foto principal" className="h-full min-h-64" />
+            <GalleryDepthImage item={heroImage} alt="Foto principal" className="h-full min-h-64" />
           </Reveal>
         ) : null}
 
@@ -279,7 +332,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
           </Reveal>
         ) : null}
 
-        {/* Géneros + influencias */}
+        {/* Géneros + influencias + instrumentos */}
         {hasTags ? (
           <Reveal delay={0.16} className={secondImage ? "md:col-span-3" : "md:col-span-6"}>
             <DepthCard className="h-full" intensity={7}>
@@ -296,6 +349,23 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
                           className="rounded-full border border-border px-3 py-1 text-xs text-foreground/80"
                         >
                           {genre}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {instruments.length > 0 ? (
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <Guitar className="size-3.5 text-primary" /> Instrumentos y habilidades
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {instruments.map((inst) => (
+                        <span
+                          key={inst}
+                          className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs text-foreground/85"
+                        >
+                          {inst}
                         </span>
                       ))}
                     </div>
@@ -326,10 +396,36 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
         {/* Segunda foto */}
         {secondImage ? (
           <Reveal delay={0.2} className="min-h-56 md:col-span-3">
-            <GalleryDepthImage src={secondImage} alt="Foto de galería" className="h-full min-h-56" />
+            <GalleryDepthImage item={secondImage} alt="Foto de galería" className="h-full min-h-56" />
           </Reveal>
         ) : null}
       </div>
+
+      {/* ── Cifras destacadas ── */}
+      {stats.length > 0 ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {stats.slice(0, 4).map((stat, i) => (
+            <Reveal key={stat.id} delay={Math.min(i * 0.06, 0.3)}>
+              <DepthCard intensity={10}>
+                <div
+                  className="flex flex-col items-center gap-1 rounded-3xl border border-border/70 bg-card/50 px-4 py-6 text-center backdrop-blur"
+                  style={{ transformStyle: "preserve-3d" }}
+                >
+                  <span
+                    className="font-display text-3xl font-extrabold text-primary drop-shadow-[0_0_18px_color-mix(in_oklch,var(--primary)_60%,transparent)] sm:text-4xl"
+                    style={{ transform: "translateZ(26px)" }}
+                  >
+                    {stat.value}
+                  </span>
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {stat.label}
+                  </span>
+                </div>
+              </DepthCard>
+            </Reveal>
+          ))}
+        </div>
+      ) : null}
 
       {/* ── Línea de tiempo ── */}
       {data.timeline.length > 0 ? (
@@ -353,6 +449,129 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
         </div>
       ) : null}
 
+      {/* ── Formación + Premios ── */}
+      {(education.length > 0 || awards.length > 0) && (
+        <div className={`grid gap-4 ${education.length > 0 && awards.length > 0 ? "md:grid-cols-2" : ""}`}>
+          {education.length > 0 && (
+            <Reveal>
+              <DepthCard className="h-full" intensity={5}>
+                <div className="flex h-full flex-col rounded-3xl border border-border/70 bg-card/40 p-6 backdrop-blur sm:p-8">
+                  <Eyebrow icon={GraduationCap}>Formación</Eyebrow>
+                  <ul className="mt-5 space-y-4">
+                    {education.map((edu) => (
+                      <li key={edu.id} className="flex items-start gap-3">
+                        <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <GraduationCap className="size-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{edu.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {edu.institution}
+                            {edu.year ? ` · ${edu.year}` : ""}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </DepthCard>
+            </Reveal>
+          )}
+          {awards.length > 0 && (
+            <Reveal delay={0.08}>
+              <DepthCard className="h-full" intensity={5}>
+                <div className="flex h-full flex-col rounded-3xl border border-border/70 bg-card/40 p-6 backdrop-blur sm:p-8">
+                  <Eyebrow icon={Trophy}>Premios y reconocimientos</Eyebrow>
+                  <ul className="mt-5 space-y-4">
+                    {awards.map((award) => (
+                      <li key={award.id} className="flex items-start gap-3">
+                        <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Trophy className="size-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{award.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {award.org}
+                            {award.year ? ` · ${award.year}` : ""}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </DepthCard>
+            </Reveal>
+          )}
+        </div>
+      )}
+
+      {/* ── Prensa ── */}
+      {press.length > 0 && (
+        <div>
+          <Reveal>
+            <Eyebrow icon={Newspaper}>Dicen de mí</Eyebrow>
+          </Reveal>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {press.map((quote, i) => (
+              <Reveal key={quote.id} delay={Math.min(i * 0.07, 0.35)}>
+                <DepthCard className="h-full" intensity={7}>
+                  <figure className="flex h-full flex-col justify-between rounded-3xl border border-border/70 bg-card/40 p-6 backdrop-blur">
+                    <Quote className="size-6 text-primary/50" />
+                    <blockquote className="mt-3 flex-1 text-sm italic leading-relaxed text-foreground/90">
+                      “{quote.quote}”
+                    </blockquote>
+                    <figcaption className="mt-4 text-xs font-semibold text-primary">
+                      {quote.url ? (
+                        <a href={quote.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                          — {quote.source}
+                        </a>
+                      ) : (
+                        <>— {quote.source}</>
+                      )}
+                    </figcaption>
+                  </figure>
+                </DepthCard>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Shows y escenarios destacados ── */}
+      {shows.length > 0 && (
+        <div>
+          <Reveal>
+            <Eyebrow icon={Ticket}>Escenarios destacados</Eyebrow>
+          </Reveal>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {shows.map((show, i) => (
+              <Reveal key={show.id} delay={Math.min(i * 0.05, 0.3)}>
+                <DepthCard intensity={8}>
+                  <div
+                    className="flex items-center gap-4 rounded-2xl border border-border/70 bg-card/40 p-4 backdrop-blur"
+                    style={{ transformStyle: "preserve-3d" }}
+                  >
+                    <span
+                      className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 via-card to-background font-display text-sm font-bold text-primary"
+                      style={{ transform: "translateZ(20px)" }}
+                    >
+                      {show.year || <Ticket className="size-4" />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">{show.name}</p>
+                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <MapPin className="size-3 shrink-0" />
+                        {[show.venue, show.city].filter(Boolean).join(", ")}
+                      </p>
+                    </div>
+                  </div>
+                </DepthCard>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Mosaico con el resto de la galería ── */}
       {mosaicImages.length > 0 ? (
         <div>
@@ -360,14 +579,14 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
             <Eyebrow icon={MapPin}>Galería</Eyebrow>
           </Reveal>
           <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-12">
-            {mosaicImages.map((url, i) => {
+            {mosaicImages.map((item, i) => {
               // Patrón de bento que se repite cada 4 fotos: ancha, cuadrada,
               // cuadrada, ancha — mantiene el ritmo asimétrico sin huecos.
               const pattern = ["md:col-span-5", "md:col-span-3", "md:col-span-4", "md:col-span-4"]
               const span = pattern[i % pattern.length]
               return (
-                <Reveal key={`${url}-${i}`} delay={Math.min(i * 0.05, 0.4)} className={`${span} min-h-48`}>
-                  <GalleryDepthImage src={url} alt={`Foto de galería ${i + 3}`} className="h-full min-h-48" />
+                <Reveal key={`${item.url}-${i}`} delay={Math.min(i * 0.05, 0.4)} className={`${span} min-h-48`}>
+                  <GalleryDepthImage item={item} alt={`Foto de galería ${i + 3}`} className="h-full min-h-48" />
                 </Reveal>
               )
             })}

@@ -2,10 +2,19 @@
 
 import { useState } from "react"
 import { Plus, Trash2, X } from "lucide-react"
-import type { LegadoData, LegadoMilestone } from "@/lib/blocks"
+import type {
+  LegadoAward,
+  LegadoData,
+  LegadoEducation,
+  LegadoGalleryItem,
+  LegadoMilestone,
+  LegadoPress,
+  LegadoShow,
+  LegadoStat,
+} from "@/lib/blocks"
 import { Field, TextInput, inputClass, ImageUploader, type BlobRegistry } from "@/components/block-inspector"
 
-// ─── Editor de listas de texto simples (géneros / influencias) ────────────
+// ─── Editor de listas de texto simples (géneros / influencias / skills) ───
 
 function TagListEditor({
   label,
@@ -74,6 +83,36 @@ function TagListEditor({
   )
 }
 
+// ─── Encabezado de sección con botón "Agregar" ────────────────────────────
+
+function SectionHeader({ title, onAdd }: { title: string; onAdd: () => void }) {
+  return (
+    <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+      >
+        <Plus className="size-3" /> Agregar
+      </button>
+    </div>
+  )
+}
+
+function RemoveButton({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+      title={title}
+    >
+      <Trash2 className="size-3.5" />
+    </button>
+  )
+}
+
 // ─── Hitos de trayectoria ───────────────────────────────────────────────
 
 function TimelineFields({
@@ -96,24 +135,9 @@ function TimelineFields({
     onChange(timeline.map((m, i) => (i === index ? { ...m, ...changes } : m)))
   }
 
-  const removeMilestone = (index: number) => {
-    onChange(timeline.filter((_, i) => i !== index))
-  }
-
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Trayectoria — hitos de carrera
-        </p>
-        <button
-          type="button"
-          onClick={addMilestone}
-          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-        >
-          <Plus className="size-3" /> Agregar hito
-        </button>
-      </div>
+      <SectionHeader title="Hitos de carrera" onAdd={addMilestone} />
 
       {timeline.map((milestone, index) => (
         <div key={milestone.id} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
@@ -123,14 +147,7 @@ function TimelineFields({
               onChange={(e) => setMilestone(index, { year: e.target.value })}
               placeholder="Año, ej. 2021"
             />
-            <button
-              type="button"
-              onClick={() => removeMilestone(index)}
-              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              title="Eliminar hito"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
+            <RemoveButton onClick={() => onChange(timeline.filter((_, i) => i !== index))} title="Eliminar hito" />
           </div>
           <TextInput
             value={milestone.title}
@@ -155,53 +172,240 @@ function TimelineFields({
   )
 }
 
-// ─── Galería de referencia ──────────────────────────────────────────────
+// ─── Cifras destacadas ──────────────────────────────────────────────────
+
+function StatsFields({ stats, onChange }: { stats: LegadoStat[]; onChange: (s: LegadoStat[]) => void }) {
+  const add = () => onChange([...stats, { id: `stat-${Date.now()}`, value: "", label: "" }])
+  const set = (i: number, changes: Partial<LegadoStat>) =>
+    onChange(stats.map((s, idx) => (idx === i ? { ...s, ...changes } : s)))
+
+  return (
+    <div className="space-y-2">
+      <SectionHeader title="Cifras destacadas (máx. 4 visibles)" onAdd={add} />
+      {stats.map((stat, i) => (
+        <div key={stat.id} className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
+          <TextInput
+            value={stat.value}
+            onChange={(e) => set(i, { value: e.target.value })}
+            placeholder="+300"
+          />
+          <TextInput
+            value={stat.label}
+            onChange={(e) => set(i, { label: e.target.value })}
+            placeholder="Shows en vivo"
+          />
+          <RemoveButton onClick={() => onChange(stats.filter((_, idx) => idx !== i))} title="Eliminar cifra" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Formación ──────────────────────────────────────────────────────────
+
+function EducationFields({
+  education,
+  onChange,
+}: {
+  education: LegadoEducation[]
+  onChange: (e: LegadoEducation[]) => void
+}) {
+  const add = () => onChange([...education, { id: `edu-${Date.now()}`, title: "", institution: "", year: "" }])
+  const set = (i: number, changes: Partial<LegadoEducation>) =>
+    onChange(education.map((e, idx) => (idx === i ? { ...e, ...changes } : e)))
+
+  return (
+    <div className="space-y-2">
+      <SectionHeader title="Formación y estudios" onAdd={add} />
+      {education.map((edu, i) => (
+        <div key={edu.id} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <TextInput
+              value={edu.title}
+              onChange={(e) => set(i, { title: e.target.value })}
+              placeholder="Ej. Composición musical"
+            />
+            <RemoveButton onClick={() => onChange(education.filter((_, idx) => idx !== i))} title="Eliminar" />
+          </div>
+          <div className="flex gap-2">
+            <TextInput
+              value={edu.institution}
+              onChange={(e) => set(i, { institution: e.target.value })}
+              placeholder="Institución / maestro"
+            />
+            <TextInput
+              value={edu.year}
+              onChange={(e) => set(i, { year: e.target.value })}
+              placeholder="2018 — 2022"
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Premios ────────────────────────────────────────────────────────────
+
+function AwardsFields({ awards, onChange }: { awards: LegadoAward[]; onChange: (a: LegadoAward[]) => void }) {
+  const add = () => onChange([...awards, { id: `award-${Date.now()}`, title: "", org: "", year: "" }])
+  const set = (i: number, changes: Partial<LegadoAward>) =>
+    onChange(awards.map((a, idx) => (idx === i ? { ...a, ...changes } : a)))
+
+  return (
+    <div className="space-y-2">
+      <SectionHeader title="Premios y reconocimientos" onAdd={add} />
+      {awards.map((award, i) => (
+        <div key={award.id} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <TextInput
+              value={award.title}
+              onChange={(e) => set(i, { title: e.target.value })}
+              placeholder="Ej. Mejor artista nuevo"
+            />
+            <RemoveButton onClick={() => onChange(awards.filter((_, idx) => idx !== i))} title="Eliminar" />
+          </div>
+          <div className="flex gap-2">
+            <TextInput
+              value={award.org}
+              onChange={(e) => set(i, { org: e.target.value })}
+              placeholder="Quién lo otorgó"
+            />
+            <TextInput value={award.year} onChange={(e) => set(i, { year: e.target.value })} placeholder="Año" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Prensa ─────────────────────────────────────────────────────────────
+
+function PressFields({ press, onChange }: { press: LegadoPress[]; onChange: (p: LegadoPress[]) => void }) {
+  const add = () => onChange([...press, { id: `press-${Date.now()}`, quote: "", source: "", url: "" }])
+  const set = (i: number, changes: Partial<LegadoPress>) =>
+    onChange(press.map((p, idx) => (idx === i ? { ...p, ...changes } : p)))
+
+  return (
+    <div className="space-y-2">
+      <SectionHeader title="Prensa — qué dicen de ti" onAdd={add} />
+      {press.map((quote, i) => (
+        <div key={quote.id} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <textarea
+              value={quote.quote}
+              onChange={(e) => set(i, { quote: e.target.value })}
+              rows={2}
+              className={inputClass}
+              placeholder="La cita, sin comillas"
+            />
+            <RemoveButton onClick={() => onChange(press.filter((_, idx) => idx !== i))} title="Eliminar cita" />
+          </div>
+          <div className="flex gap-2">
+            <TextInput
+              value={quote.source}
+              onChange={(e) => set(i, { source: e.target.value })}
+              placeholder="Medio o persona"
+            />
+            <TextInput
+              value={quote.url || ""}
+              onChange={(e) => set(i, { url: e.target.value })}
+              placeholder="Enlace (opcional)"
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Shows destacados ───────────────────────────────────────────────────
+
+function ShowsFields({ shows, onChange }: { shows: LegadoShow[]; onChange: (s: LegadoShow[]) => void }) {
+  const add = () => onChange([...shows, { id: `show-${Date.now()}`, name: "", venue: "", city: "", year: "" }])
+  const set = (i: number, changes: Partial<LegadoShow>) =>
+    onChange(shows.map((s, idx) => (idx === i ? { ...s, ...changes } : s)))
+
+  return (
+    <div className="space-y-2">
+      <SectionHeader title="Escenarios y shows destacados" onAdd={add} />
+      {shows.map((show, i) => (
+        <div key={show.id} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <TextInput
+              value={show.name}
+              onChange={(e) => set(i, { name: e.target.value })}
+              placeholder="Festival / gira / evento"
+            />
+            <RemoveButton onClick={() => onChange(shows.filter((_, idx) => idx !== i))} title="Eliminar show" />
+          </div>
+          <div className="flex gap-2">
+            <TextInput
+              value={show.venue}
+              onChange={(e) => set(i, { venue: e.target.value })}
+              placeholder="Recinto"
+            />
+            <TextInput value={show.city} onChange={(e) => set(i, { city: e.target.value })} placeholder="Ciudad" />
+            <TextInput value={show.year} onChange={(e) => set(i, { year: e.target.value })} placeholder="Año" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Galería de referencia (con fotos recortadas 3D) ────────────────────
 
 function GalleryFields({
   gallery,
   onChange,
   blobRegistry,
 }: {
-  gallery: string[]
-  onChange: (gallery: string[]) => void
+  gallery: LegadoGalleryItem[]
+  onChange: (gallery: LegadoGalleryItem[]) => void
   blobRegistry: BlobRegistry
 }) {
-  const addImage = () => onChange([...gallery, ""])
-  const setImage = (index: number, url: string) => onChange(gallery.map((g, i) => (i === index ? url : g)))
+  const addImage = () => onChange([...gallery, { url: "" }])
+  const set = (index: number, changes: Partial<LegadoGalleryItem>) =>
+    onChange(gallery.map((g, i) => (i === index ? { ...g, ...changes } : g)))
   const removeImage = (index: number) => onChange(gallery.filter((_, i) => i !== index))
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Galería de referencia (fotos de prensa/shows)
-        </p>
-        <button
-          type="button"
-          onClick={addImage}
-          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-        >
-          <Plus className="size-3" /> Agregar foto
-        </button>
-      </div>
+      <SectionHeader title="Galería (fotos de prensa/shows)" onAdd={addImage} />
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        Las dos primeras fotos van al bento principal. Marca “Sin fondo” en fotos PNG con
+        transparencia para que floten en 3D con sombra propia.
+      </p>
 
-      {gallery.map((url, index) => (
-        <div key={index} className="flex items-start gap-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
-          <div className="flex-1">
-            <ImageUploader
-              currentImageUrl={url}
-              onUploadReady={(newUrl) => setImage(index, newUrl)}
-              blobRegistry={blobRegistry}
+      {gallery.map((item, index) => (
+        <div key={index} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <ImageUploader
+                currentImageUrl={item.url}
+                onUploadReady={(newUrl) => set(index, { url: newUrl })}
+                blobRegistry={blobRegistry}
+              />
+            </div>
+            <RemoveButton onClick={() => removeImage(index)} title="Eliminar foto" />
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-foreground">
+              <input
+                type="checkbox"
+                checked={Boolean(item.cutout)}
+                onChange={(e) => set(index, { cutout: e.target.checked })}
+                className="size-3.5 accent-[var(--primary)]"
+              />
+              Sin fondo (flota en 3D)
+            </label>
+            <TextInput
+              value={item.caption || ""}
+              onChange={(e) => set(index, { caption: e.target.value })}
+              placeholder="Leyenda (opcional)"
             />
           </div>
-          <button
-            type="button"
-            onClick={() => removeImage(index)}
-            className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            title="Eliminar foto"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
         </div>
       ))}
     </div>
@@ -246,18 +450,29 @@ export function LegadoFields({
         placeholder="Ej. Cumbia, Trap"
       />
       <TagListEditor
+        label="Instrumentos y habilidades"
+        values={data.instruments ?? []}
+        onChange={(instruments) => onChange({ ...data, instruments })}
+        placeholder="Ej. Guitarra, Ableton, Dirección coral"
+      />
+      <TagListEditor
         label="Influencias"
         values={data.influences}
         onChange={(influences) => onChange({ ...data, influences })}
         placeholder="Ej. Los Ángeles Azules"
       />
+      <StatsFields stats={data.stats ?? []} onChange={(stats) => onChange({ ...data, stats })} />
       <TimelineFields
         timeline={data.timeline}
         onChange={(timeline) => onChange({ ...data, timeline })}
         blobRegistry={blobRegistry}
       />
+      <EducationFields education={data.education ?? []} onChange={(education) => onChange({ ...data, education })} />
+      <AwardsFields awards={data.awards ?? []} onChange={(awards) => onChange({ ...data, awards })} />
+      <PressFields press={data.press ?? []} onChange={(press) => onChange({ ...data, press })} />
+      <ShowsFields shows={data.shows ?? []} onChange={(shows) => onChange({ ...data, shows })} />
       <GalleryFields
-        gallery={data.gallery}
+        gallery={(data.gallery ?? []).map((g) => (typeof g === "string" ? { url: g } : g))}
         onChange={(gallery) => onChange({ ...data, gallery })}
         blobRegistry={blobRegistry}
       />

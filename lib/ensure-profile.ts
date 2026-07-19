@@ -6,7 +6,7 @@ import type { User } from "@supabase/supabase-js"
 // Antes, una cuenta nueva quedaba sin perfil propio y toda la app caía al
 // perfil semilla PROFILE_ID — con dos usuarios reales eso colisionaba (o
 // RLS lo bloqueaba). Ahora hay doble red: un trigger en la base de datos
-// crea el perfil al registrarse (supabase/setup_decima.sql) y este helper
+// crea el perfil al registrarse (supabase/setup_vibra.sql) y este helper
 // lo repone desde el cliente si el trigger aún no está instalado.
 
 export type OwnProfile = {

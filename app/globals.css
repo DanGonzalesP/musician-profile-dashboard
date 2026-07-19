@@ -141,12 +141,121 @@
   --sidebar-ring: oklch(0.58 0.24 20);
 }
 
+/* ─── Acentos eléctricos alternativos ──────────────────────────────────────
+   El rojo escarlata (:root) es el acento por defecto. Estas clases cambian
+   SOLO las variables de acento (primary/accent/ring/sidebar/chart-1) y se
+   pueden aplicar en <html> (preferencia del usuario para toda la app, ver
+   lib/theme.ts) o en un contenedor puntual (el acento público que un perfil
+   eligió en Configuración — las variables CSS se heredan hacia adentro).
+   Cada acento tiene su variante clara para cuando .light está activo. */
+
+.accent-morado {
+  --primary: oklch(0.62 0.26 305);
+  --primary-foreground: oklch(0.99 0.005 305);
+  --accent: oklch(0.21 0.07 305);
+  --accent-foreground: oklch(0.96 0.02 305);
+  --ring: oklch(0.62 0.26 305);
+  --chart-1: oklch(0.62 0.26 305);
+  --sidebar-primary: oklch(0.62 0.26 305);
+  --sidebar-primary-foreground: oklch(0.99 0.005 305);
+  --sidebar-ring: oklch(0.62 0.26 305);
+}
+
+.light .accent-morado,
+.light.accent-morado {
+  --primary: oklch(0.54 0.24 300);
+  --primary-foreground: oklch(0.99 0.005 300);
+  --accent: oklch(0.94 0.03 300);
+  --accent-foreground: oklch(0.32 0.09 300);
+  --ring: oklch(0.54 0.24 300);
+  --chart-1: oklch(0.54 0.24 300);
+  --sidebar-primary: oklch(0.54 0.24 300);
+  --sidebar-primary-foreground: oklch(0.99 0.005 300);
+  --sidebar-ring: oklch(0.54 0.24 300);
+}
+
+.accent-azul {
+  --primary: oklch(0.62 0.22 255);
+  --primary-foreground: oklch(0.99 0.005 255);
+  --accent: oklch(0.21 0.06 255);
+  --accent-foreground: oklch(0.96 0.02 255);
+  --ring: oklch(0.62 0.22 255);
+  --chart-1: oklch(0.62 0.22 255);
+  --sidebar-primary: oklch(0.62 0.22 255);
+  --sidebar-primary-foreground: oklch(0.99 0.005 255);
+  --sidebar-ring: oklch(0.62 0.22 255);
+}
+
+.light .accent-azul,
+.light.accent-azul {
+  --primary: oklch(0.52 0.2 255);
+  --primary-foreground: oklch(0.99 0.005 255);
+  --accent: oklch(0.94 0.03 255);
+  --accent-foreground: oklch(0.3 0.08 255);
+  --ring: oklch(0.52 0.2 255);
+  --chart-1: oklch(0.52 0.2 255);
+  --sidebar-primary: oklch(0.52 0.2 255);
+  --sidebar-primary-foreground: oklch(0.99 0.005 255);
+  --sidebar-ring: oklch(0.52 0.2 255);
+}
+
+.accent-verde {
+  --primary: oklch(0.72 0.21 150);
+  --primary-foreground: oklch(0.15 0.03 150);
+  --accent: oklch(0.21 0.06 150);
+  --accent-foreground: oklch(0.95 0.03 150);
+  --ring: oklch(0.72 0.21 150);
+  --chart-1: oklch(0.72 0.21 150);
+  --sidebar-primary: oklch(0.72 0.21 150);
+  --sidebar-primary-foreground: oklch(0.15 0.03 150);
+  --sidebar-ring: oklch(0.72 0.21 150);
+}
+
+.light .accent-verde,
+.light.accent-verde {
+  --primary: oklch(0.55 0.17 150);
+  --primary-foreground: oklch(0.99 0.005 150);
+  --accent: oklch(0.94 0.04 150);
+  --accent-foreground: oklch(0.3 0.07 150);
+  --ring: oklch(0.55 0.17 150);
+  --chart-1: oklch(0.55 0.17 150);
+  --sidebar-primary: oklch(0.55 0.17 150);
+  --sidebar-primary-foreground: oklch(0.99 0.005 150);
+  --sidebar-ring: oklch(0.55 0.17 150);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* ─── Fotos recortadas 3D (Trayectoria) ───────────────────────────────────
+   Para fotos PNG sin fondo: flotación suave + sombra proyectada + glow del
+   acento, así el recorte "vive" en el espacio 3D de la sección. */
+
+@keyframes cutout-float {
+  0%, 100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1.2deg);
+  }
+}
+
+.cutout-float {
+  animation: cutout-float 6s ease-in-out infinite;
+  filter: drop-shadow(0 24px 28px rgb(0 0 0 / 0.5))
+    drop-shadow(0 0 32px color-mix(in oklch, var(--primary) 28%, transparent));
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cutout-float {
+    animation: none;
   }
 }
 

@@ -10,6 +10,7 @@ import {
   type PublicacionItem,
 } from "@/lib/blocks"
 import { Field, TextInput, ImageUploader, type BlobRegistry } from "@/components/block-inspector"
+import { EmbedsFields } from "@/components/inspector/embeds-fields"
 
 // ─── VideoUploader — mismo patrón que ImageUploader/AudioUploader, sin
 // transcodificación (el video se sube tal cual a la carpeta "video" de R2) ──
@@ -222,6 +223,14 @@ export function PublicacionesFields({
           />
         </div>
       ))}
+
+      {/* Embeds (YouTube/TikTok) — misma sección que Publicaciones: se
+          muestran como filas extra al final del bloque público. */}
+      <EmbedsFields
+        data={{ items: data.embeds ?? [] }}
+        onChange={(embedsData) => onChange({ ...data, embeds: embedsData.items })}
+        blobRegistry={blobRegistry}
+      />
     </div>
   )
 }

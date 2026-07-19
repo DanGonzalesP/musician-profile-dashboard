@@ -3,8 +3,8 @@
 import { cn } from "@/lib/utils"
 
 /**
- * Marca de décima — logotipo de UNA sola palabra, sin ícono adosado.
- * La palabra completa "décima" se escribe en el display de la casa con un
+ * Marca de vibra — logotipo de UNA sola palabra, sin ícono adosado.
+ * La palabra completa "vibra" se escribe en el display de la casa con un
  * degradado que termina en el color primario (la marca "se enciende" hacia
  * el final), y debajo lleva su firma sonora: un pulso de ecualizador de
  * cinco barras que hace de subrayado. Ese pulso es el mismo que usa
@@ -43,7 +43,7 @@ export function LogoMark({ className }: { className?: string }) {
       )}
     >
       <svg viewBox="0 0 100 100" className="size-[70%]" fill="currentColor">
-        {/* La "d" de décima con su pulso de ecualizador debajo */}
+        {/* La "v" de vibra con su pulso de ecualizador debajo */}
         <text
           x="50"
           y="56"
@@ -55,7 +55,7 @@ export function LogoMark({ className }: { className?: string }) {
           className="text-white"
           fill="currentColor"
         >
-          d
+          v
         </text>
         <g className="text-primary">
           <rect x="22" y="82" width="7" height="8" rx="3.5" />
@@ -85,7 +85,7 @@ export function Logo({
   return (
     <span className={cn("inline-flex flex-col items-start leading-none", className)}>
       <span className="bg-gradient-to-r from-foreground from-40% to-primary bg-clip-text font-display text-xl font-extrabold tracking-tight text-transparent">
-        décima
+        vibra
       </span>
       <PulseUnderline className={cn("mt-0.5 ml-0.5", markClassName)} />
     </span>

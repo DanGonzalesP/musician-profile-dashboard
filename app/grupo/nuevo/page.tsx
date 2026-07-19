@@ -31,7 +31,7 @@ type PendingInvitation = { username: string; role: "admin" | "editor" }
 const STEPS = [
   { title: "Nombre", subtitle: "¿Cómo se llama tu grupo?" },
   { title: "Identidad", subtitle: "Cuéntale al mundo quiénes son" },
-  { title: "Integrantes", subtitle: "Invita a tu equipo" },
+  { title: "Integrantes", subtitle: "Invita a tu equipo (opcional)" },
 ] as const
 
 export default function NuevoGrupoPage() {
@@ -112,7 +112,7 @@ export default function NuevoGrupoPage() {
       // El error típico de RLS de Supabase es críptico — se traduce a algo accionable.
       setErrorMessage(
         raw.includes("row-level security")
-          ? "Supabase rechazó la creación del grupo. Falta correr supabase/setup_decima.sql en el proyecto (una sola vez, desde el SQL Editor)."
+          ? "Supabase rechazó la creación del grupo. Falta correr supabase/setup_vibra.sql en el proyecto (una sola vez, desde el SQL Editor)."
           : raw || "No se pudo crear el grupo musical. Intenta de nuevo."
       )
     } finally {
@@ -290,8 +290,10 @@ export default function NuevoGrupoPage() {
                 {step === 2 && (
                   <div className="mt-6 space-y-4">
                     <p className="text-sm leading-relaxed text-muted-foreground">
-                      Invita a los demás integrantes por su usuario. Recibirán la invitación en su panel y,
-                      al aceptar, podrán editar la página según su rol. También puedes hacerlo después.
+                      Este paso es <strong className="text-foreground">totalmente opcional</strong>: puedes crear
+                      el grupo tú solo ahora mismo e invitar integrantes cuando quieras desde el panel del grupo.
+                      Si invitas a alguien, recibirá la invitación en su panel y, al aceptar, podrá editar la
+                      página según su rol.
                     </p>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <input
@@ -388,10 +390,16 @@ export default function NuevoGrupoPage() {
                         </>
                       ) : (
                         <>
-                          <Check className="size-4" /> Crear grupo musical
+                          <Check className="size-4" />
+                          {invitations.length === 0 ? "Crear grupo sin invitar a nadie" : "Crear grupo musical"}
                         </>
                       )}
                     </button>
+                  )}
+                  {step === 2 && invitations.length === 0 && !creating && (
+                    <span className="text-xs text-muted-foreground">
+                      Podrás invitar integrantes después.
+                    </span>
                   )}
                 </div>
               </motion.section>

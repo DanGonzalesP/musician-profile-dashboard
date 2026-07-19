@@ -10,8 +10,8 @@ const unbounded = Unbounded({ subsets: ['latin'], variable: '--font-unbounded' }
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'Décima — Perfil de Artista',
-  description: 'Construye tu perfil de artista: discografía, trayectoria y publicaciones, con un editor modular de bloques.',
+  title: 'vibra — Tu música, tu escenario',
+  description: 'vibra: la plataforma donde músicos de todos los rubros publican su música, su trayectoria, su tienda y sus servicios en un solo perfil.',
   generator: 'v0.app',
   icons: {
     icon: [

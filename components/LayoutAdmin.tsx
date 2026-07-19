@@ -115,13 +115,21 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
             })}
           </nav>
         </div>
-        <button
-          onClick={cerrarSesion}
-          className="mt-6 flex w-full items-center gap-3 rounded-lg border border-transparent px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:border-destructive/30 hover:bg-destructive/10"
-        >
-          <LogOut className="size-4" />
-          <span>Cerrar Sesión</span>
-        </button>
+        <div className="mt-6 space-y-2">
+          <Link
+            href="/legal"
+            className="block px-4 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Términos, privacidad y derechos de autor
+          </Link>
+          <button
+            onClick={cerrarSesion}
+            className="flex w-full items-center gap-3 rounded-lg border border-transparent px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:border-destructive/30 hover:bg-destructive/10"
+          >
+            <LogOut className="size-4" />
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
       </aside>
       <main className="flex-1 overflow-y-auto bg-card/20">{children}</main>
     </div>

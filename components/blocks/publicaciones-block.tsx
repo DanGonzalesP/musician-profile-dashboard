@@ -7,10 +7,12 @@
 
 import { useMemo, useRef, useState } from "react"
 import { motion } from "framer-motion"
-import { ChevronLeft, ChevronRight, GalleryHorizontalEnd, Play } from "lucide-react"
+import { ChevronLeft, ChevronRight, GalleryHorizontalEnd, Music2, Play, PlayCircle } from "lucide-react"
+import { getYoutubeEmbedUrl } from "@/lib/youtube"
 import {
   PUBLICACIONES_DEFAULT_ROW_TITLES,
   PUBLICACIONES_ROWS,
+  type EmbedItem,
   type PublicacionesData,
   type PublicacionItem,
 } from "@/lib/blocks"
@@ -29,6 +31,7 @@ type RowData = { title: string; items: { item: PublicacionItem; globalIndex: num
 
 export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
   const items = data.items
+  const embeds = data.embeds ?? []
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
 
   // Reparte las publicaciones en PUBLICACIONES_ROWS filas consecutivas.
@@ -52,7 +55,7 @@ export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
         PUBLICACIONES
       </span>
 
-      {items.length === 0 ? (
+      {items.length === 0 && embeds.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
           Todavía no hay publicaciones.
         </div>
@@ -66,6 +69,7 @@ export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
               onOpen={(globalIndex) => setViewerIndex(globalIndex)}
             />
           ))}
+          {embeds.length > 0 && <EmbedsRows embeds={embeds} startNumber={rows.length + 1} />}
         </div>
       )}
 
@@ -77,6 +81,118 @@ export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
         <MediaViewer items={items} startIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Embeds (YouTube/TikTok) — viven dentro de Publicaciones, como filas extra
+// numeradas que continúan las de fotos/videos. Son una sola sección.
+// ---------------------------------------------------------------------------
+
+const embedVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: "easeOut" as const },
+  },
+}
+
+function EmbedsRows({ embeds, startNumber }: { embeds: EmbedItem[]; startNumber: number }) {
+  const youtubeItems = embeds
+    .filter((item) => item.platform === "youtube")
+    .map((item) => ({ item, embedUrl: getYoutubeEmbedUrl(item.url) }))
+    .filter((entry): entry is { item: EmbedItem; embedUrl: string } => entry.embedUrl !== null)
+  const tiktokItems = embeds.filter((item) => item.platform === "tiktok")
+
+  let number = startNumber
+
+  return (
+    <>
+      {youtubeItems.length > 0 && (
+        <section>
+          <h3 className="mb-3 flex items-baseline gap-2.5">
+            <span aria-hidden="true" className="font-display text-lg font-bold text-primary/50">
+              {String(number++).padStart(2, "0")}
+            </span>
+            <span className="flex items-center gap-1.5 font-display text-base font-bold text-foreground sm:text-lg">
+              <PlayCircle className="size-4 text-primary" /> Videos
+            </span>
+          </h3>
+          <motion.div
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
+            {youtubeItems.map(({ item, embedUrl }) => (
+              <motion.div key={item.id} variants={embedVariants}>
+                <div className="overflow-hidden rounded-xl border border-border bg-card/60">
+                  <div className="aspect-video w-full">
+                    <iframe
+                      src={embedUrl}
+                      className="size-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title={item.title ?? "Video de YouTube"}
+                    />
+                  </div>
+                  {item.title && <p className="px-3 py-2.5 text-sm font-medium text-foreground">{item.title}</p>}
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
+      )}
+
+      {tiktokItems.length > 0 && (
+        <section>
+          <h3 className="mb-3 flex items-baseline gap-2.5">
+            <span aria-hidden="true" className="font-display text-lg font-bold text-primary/50">
+              {String(number++).padStart(2, "0")}
+            </span>
+            <span className="flex items-center gap-1.5 font-display text-base font-bold text-foreground sm:text-lg">
+              <Music2 className="size-4 text-primary" /> TikTok
+            </span>
+          </h3>
+          <motion.div
+            className="flex flex-wrap gap-4"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
+            {tiktokItems.map((item) => (
+              <motion.div key={item.id} variants={embedVariants}>
+                <div className="flex w-48 shrink-0 flex-col gap-2 sm:w-56">
+                  <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl border border-border bg-card/60">
+                    {item.thumbnail ? (
+                      <img src={item.thumbnail} alt={item.title ?? "Clip de TikTok"} className="size-full object-cover" />
+                    ) : (
+                      <div className="flex size-full items-center justify-center bg-gradient-to-br from-card via-background to-black">
+                        <Music2 className="size-10 text-primary/80" />
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-background/95 via-background/40 to-transparent p-3">
+                      {item.title && <p className="line-clamp-2 text-xs font-medium text-foreground">{item.title}</p>}
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"
+                      >
+                        Ver en TikTok
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
+      )}
+    </>
   )
 }
 

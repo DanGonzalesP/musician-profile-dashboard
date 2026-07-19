@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, PROFILE_ID } from "@/lib/blocks"
+import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog } from "@/lib/catalog"
 import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
@@ -10,6 +10,7 @@ import { PreviewCanvas } from "@/components/preview-canvas"
 import { BlockInspector } from "@/components/block-inspector"
 import { Layers, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { authedFetch } from "@/lib/authed-fetch"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
@@ -141,7 +142,7 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
   const uploadBody =
     uploadFile.type === contentType ? uploadFile : new File([uploadFile], uploadFile.name, { type: contentType })
 
-  const presignRes = await fetch("/api/upload-url", {
+  const presignRes = await authedFetch("/api/upload-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ folder, extension: ext, contentType }),
@@ -338,7 +339,7 @@ export function ProfileEditor() {
               ...b,
               data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"],
             }))
-          setBlocks(cleanBlocks)
+          setBlocks(mergePublicacionesEmbeds(cleanBlocks))
           setProducts((draft.products ?? []).map((p) => stripDeadBlobUrls(p as unknown as Record<string, unknown>) as unknown as CatalogProduct))
           setServices((draft.services ?? []).map((s) => stripDeadBlobUrls(s as unknown as Record<string, unknown>) as unknown as CatalogService))
         } else {
@@ -352,9 +353,11 @@ export function ProfileEditor() {
 
           if (dbBlocks && dbBlocks.length > 0) {
             setBlocks(
-              dbBlocks
-                .filter((b) => isKnownBlockType(b.block_type))
-                .map((b) => dbBlockToBlock(b, { isBand }))
+              mergePublicacionesEmbeds(
+                dbBlocks
+                  .filter((b) => isKnownBlockType(b.block_type))
+                  .map((b) => dbBlockToBlock(b, { isBand }))
+              )
             )
           } else {
             setBlocks([
@@ -423,7 +426,7 @@ export function ProfileEditor() {
   // ── Generación de banner con IA ──────────────────────────────────────
   async function generarBannerConIA(promptTexto: string) {
     try {
-      const res = await fetch("/api/generate-image", {
+      const res = await authedFetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: promptTexto }),

@@ -13,6 +13,8 @@ import { supabase } from "@/lib/supabase";
 import LayoutAdmin from "@/components/LayoutAdmin";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { AccentSwatches, AppAccentCard } from "@/components/accent-picker";
+import { isAccentColor, type AccentColor } from "@/lib/theme";
 import { ensureOwnProfile } from "@/lib/ensure-profile";
 import {
   Check,
@@ -47,6 +49,7 @@ export default function ConfigPerfilPage() {
   const [displayName, setDisplayName] = useState("");
   const [unifiedProfile, setUnifiedProfile] = useState(false);
   const [roles, setRoles] = useState<MusicianRole[]>([]);
+  const [profileAccent, setProfileAccent] = useState<AccentColor>("rojo");
   const [guardado, setGuardado] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
   const router = useRouter();
@@ -73,7 +76,7 @@ export default function ConfigPerfilPage() {
       setDisplayName(profile.displayName);
       setUnifiedProfile(profile.unifiedProfile);
 
-      // Los roles se consultan aparte: si la migración setup_decima.sql no
+      // Los roles se consultan aparte: si la migración setup_vibra.sql no
       // corrió todavía, este select falla sin arrastrar al resto.
       const { data: rolesRow } = await supabase
         .from("profiles")
@@ -82,6 +85,17 @@ export default function ConfigPerfilPage() {
         .maybeSingle();
       if (rolesRow) {
         setRoles(parseMusicianRoles(rolesRow.musician_roles ?? rolesRow.musician_category));
+      }
+
+      // Igual que los roles: consulta aparte para que una columna faltante
+      // (migración setup_vibra.sql sin correr) no rompa el resto.
+      const { data: accentRow } = await supabase
+        .from("profiles")
+        .select("accent_color")
+        .eq("id", profile.id)
+        .maybeSingle();
+      if (accentRow && isAccentColor(accentRow.accent_color)) {
+        setProfileAccent(accentRow.accent_color);
       }
       setLoading(false);
     }
@@ -122,7 +136,18 @@ export default function ConfigPerfilPage() {
       .eq("id", profileId);
     if (rolesError) {
       setErrorMensaje(
-        "El perfil se guardó, pero los roles no: falta correr supabase/setup_decima.sql."
+        "El perfil se guardó, pero los roles no: falta correr supabase/setup_vibra.sql."
+      );
+      return;
+    }
+
+    const { error: accentError } = await supabase
+      .from("profiles")
+      .update({ accent_color: profileAccent })
+      .eq("id", profileId);
+    if (accentError) {
+      setErrorMensaje(
+        "El perfil se guardó, pero el color no: falta correr supabase/setup_vibra.sql."
       );
       return;
     }
@@ -173,6 +198,7 @@ export default function ConfigPerfilPage() {
               </div>
               <LanguageSwitcher />
             </div>
+            <AppAccentCard />
           </div>
         </section>
 
@@ -237,6 +263,16 @@ export default function ConfigPerfilPage() {
                 );
               })}
             </div>
+          </div>
+
+          {/* ── Acento del perfil público: lo ven todos los visitantes ── */}
+          <div className="rounded-xl border border-border bg-background p-4">
+            <p className="text-sm font-medium text-foreground">Color de tu perfil público</p>
+            <p className="mb-3 mt-0.5 max-w-sm text-xs text-muted-foreground">
+              El acento neón con el que todos ven tu página pública. Es independiente del color que
+              elijas para la plataforma.
+            </p>
+            <AccentSwatches value={profileAccent} onChange={setProfileAccent} />
           </div>
 
           <div className="flex items-center justify-between rounded-xl border border-border bg-background p-4">

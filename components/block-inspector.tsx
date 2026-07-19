@@ -2006,6 +2006,13 @@ function MerchFields({
       <Field label="Título de la sección">
         <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
+      <a
+        href="/perfil/admin-merch"
+        className="block rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-[11px] leading-snug text-primary transition-colors hover:bg-primary/10"
+      >
+        Aquí editas lo básico. Para categorías, variantes (tallas/colores), fotos múltiples,
+        productos digitales y enlaces de compra, abre la <strong>gestión completa de la tienda →</strong>
+      </a>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Productos</p>
         <button
@@ -2100,6 +2107,13 @@ function ServiceFields({
       <Field label="Título de la sección">
         <TextInput value={data.title || ""} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
+      <a
+        href="/perfil/admin-servicios"
+        className="block rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-[11px] leading-snug text-primary transition-colors hover:bg-primary/10"
+      >
+        Aquí editas lo básico. Para categorías, modalidad, duración, qué incluye y enlaces de
+        reserva, abre la <strong>gestión completa de servicios →</strong>
+      </a>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ofertas</p>
         <button

@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- setup_decima.sql — ÚNICA migración pendiente. Corre este archivo COMPLETO
+-- setup_vibra.sql — ÚNICA migración pendiente. Corre este archivo COMPLETO
 -- en el SQL Editor de Supabase y la app queda lista para funcionar con
 -- varios usuarios reales. Es idempotente: puedes correrlo las veces que
 -- quieras sin romper nada.
@@ -185,3 +185,66 @@ create policy "profile_blocks_delete_by_role"
 on profile_blocks for delete
 to authenticated
 using (get_profile_role(profile_id) in ('owner', 'admin'));
+
+
+-- ─── 5) Acento de color del perfil público (rojo por defecto) ─────────────
+
+alter table profiles add column if not exists accent_color text not null default 'rojo';
+
+do $$ begin
+  alter table profiles add constraint profiles_accent_color_check check (
+    accent_color in ('rojo', 'morado', 'azul', 'verde')
+  );
+exception when duplicate_object then null;
+end $$;
+
+
+-- ─── 6) Tienda completa: columnas nuevas de products ──────────────────────
+-- Un producto puede ser cualquier cosa que venda un músico: ropa, vinilos,
+-- instrumentos, arte, digitales, entradas... con variantes y enlace de
+-- compra externo.
+
+alter table products add column if not exists description text;
+alter table products add column if not exists category text not null default 'otro';
+alter table products add column if not exists product_kind text not null default 'fisico';
+alter table products add column if not exists currency text not null default 'USD';
+alter table products add column if not exists variants jsonb not null default '[]'::jsonb;
+alter table products add column if not exists purchase_url text;
+alter table products add column if not exists is_active boolean not null default true;
+alter table products add column if not exists is_featured boolean not null default false;
+
+do $$ begin
+  alter table products add constraint products_kind_check check (product_kind in ('fisico', 'digital'));
+exception when duplicate_object then null;
+end $$;
+
+
+-- ─── 7) Servicios completos: columnas nuevas de services ──────────────────
+-- Clases, producción, mezcla/máster, composición, sesiones, shows,
+-- alquiler... con modalidad, unidad de precio, qué incluye y reserva.
+
+alter table services add column if not exists category text not null default 'otro';
+alter table services add column if not exists price_unit text not null default 'proyecto';
+alter table services add column if not exists modality text not null default 'ambas';
+alter table services add column if not exists duration text;
+alter table services add column if not exists delivery_time text;
+alter table services add column if not exists features jsonb not null default '[]'::jsonb;
+alter table services add column if not exists booking_url text;
+alter table services add column if not exists image_url text;
+alter table services add column if not exists is_active boolean not null default true;
+alter table services add column if not exists is_featured boolean not null default false;
+
+do $$ begin
+  alter table services add constraint services_modality_check check (modality in ('presencial', 'online', 'ambas'));
+exception when duplicate_object then null;
+end $$;
+
+
+-- ─── 8) Refuerzo de seguridad: RLS activo en las tablas del catálogo ──────
+-- (Si ya corriste harden_products_services_rls.sql esto no cambia nada;
+-- si no, activa RLS — las políticas de dueño ya deben existir.)
+
+alter table products enable row level security;
+alter table services enable row level security;
+alter table profiles enable row level security;
+alter table profile_blocks enable row level security;

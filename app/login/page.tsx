@@ -26,10 +26,15 @@ function LoginForm() {
   const [exitoMensaje, setExitoMensaje] = useState("");
   const searchParams = useSearchParams();
   const [isRegistering, setIsRegistering] = useState(searchParams.get("modo") === "registro");
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const router = useRouter();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRegistering && !aceptaTerminos) {
+      setErrorMensaje("Debes aceptar los Términos y la Política de Privacidad para crear tu cuenta.");
+      return;
+    }
     setLoading(true);
     setErrorMensaje("");
     setExitoMensaje("");
@@ -115,6 +120,29 @@ function LoginForm() {
               />
             </div>
 
+            {isRegistering && (
+              <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={aceptaTerminos}
+                  onChange={(e) => setAceptaTerminos(e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 accent-[var(--primary)]"
+                />
+                <span>
+                  Acepto los{" "}
+                  <Link href="/legal/terminos" target="_blank" className="text-primary hover:underline">
+                    Términos y Condiciones
+                  </Link>{" "}
+                  y la{" "}
+                  <Link href="/legal/privacidad" target="_blank" className="text-primary hover:underline">
+                    Política de Privacidad
+                  </Link>
+                  , y declaro que el contenido que suba es de mi autoría o cuento con los derechos
+                  para publicarlo.
+                </span>
+              </label>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -149,6 +177,16 @@ function LoginForm() {
             </button>
           </div>
         </div>
+
+        <p className="text-center text-[11px] text-muted-foreground">
+          <Link href="/legal/terminos" className="hover:text-foreground hover:underline">Términos</Link>
+          {" · "}
+          <Link href="/legal/privacidad" className="hover:text-foreground hover:underline">Privacidad</Link>
+          {" · "}
+          <Link href="/legal/copyright" className="hover:text-foreground hover:underline">Derechos de autor</Link>
+          {" · "}
+          <Link href="/legal" className="hover:text-foreground hover:underline">Centro legal</Link>
+        </p>
       </div>
     </div>
   );

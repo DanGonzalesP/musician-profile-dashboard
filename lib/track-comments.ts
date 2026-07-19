@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase"
 
 // Comentarios de las canciones del feed principal — tabla feed_comments
-// (ver supabase/setup_decima.sql). Lectura pública; escribir requiere
+// (ver supabase/setup_vibra.sql). Lectura pública; escribir requiere
 // sesión. Si la tabla todavía no existe en Supabase, todo degrada a listas
 // vacías para no romper el feed.
 
@@ -89,7 +89,7 @@ export async function addTrackComment(trackId: string, content: string): Promise
   if (error) {
     throw new Error(
       error.message.includes("feed_comments")
-        ? "Los comentarios aún no están activados: falta correr supabase/setup_decima.sql."
+        ? "Los comentarios aún no están activados: falta correr supabase/setup_vibra.sql."
         : error.message
     )
   }

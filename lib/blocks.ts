@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library, Users, Sparkles, GalleryHorizontalEnd, Video } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library, Users, Sparkles, GalleryHorizontalEnd } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -179,14 +179,68 @@ export type LegadoMember = {
   bio?: string
 }
 
+// Foto de la galería de trayectoria. `cutout: true` marca una foto SIN fondo
+// (PNG transparente): el bloque público la muestra flotando en 3D
+// (object-contain + sombra proyectada + glow), sin marco de tarjeta.
+export type LegadoGalleryItem = {
+  url: string
+  cutout?: boolean
+  caption?: string
+}
+
+// ─── CV especializado del músico — secciones adicionales ──────────────────
+
+export type LegadoEducation = {
+  id: string
+  title: string // ej. "Composición musical"
+  institution: string // ej. "Conservatorio Nacional"
+  year: string // "2018 — 2022"
+}
+
+export type LegadoAward = {
+  id: string
+  title: string
+  org: string // quién lo otorgó / certamen
+  year: string
+}
+
+export type LegadoPress = {
+  id: string
+  quote: string
+  source: string // medio / persona
+  url?: string
+}
+
+export type LegadoShow = {
+  id: string
+  name: string // festival / gira / evento
+  venue: string
+  city: string
+  year: string
+}
+
+// Cifra destacada del CV — ej. "Años de carrera: 12", "Shows: +300".
+export type LegadoStat = {
+  id: string
+  value: string
+  label: string
+}
+
 export type LegadoData = {
   headline: string
   bio: string
   genres: string[]
   influences: string[]
+  // Instrumentos y habilidades: "Guitarra", "Ableton Live", "Dirección coral"...
+  instruments: string[]
+  stats: LegadoStat[]
   timeline: LegadoMilestone[]
+  education: LegadoEducation[]
+  awards: LegadoAward[]
+  press: LegadoPress[]
+  shows: LegadoShow[]
   members: LegadoMember[]
-  gallery: string[]
+  gallery: LegadoGalleryItem[]
 }
 
 // ─── Bloque "publicaciones" — galería de fotos/videos, tier gratuito ───────
@@ -217,6 +271,11 @@ export type PublicacionesData = {
   items: PublicacionItem[]
   // Subtítulo de cada fila del carrusel — siempre PUBLICACIONES_ROWS entradas.
   rowTitles: string[]
+  // Publicaciones y Embeds son UNA sola sección: los enlaces de YouTube y
+  // TikTok viven dentro del bloque de publicaciones (fila "Videos" al
+  // final). Los bloques "embeds" viejos se pliegan aquí automáticamente al
+  // cargar — ver mergePublicacionesEmbeds().
+  embeds: EmbedItem[]
 }
 
 // ─── Bloque "embeds" — YouTube (iframe real, puede traer anuncios) y
@@ -339,15 +398,8 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
   {
     type: "publicaciones",
     label: "Publicaciones",
-    description: "Hasta 9 fotos y videos, tus mejores momentos.",
+    description: "Fotos, videos y tus enlaces de YouTube/TikTok — todo en una sola sección.",
     icon: GalleryHorizontalEnd,
-    category: "Perfil",
-  },
-  {
-    type: "embeds",
-    label: "Embeds",
-    description: "Enlaces de YouTube y TikTok que ya publicaste en otras plataformas.",
-    icon: Video,
     category: "Perfil",
   },
   {
@@ -373,7 +425,10 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
   },
 ]
 
-const KNOWN_BLOCK_TYPES = BLOCK_LIBRARY.map((b) => b.type)
+// "embeds" ya no se ofrece en la librería (se fusionó con Publicaciones),
+// pero sigue siendo un tipo conocido para poder LEER los bloques guardados
+// antes de la fusión y plegarlos vía mergePublicacionesEmbeds().
+const KNOWN_BLOCK_TYPES: BlockType[] = [...BLOCK_LIBRARY.map((b) => b.type), "embeds"]
 
 /**
  * Filtra block_type que ya no existen en BLOCK_LIBRARY (ej. "license", del
@@ -489,9 +544,15 @@ export function normalizeBlockData(
         bio: String(content.bio ?? ""),
         genres: Array.isArray(content.genres) ? content.genres.map(String) : [],
         influences: Array.isArray(content.influences) ? content.influences.map(String) : [],
+        instruments: Array.isArray(content.instruments) ? content.instruments.map(String) : [],
+        stats: Array.isArray(content.stats) ? content.stats.map(normalizeLegadoStat) : [],
         timeline: Array.isArray(content.timeline) ? content.timeline.map((m, i) => normalizeLegadoMilestone(m, i)) : [],
+        education: Array.isArray(content.education) ? content.education.map(normalizeLegadoEducation) : [],
+        awards: Array.isArray(content.awards) ? content.awards.map(normalizeLegadoAward) : [],
+        press: Array.isArray(content.press) ? content.press.map(normalizeLegadoPress) : [],
+        shows: Array.isArray(content.shows) ? content.shows.map(normalizeLegadoShow) : [],
         members: Array.isArray(content.members) ? content.members.map((m, i) => normalizeLegadoMember(m, i)) : [],
-        gallery: Array.isArray(content.gallery) ? content.gallery.map(String) : [],
+        gallery: Array.isArray(content.gallery) ? content.gallery.map(normalizeLegadoGalleryItem) : [],
       }
     case "publicaciones": {
       const normalized = Array.isArray(content.items)
@@ -502,6 +563,7 @@ export function normalizeBlockData(
       return {
         items: opts?.isBand ? normalized : normalized.slice(0, PUBLICACIONES_MAX_ITEMS),
         rowTitles: normalizeRowTitles(content.rowTitles),
+        embeds: Array.isArray(content.embeds) ? content.embeds.map((e, i) => normalizeEmbedItem(e, i)) : [],
       }
     }
     case "embeds":
@@ -584,6 +646,64 @@ function normalizeLegadoMilestone(raw: unknown, index: number): LegadoMilestone 
     title: String(m.title ?? ""),
     description: String(m.description ?? ""),
     image: m.image ? String(m.image) : undefined,
+  }
+}
+
+// Retrocompatibilidad: la galería vieja era string[] (solo URLs); la nueva
+// es LegadoGalleryItem[] con recorte/leyenda opcionales.
+function normalizeLegadoGalleryItem(raw: unknown): LegadoGalleryItem {
+  if (typeof raw === "string") return { url: raw }
+  const g = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    url: String(g.url ?? ""),
+    cutout: Boolean(g.cutout),
+    caption: g.caption ? String(g.caption) : undefined,
+  }
+}
+
+function normalizeLegadoStat(raw: unknown, index: number): LegadoStat {
+  const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return { id: String(s.id ?? `stat-${index + 1}`), value: String(s.value ?? ""), label: String(s.label ?? "") }
+}
+
+function normalizeLegadoEducation(raw: unknown, index: number): LegadoEducation {
+  const e = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(e.id ?? `edu-${index + 1}`),
+    title: String(e.title ?? ""),
+    institution: String(e.institution ?? ""),
+    year: String(e.year ?? ""),
+  }
+}
+
+function normalizeLegadoAward(raw: unknown, index: number): LegadoAward {
+  const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(a.id ?? `award-${index + 1}`),
+    title: String(a.title ?? ""),
+    org: String(a.org ?? ""),
+    year: String(a.year ?? ""),
+  }
+}
+
+function normalizeLegadoPress(raw: unknown, index: number): LegadoPress {
+  const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(p.id ?? `press-${index + 1}`),
+    quote: String(p.quote ?? ""),
+    source: String(p.source ?? ""),
+    url: p.url ? String(p.url) : undefined,
+  }
+}
+
+function normalizeLegadoShow(raw: unknown, index: number): LegadoShow {
+  const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(s.id ?? `show-${index + 1}`),
+    name: String(s.name ?? ""),
+    venue: String(s.venue ?? ""),
+    city: String(s.city ?? ""),
+    year: String(s.year ?? ""),
   }
 }
 
@@ -778,13 +898,59 @@ function defaultData(type: BlockType): BlockData {
         bio: "",
         genres: [],
         influences: [],
+        instruments: [],
+        stats: [],
         timeline: [],
+        education: [],
+        awards: [],
+        press: [],
+        shows: [],
         members: [],
         gallery: [],
       }
     case "publicaciones":
-      return { items: [], rowTitles: [...PUBLICACIONES_DEFAULT_ROW_TITLES] }
+      return { items: [], rowTitles: [...PUBLICACIONES_DEFAULT_ROW_TITLES], embeds: [] }
     case "embeds":
       return { items: [] }
   }
+}
+
+/**
+ * Publicaciones y Embeds son una sola sección: este helper pliega cualquier
+ * bloque "embeds" que siga guardado (perfiles publicados antes de la fusión)
+ * dentro del bloque "publicaciones" (campo `embeds`), y elimina el bloque
+ * suelto de la lista. Si el perfil solo tenía embeds, el bloque se convierte
+ * en un bloque de publicaciones sin fotos pero con los videos. Se aplica al
+ * CARGAR (editor y páginas públicas) — al volver a publicar desde el editor,
+ * lo guardado ya queda fusionado de forma permanente.
+ */
+export function mergePublicacionesEmbeds(blocks: Block[]): Block[] {
+  const embedBlocks = blocks.filter((b) => b.type === "embeds")
+  if (embedBlocks.length === 0) return blocks
+
+  const looseEmbeds = embedBlocks.flatMap((b) => (b.data as EmbedsData).items ?? [])
+  const rest = blocks.filter((b) => b.type !== "embeds")
+  const pubIndex = rest.findIndex((b) => b.type === "publicaciones")
+
+  if (pubIndex >= 0) {
+    const pub = rest[pubIndex]
+    const pubData = pub.data as PublicacionesData
+    const existingIds = new Set((pubData.embeds ?? []).map((e) => e.id))
+    const merged: PublicacionesData = {
+      ...pubData,
+      embeds: [...(pubData.embeds ?? []), ...looseEmbeds.filter((e) => !existingIds.has(e.id))],
+    }
+    return rest.map((b, i) => (i === pubIndex ? { ...b, data: merged } : b))
+  }
+
+  // No había bloque de publicaciones: el primer bloque embeds se convierte.
+  const firstEmbedsPosition = blocks.findIndex((b) => b.type === "embeds")
+  const converted: Block = {
+    id: `publicaciones-${embedBlocks[0].id}`,
+    type: "publicaciones",
+    data: { items: [], rowTitles: [...PUBLICACIONES_DEFAULT_ROW_TITLES], embeds: looseEmbeds },
+  }
+  const result = [...rest]
+  result.splice(Math.min(firstEmbedsPosition, result.length), 0, converted)
+  return result
 }

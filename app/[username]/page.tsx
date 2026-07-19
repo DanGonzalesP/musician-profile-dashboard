@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block, type BlockType, type TracksData, type CreditsData, dbBlockToBlock, isKnownBlockType } from "@/lib/blocks";
+import { type Block, type BlockType, type TracksData, type CreditsData, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
+import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, Home, ArrowLeft, LayoutDashboard, Sparkles, GalleryHorizontalEnd, Users, Video, type LucideIcon } from "lucide-react";
+import { Store, Home, ArrowLeft, LayoutDashboard, Sparkles, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
-type TabKey = "main" | "legado" | "publicaciones" | "embeds" | "store";
+type TabKey = "main" | "legado" | "publicaciones" | "store";
 
 // Perfil "separado" (default): Hero, Single Destacado, Meta de Producción,
 // Track List y Donaciones viven en la pestaña "Legado" (el catálogo de
@@ -45,6 +46,7 @@ function PerfilPublicoContent() {
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [isBand, setIsBand] = useState(false);
+  const [profileAccent, setProfileAccent] = useState<AccentColor>("rojo");
 
   useEffect(() => {
     setShareUrl(window.location.href);
@@ -96,6 +98,20 @@ function PerfilPublicoContent() {
         setOwnerUserId(profile.user_id ?? null);
         setIsBand(profile.profile_type === "band");
 
+        // Acento elegido por el artista para SU página. Consulta aparte y
+        // tolerante: si la columna no existe (setup_vibra.sql sin correr),
+        // simplemente queda el rojo por defecto.
+        supabase
+          .from("profiles")
+          .select("accent_color")
+          .eq("id", profile.id)
+          .maybeSingle()
+          .then(({ data: accentRow }) => {
+            if (!controller.signal.aborted && accentRow && isAccentColor(accentRow.accent_color)) {
+              setProfileAccent(accentRow.accent_color);
+            }
+          });
+
         // Cargar bloques del perfil
         const { data: dbBlocks, error: blocksError } = await supabase
           .from("profile_blocks")
@@ -111,9 +127,11 @@ function PerfilPublicoContent() {
         }
 
         const isBandProfile = profile.profile_type === "band";
-        const parsedBlocks = (dbBlocks ?? [])
-          .filter((b) => isKnownBlockType(b.block_type))
-          .map((b) => dbBlockToBlock(b, { isBand: isBandProfile }));
+        const parsedBlocks = mergePublicacionesEmbeds(
+          (dbBlocks ?? [])
+            .filter((b) => isKnownBlockType(b.block_type))
+            .map((b) => dbBlockToBlock(b, { isBand: isBandProfile }))
+        );
 
         const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profile.id);
 
@@ -221,7 +239,6 @@ function PerfilPublicoContent() {
   const mainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type) && b.type !== "hero");
   const legadoBlocks = blocks.filter((b) => b.type === "legado");
   const publicacionesBlocks = blocks.filter((b) => b.type === "publicaciones");
-  const embedsBlocks = blocks.filter((b) => b.type === "embeds");
   const storeBlocks = blocks.filter(
     (b) => !MAIN_BLOCK_TYPES.includes(b.type) && !EXTRA_TAB_TYPES.includes(b.type)
   );
@@ -234,7 +251,6 @@ function PerfilPublicoContent() {
     ...(publicacionesBlocks.length > 0
       ? [{ key: "publicaciones" as const, label: t("tab_publicaciones"), icon: GalleryHorizontalEnd, blocks: publicacionesBlocks }]
       : []),
-    ...(embedsBlocks.length > 0 ? [{ key: "embeds" as const, label: t("tab_embeds"), icon: Video, blocks: embedsBlocks }] : []),
     ...(storeBlocks.length > 0 ? [{ key: "store" as const, label: t("tab_store"), icon: Store, blocks: storeBlocks }] : []),
   ];
   const showTabBar = !unifiedProfile && tabs.length > 1;
@@ -253,11 +269,17 @@ function PerfilPublicoContent() {
   );
 
   return (
-    <div className="min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8">
+    <div className={`min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8 ${accentClassName(profileAccent)}`}>
       <AudioReactiveBackground />
       {backToFeedButton}
       {editPanelButton}
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 animate-fade-in">
+      {/* La pestaña de Trayectoria (CV) usa todo el espacio lateral disponible;
+          el resto del perfil mantiene el ancho de lectura clásico. */}
+      <main
+        className={`mx-auto flex w-full flex-col gap-8 animate-fade-in ${
+          !unifiedProfile && activeTab === "legado" ? "max-w-[88rem]" : "max-w-6xl"
+        }`}
+      >
         {/* El bloque hero (foto de perfil + portada) siempre va primero —
             la barra de tabs y el resto del contenido se acomodan debajo,
             nunca encima de él. */}

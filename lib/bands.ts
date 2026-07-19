@@ -188,7 +188,7 @@ export async function inviteMember(bandProfileId: string, username: string, role
     }
     if (error.message.includes("row-level security")) {
       throw new Error(
-        "Supabase rechazó la invitación: falta correr supabase/setup_decima.sql en el proyecto."
+        "Supabase rechazó la invitación: falta correr supabase/setup_vibra.sql en el proyecto."
       )
     }
     throw error
