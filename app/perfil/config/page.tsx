@@ -1,21 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// Configuración del perfil. Cambios del gran rediseño:
+//  • El idioma (ES/EN) vive aquí, al lado del modo oscuro/claro — ya no en
+//    el header del feed.
+//  • La descripción/bio desapareció: ahora el músico elige sus ROLES (los 7
+//    de lib/musician-roles.ts, selección múltiple) — eso define qué es como
+//    músico en toda la plataforma y dónde aparece en el filtro del feed.
+
+import { useEffect, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { PROFILE_ID } from "@/lib/blocks";
 import LayoutAdmin from "@/components/LayoutAdmin";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Loader2 } from "lucide-react";
-import { MUSICIAN_CATEGORIES, isMusicianCategory, type MusicianCategory } from "@/lib/musician-categories";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { ensureOwnProfile } from "@/lib/ensure-profile";
+import {
+  Check,
+  Disc3,
+  Feather,
+  Guitar,
+  Layers,
+  Loader2,
+  Music4,
+  SlidersHorizontal,
+  Wand2,
+} from "lucide-react";
+import {
+  MUSICIAN_ROLES,
+  parseMusicianRoles,
+  type MusicianRole,
+} from "@/lib/musician-roles";
+
+const ROLE_ICONS: Record<MusicianRole, ComponentType<{ className?: string }>> = {
+  autores: Feather,
+  compositores: Music4,
+  arreglistas: Layers,
+  directores: Wand2,
+  productores: Disc3,
+  mezclas: SlidersHorizontal,
+  musicos: Guitar,
+};
 
 export default function ConfigPerfilPage() {
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
-  const [bio, setBio] = useState("");
   const [unifiedProfile, setUnifiedProfile] = useState(false);
-  const [musicianCategory, setMusicianCategory] = useState<MusicianCategory | null>(null);
+  const [roles, setRoles] = useState<MusicianRole[]>([]);
   const [guardado, setGuardado] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
   const router = useRouter();
@@ -28,52 +59,52 @@ export default function ConfigPerfilPage() {
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, display_name, bio, unified_profile")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        setErrorMensaje(profileError.message);
+      // Si la cuenta es nueva y todavía no tiene fila en profiles, se crea
+      // aquí mismo — así cualquier persona recién registrada puede
+      // configurar su perfil sin pasos manuales.
+      const profile = await ensureOwnProfile(user);
+      if (!profile) {
+        setErrorMensaje("No se pudo cargar tu perfil. Recarga la página.");
         setLoading(false);
         return;
       }
 
-      if (profile) {
-        setProfileId(profile.id);
-        setDisplayName(profile.display_name || "");
-        setBio(profile.bio || "");
-        setUnifiedProfile(Boolean(profile.unified_profile));
+      setProfileId(profile.id);
+      setDisplayName(profile.displayName);
+      setUnifiedProfile(profile.unifiedProfile);
 
-        // La categoría se consulta aparte: si la migración
-        // profiles_musician_category.sql no corrió todavía, este select
-        // falla sin arrastrar al resto de la configuración.
-        const { data: categoryRow } = await supabase
-          .from("profiles")
-          .select("musician_category")
-          .eq("id", profile.id)
-          .maybeSingle();
-        if (categoryRow && isMusicianCategory(categoryRow.musician_category)) {
-          setMusicianCategory(categoryRow.musician_category);
-        }
-      } else {
-        setProfileId(PROFILE_ID);
+      // Los roles se consultan aparte: si la migración setup_decima.sql no
+      // corrió todavía, este select falla sin arrastrar al resto.
+      const { data: rolesRow } = await supabase
+        .from("profiles")
+        .select("musician_roles, musician_category")
+        .eq("id", profile.id)
+        .maybeSingle();
+      if (rolesRow) {
+        setRoles(parseMusicianRoles(rolesRow.musician_roles ?? rolesRow.musician_category));
       }
       setLoading(false);
     }
     cargarPerfil();
   }, [router]);
 
+  const toggleRole = (role: MusicianRole) => {
+    setRoles((prev) =>
+      prev.includes(role)
+        ? prev.filter((r) => r !== role)
+        : MUSICIAN_ROLES.map((r) => r.id).filter((id) => id === role || prev.includes(id))
+    );
+  };
+
   const guardarCambios = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profileId) return;
+    setErrorMensaje("");
 
     const { error } = await supabase
       .from("profiles")
       .update({
         display_name: displayName.trim(),
-        bio: bio.trim(),
         unified_profile: unifiedProfile,
       })
       .eq("id", profileId);
@@ -85,13 +116,13 @@ export default function ConfigPerfilPage() {
 
     // Update aparte por la misma razón que la carga: si la columna todavía
     // no existe en Supabase, no debe bloquear el guardado del resto.
-    const { error: categoryError } = await supabase
+    const { error: rolesError } = await supabase
       .from("profiles")
-      .update({ musician_category: musicianCategory })
+      .update({ musician_roles: roles })
       .eq("id", profileId);
-    if (categoryError) {
+    if (rolesError) {
       setErrorMensaje(
-        "El perfil se guardó, pero la categoría no: falta correr supabase/profiles_musician_category.sql."
+        "El perfil se guardó, pero los roles no: falta correr supabase/setup_decima.sql."
       );
       return;
     }
@@ -103,7 +134,7 @@ export default function ConfigPerfilPage() {
   if (loading) {
     return (
       <LayoutAdmin>
-        <div className="flex items-center justify-center p-12 text-zinc-400">
+        <div className="flex items-center justify-center p-12 text-muted-foreground">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
       </LayoutAdmin>
@@ -112,77 +143,106 @@ export default function ConfigPerfilPage() {
 
   return (
     <LayoutAdmin>
-      <div className="p-8 max-w-2xl mx-auto space-y-8">
-        <header className="border-b border-zinc-800 pb-4">
-          <h1 className="text-2xl font-bold text-white">Configuración de Perfil</h1>
-          <p className="text-zinc-400 text-xs mt-1">Personaliza la información pública que ven los usuarios.</p>
+      <div className="mx-auto max-w-2xl space-y-8 p-8">
+        <header className="border-b border-border pb-4">
+          <h1 className="text-2xl font-bold text-foreground">Configuración de Perfil</h1>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Personaliza tu identidad, tus roles y cómo se ve la plataforma.
+          </p>
         </header>
 
         {errorMensaje && (
-          <div className="p-4 rounded-md border bg-red-500/10 border-red-500/20 text-red-400 text-sm">
+          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
             {errorMensaje}
           </div>
         )}
 
-        <ThemeToggle />
+        {/* ── Apariencia e idioma ─────────────────────────────────────── */}
+        <section>
+          <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Apariencia e idioma
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ThemeToggle />
+            <div className="flex h-full items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Idioma</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Español o inglés para toda la interfaz.
+                </p>
+              </div>
+              <LanguageSwitcher />
+            </div>
+          </div>
+        </section>
 
-        <form onSubmit={guardarCambios} className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 space-y-4">
+        <form onSubmit={guardarCambios} className="space-y-6 rounded-xl border border-border bg-card p-6">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Nombre de artista</label>
+            <label className="mb-1 block text-xs text-muted-foreground">Nombre de artista</label>
             <input
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500"
+              className="w-full rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="Ej. Nova Reyes"
             />
           </div>
 
+          {/* ── Roles: definen qué eres como músico ───────────────────── */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Biografía / Descripción del perfil</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              rows={3}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500 resize-none"
-              placeholder="Escribe algo sobre ti..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">¿Qué tipo de músico eres?</label>
-            <p className="text-[11px] text-zinc-500 mb-2">
-              Define en qué categoría te encuentran cuando filtran el feed principal.
+            <label className="mb-1 block text-xs text-muted-foreground">¿Qué eres como músico?</label>
+            <p className="mb-3 text-[11px] text-muted-foreground/80">
+              Elige todos los roles que te definen — no solo dentro de tus canciones, sino como
+              profesional. Con ellos te encuentran en el feed principal.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {MUSICIAN_CATEGORIES.map((cat) => {
-                const selected = musicianCategory === cat.id;
+              {MUSICIAN_ROLES.map((role) => {
+                const selected = roles.includes(role.id);
+                const Icon = ROLE_ICONS[role.id];
                 return (
                   <button
-                    key={cat.id}
+                    key={role.id}
                     type="button"
-                    onClick={() => setMusicianCategory(selected ? null : cat.id)}
+                    onClick={() => toggleRole(role.id)}
                     aria-pressed={selected}
-                    className={`rounded-lg border p-3 text-left transition-colors ${
+                    className={`group relative flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
                       selected
-                        ? "border-primary/60 bg-primary/10"
-                        : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"
+                        ? "border-primary/60 bg-primary/10 shadow-[0_0_16px_-8px_var(--primary)]"
+                        : "border-border bg-background hover:border-primary/30"
                     }`}
                   >
-                    <p className={`text-sm font-semibold ${selected ? "text-primary" : "text-white"}`}>
-                      {cat.label}
-                    </p>
-                    <p className="mt-0.5 text-[11px] leading-snug text-zinc-400">{cat.description}</p>
+                    <span
+                      className={`flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                        selected
+                          ? "border-primary/50 bg-primary text-primary-foreground"
+                          : "border-border bg-card text-muted-foreground group-hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="size-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className={`block text-sm font-semibold ${selected ? "text-primary" : "text-foreground"}`}>
+                        {role.label}
+                      </span>
+                      <span className="block truncate text-[11px] leading-snug text-muted-foreground">
+                        {role.description}
+                      </span>
+                    </span>
+                    {selected && (
+                      <span className="absolute right-2.5 top-2.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Check className="size-2.5" />
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <div className="flex items-center justify-between rounded-xl border border-border bg-background p-4">
             <div>
-              <p className="text-sm font-medium text-white">Unificar perfil</p>
-              <p className="text-xs text-zinc-400 mt-0.5 max-w-sm">
+              <p className="text-sm font-medium text-foreground">Unificar perfil</p>
+              <p className="mt-0.5 max-w-sm text-xs text-muted-foreground">
                 Muestra Merch y Servicios junto con tu Perfil, Canciones y Donaciones en una sola página.
                 Si está desactivado, Merch y Servicios aparecen en una pestaña aparte.
               </p>
@@ -193,20 +253,27 @@ export default function ConfigPerfilPage() {
               aria-checked={unifiedProfile}
               onClick={() => setUnifiedProfile((v) => !v)}
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                unifiedProfile ? "bg-amber-500" : "bg-zinc-700"
+                unifiedProfile ? "bg-primary" : "bg-secondary"
               }`}
             >
               <span
-                className={`absolute top-0.5 size-5 rounded-full bg-white transition-transform ${
+                className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform ${
                   unifiedProfile ? "translate-x-5" : "translate-x-0.5"
                 }`}
               />
             </button>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            {guardado ? <span className="text-xs font-bold text-emerald-400">¡Cambios guardados con éxito!</span> : <div />}
-            <button type="submit" className="bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-sm px-6 py-2 rounded transition-colors">
+          <div className="flex items-center justify-between pt-1">
+            {guardado ? (
+              <span className="text-xs font-bold text-emerald-500">¡Cambios guardados con éxito!</span>
+            ) : (
+              <div />
+            )}
+            <button
+              type="submit"
+              className="rounded-lg bg-primary px-6 py-2 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
+            >
               Guardar Perfil
             </button>
           </div>

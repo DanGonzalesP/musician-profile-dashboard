@@ -112,7 +112,7 @@ export default function NuevoGrupoPage() {
       // El error típico de RLS de Supabase es críptico — se traduce a algo accionable.
       setErrorMessage(
         raw.includes("row-level security")
-          ? "Supabase rechazó la creación del grupo. Falta correr supabase/fix_group_creation_rls.sql en el proyecto."
+          ? "Supabase rechazó la creación del grupo. Falta correr supabase/setup_decima.sql en el proyecto (una sola vez, desde el SQL Editor)."
           : raw || "No se pudo crear el grupo musical. Intenta de nuevo."
       )
     } finally {

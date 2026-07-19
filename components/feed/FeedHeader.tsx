@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLocale } from "@/components/locale-provider";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { Logo } from "@/components/logo";
 import ProfileMenu from "./ProfileMenu";
 import { supabase } from "@/lib/supabase";
@@ -63,9 +62,8 @@ export default function FeedHeader() {
         <Logo />
       </div>
 
+      {/* El selector de idioma ahora vive en Configuración, junto al tema. */}
       <div className="pointer-events-auto flex items-center gap-3">
-        <LanguageSwitcher />
-
         {!checkingSession &&
           (userId ? (
             <ProfileMenu

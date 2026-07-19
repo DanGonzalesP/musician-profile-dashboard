@@ -3,27 +3,32 @@
 import { cn } from "@/lib/utils"
 
 /**
- * Marca de Décima. La "d" minúscula de "décima" se reemplaza por una
- * corchea (nota musical ♪) dibujada a mano: la plica hace de asta de la
- * "d", el óvalo inclinado hace de bowl, y la bandera es lo que la vuelve
- * nota. `LogoMark` es el sello cuadrado (favicon, íconos standalone);
- * `Logo` es el logotipo completo, donde la corchea se dibuja directo junto
- * a "écima" — un solo trazo, sin caja de por medio — para que se lean como
- * una sola palabra y no como ícono + texto.
+ * Marca de décima — logotipo de UNA sola palabra, sin ícono adosado.
+ * La palabra completa "décima" se escribe en el display de la casa con un
+ * degradado que termina en el color primario (la marca "se enciende" hacia
+ * el final), y debajo lleva su firma sonora: un pulso de ecualizador de
+ * cinco barras que hace de subrayado. Ese pulso es el mismo que usa
+ * `LogoMark` (favicon, sellos cuadrados), así toda la identidad sale de un
+ * único gesto: la música como latido de la palabra.
  */
 
-function NoteGlyph({ className }: { className?: string }) {
+function PulseUnderline({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 0 44 60"
-      className={cn("h-[1.55em] w-auto shrink-0 self-end text-primary", className)}
-      style={{ filter: "drop-shadow(0 0 8px color-mix(in oklch, var(--primary) 60%, transparent))" }}
+      viewBox="0 0 64 12"
+      className={cn("h-[0.32em] w-auto text-primary", className)}
+      style={{ filter: "drop-shadow(0 0 6px color-mix(in oklch, var(--primary) 65%, transparent))" }}
       fill="currentColor"
     >
-      <rect x="25" y="2" width="8" height="48" rx="4" />
-      <ellipse cx="15" cy="48" rx="14" ry="11" transform="rotate(-8 15 48)" />
-      <path d="M33,2 C42,5 44,15 41,25 C38,19 34,14 33,15 Z" />
+      <rect x="0" y="4" width="4" height="4" rx="2" />
+      <rect x="8" y="1" width="4" height="10" rx="2" />
+      <rect x="16" y="3" width="4" height="6" rx="2" />
+      <rect x="24" y="0" width="4" height="12" rx="2" />
+      <rect x="32" y="4" width="4" height="4" rx="2" />
+      <rect x="40" y="2" width="4" height="8" rx="2" />
+      <rect x="48" y="5" width="4" height="2" rx="1" />
+      <rect x="56" y="3" width="4" height="6" rx="2" />
     </svg>
   )
 }
@@ -37,10 +42,28 @@ export function LogoMark({ className }: { className?: string }) {
         className
       )}
     >
-      <svg viewBox="0 0 100 100" className="size-[72%]" fill="none">
-        <rect x="56" y="16" width="9" height="58" rx="4.5" fill="currentColor" className="text-primary" />
-        <ellipse cx="46" cy="76" rx="18" ry="13" transform="rotate(-20 46 76)" fill="currentColor" className="text-primary" />
-        <path d="M65,16 C82,20 90,34 84,48 C81,38 74,30 65,32 Z" fill="currentColor" className="text-primary" />
+      <svg viewBox="0 0 100 100" className="size-[70%]" fill="currentColor">
+        {/* La "d" de décima con su pulso de ecualizador debajo */}
+        <text
+          x="50"
+          y="56"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontFamily="var(--font-display, inherit)"
+          fontWeight="800"
+          fontSize="62"
+          className="text-white"
+          fill="currentColor"
+        >
+          d
+        </text>
+        <g className="text-primary">
+          <rect x="22" y="82" width="7" height="8" rx="3.5" />
+          <rect x="34" y="76" width="7" height="14" rx="3.5" />
+          <rect x="46" y="80" width="7" height="10" rx="3.5" />
+          <rect x="58" y="72" width="7" height="18" rx="3.5" />
+          <rect x="70" y="79" width="7" height="11" rx="3.5" />
+        </g>
       </svg>
     </span>
   )
@@ -60,11 +83,11 @@ export function Logo({
   }
 
   return (
-    <span className={cn("inline-flex items-end", className)}>
-      <NoteGlyph className={cn("-mr-1", markClassName)} />
-      <span className="font-display text-lg font-semibold leading-none tracking-tight text-foreground">
-        écima
+    <span className={cn("inline-flex flex-col items-start leading-none", className)}>
+      <span className="bg-gradient-to-r from-foreground from-40% to-primary bg-clip-text font-display text-xl font-extrabold tracking-tight text-transparent">
+        décima
       </span>
+      <PulseUnderline className={cn("mt-0.5 ml-0.5", markClassName)} />
     </span>
   )
 }

@@ -2,15 +2,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FeedItem } from "@/lib/feed/publicPosts";
 import type { FeedTrack } from "@/lib/musicFeed";
+import { fetchCommentCounts } from "@/lib/track-comments";
 import TrackScreen from "./TrackScreen";
+import PostScreen from "./PostScreen";
+import CommentsPanel from "./CommentsPanel";
 
 interface FeedContainerProps {
-  tracks: FeedTrack[];
+  items: FeedItem[];
   isSampleFeed: boolean;
 }
 
-export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerProps) {
+export default function FeedContainer({ items, isSampleFeed }: FeedContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -20,8 +24,19 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  // Pista cuyo panel de comentarios está abierto (null = cerrado).
+  const [commentsTrack, setCommentsTrack] = useState<FeedTrack | null>(null);
 
-  const activeTrack = tracks[activeIndex];
+  const activeItem = items[activeIndex];
+  const activeTrack = activeItem?.kind === "track" ? activeItem.track : null;
+
+  // Conteos de comentarios de todas las pistas visibles, en una sola consulta.
+  useEffect(() => {
+    if (isSampleFeed) return;
+    const trackIds = items.filter((i) => i.kind === "track").map((i) => (i as { track: FeedTrack }).track.id);
+    fetchCommentCounts(trackIds).then(setCommentCounts);
+  }, [items, isSampleFeed]);
 
   useEffect(() => {
     const root = containerRef.current;
@@ -39,11 +54,21 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
     );
     sectionRefs.current.forEach((el) => el && observer.observe(el));
     return () => observer.disconnect();
-  }, [tracks.length]);
+  }, [items.length]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !activeTrack) return;
+    if (!audio) return;
+    // Una publicación no tiene audio propio: se silencia el reproductor y el
+    // video (si lo hay) se maneja dentro de PostScreen.
+    if (!activeTrack) {
+      audio.pause();
+      audio.removeAttribute("src");
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
     audio.src = activeTrack.audioUrl;
     audio.currentTime = 0;
     setCurrentTime(0);
@@ -119,28 +144,53 @@ export default function FeedContainer({ tracks, isSampleFeed }: FeedContainerPro
     []
   );
 
+  const handleCountChange = useCallback((trackId: string, count: number) => {
+    setCommentCounts((prev) => ({ ...prev, [trackId]: count }));
+  }, []);
+
   return (
     <div
       ref={containerRef}
       className="h-dvh w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth"
     >
       <audio ref={audioRef} preload="auto" />
-      {tracks.map((track, index) => (
-        <TrackScreen
-          key={track.id}
-          ref={registerSection(index)}
-          track={track}
-          isSample={isSampleFeed}
-          isActive={index === activeIndex}
-          isPlaying={index === activeIndex && isPlaying}
-          currentTime={index === activeIndex ? currentTime : 0}
-          duration={index === activeIndex ? duration : track.durationSeconds ?? 0}
-          isLiked={likedIds.has(track.id)}
-          onTogglePlay={togglePlay}
-          onSeek={seek}
-          onToggleLike={() => toggleLike(track.id)}
-        />
-      ))}
+      {items.map((item, index) =>
+        item.kind === "track" ? (
+          <TrackScreen
+            key={item.id}
+            ref={registerSection(index)}
+            track={item.track}
+            isSample={isSampleFeed}
+            isActive={index === activeIndex}
+            isPlaying={index === activeIndex && isPlaying}
+            currentTime={index === activeIndex ? currentTime : 0}
+            duration={index === activeIndex ? duration : item.track.durationSeconds ?? 0}
+            isLiked={likedIds.has(item.id)}
+            commentCount={commentCounts[item.track.id] ?? 0}
+            onTogglePlay={togglePlay}
+            onSeek={seek}
+            onToggleLike={() => toggleLike(item.id)}
+            onOpenComments={() => setCommentsTrack(item.track)}
+          />
+        ) : (
+          <PostScreen
+            key={item.id}
+            ref={registerSection(index)}
+            post={item.post}
+            isActive={index === activeIndex}
+            isLiked={likedIds.has(item.id)}
+            onToggleLike={() => toggleLike(item.id)}
+          />
+        )
+      )}
+
+      <CommentsPanel
+        trackId={commentsTrack?.id ?? null}
+        trackTitle={commentsTrack ? `${commentsTrack.title} — ${commentsTrack.artistName}` : ""}
+        isSample={isSampleFeed}
+        onClose={() => setCommentsTrack(null)}
+        onCountChange={handleCountChange}
+      />
     </div>
   );
 }

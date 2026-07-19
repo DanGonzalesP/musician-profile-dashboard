@@ -9,6 +9,8 @@ import type { FeedTrack } from "@/lib/musicFeed";
 export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   {
     id: "sample-1",
+    roles: ["autores", "compositores"],
+    isGroup: false,
     profileId: "sample-artist-1",
     title: "Andén Nocturno",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
@@ -18,6 +20,8 @@ export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   },
   {
     id: "sample-2",
+    roles: ["musicos"],
+    isGroup: false,
     profileId: "sample-artist-2",
     title: "Cumbia del Puerto",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
@@ -27,6 +31,8 @@ export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   },
   {
     id: "sample-3",
+    roles: ["productores", "mezclas"],
+    isGroup: true,
     profileId: "sample-artist-3",
     title: "Neón y Cemento",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
@@ -36,6 +42,8 @@ export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   },
   {
     id: "sample-4",
+    roles: ["autores", "productores"],
+    isGroup: false,
     profileId: "sample-artist-4",
     title: "Trap de Barranco",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
@@ -45,6 +53,8 @@ export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   },
   {
     id: "sample-5",
+    roles: ["arreglistas", "directores"],
+    isGroup: true,
     profileId: "sample-artist-5",
     title: "Huayno Eléctrico",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
@@ -54,6 +64,8 @@ export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   },
   {
     id: "sample-6",
+    roles: ["compositores", "musicos"],
+    isGroup: false,
     profileId: "sample-artist-6",
     title: "Marea Alta",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
@@ -63,6 +75,8 @@ export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   },
   {
     id: "sample-7",
+    roles: ["mezclas"],
+    isGroup: false,
     profileId: "sample-artist-7",
     title: "Callao 4AM",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
@@ -72,6 +86,8 @@ export const SAMPLE_FEED_TRACKS: FeedTrack[] = [
   },
   {
     id: "sample-8",
+    roles: ["directores", "musicos"],
+    isGroup: false,
     profileId: "sample-artist-8",
     title: "Ámbar",
     audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",

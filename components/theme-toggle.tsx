@@ -18,11 +18,11 @@ export function ThemeToggle() {
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+    <div className="flex h-full items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
       <div>
-        <p className="text-sm font-medium text-white">Modo Oscuro / Modo Claro</p>
-        <p className="text-xs text-zinc-400 mt-0.5 max-w-sm">
-          Elige cómo se ve el panel y tu perfil público en tu navegador. El modo oscuro es el predeterminado.
+        <p className="text-sm font-medium text-foreground">Modo oscuro / claro</p>
+        <p className="mt-0.5 max-w-sm text-xs text-muted-foreground">
+          Cómo se ve el panel y tu perfil público en este navegador.
         </p>
       </div>
       <button
@@ -31,7 +31,7 @@ export function ThemeToggle() {
         aria-checked={theme === "light"}
         onClick={toggle}
         className={`relative flex h-8 w-16 shrink-0 items-center rounded-full transition-colors ${
-          theme === "light" ? "bg-amber-500" : "bg-zinc-700"
+          theme === "light" ? "bg-primary" : "bg-secondary"
         }`}
       >
         <span

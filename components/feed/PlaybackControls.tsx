@@ -1,17 +1,17 @@
 // components/feed/PlaybackControls.tsx
 "use client";
 
-import { Heart, Pause, Play } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 
+// El corazón de "me gusta" ya no vive aquí: se movió al ActionRail lateral
+// (junto a comentarios y compartir), como en TikTok.
 interface PlaybackControlsProps {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
-  isLiked: boolean;
   onTogglePlay: () => void;
   onSeek: (time: number) => void;
-  onToggleLike: () => void;
 }
 
 function formatTime(seconds: number) {
@@ -25,10 +25,8 @@ export default function PlaybackControls({
   isPlaying,
   currentTime,
   duration,
-  isLiked,
   onTogglePlay,
   onSeek,
-  onToggleLike,
 }: PlaybackControlsProps) {
   const { t } = useLocale();
 
@@ -49,16 +47,7 @@ export default function PlaybackControls({
         <span className="w-9 text-xs tabular-nums text-muted-foreground">{formatTime(duration)}</span>
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-6">
-        <button
-          type="button"
-          onClick={onToggleLike}
-          aria-label={isLiked ? t("feed_like_aria_remove") : t("feed_like_aria_add")}
-          className="text-muted-foreground transition-colors hover:text-primary"
-        >
-          <Heart className={`h-6 w-6 ${isLiked ? "fill-primary text-primary" : ""}`} />
-        </button>
-
+      <div className="mt-4 flex items-center justify-center">
         <button
           type="button"
           onClick={onTogglePlay}
@@ -71,8 +60,6 @@ export default function PlaybackControls({
             <Play className="ml-0.5 h-6 w-6 fill-primary-foreground" />
           )}
         </button>
-
-        <div className="h-6 w-6" aria-hidden />
       </div>
     </div>
   );

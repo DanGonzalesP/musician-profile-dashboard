@@ -144,15 +144,35 @@ export async function inviteMember(bandProfileId: string, username: string, role
   const cleanUsername = username.trim().replace(/^@/, "")
   if (!cleanUsername) throw new Error("Escribe un nombre de usuario.")
 
-  const { data: target, error: lookupError } = await supabase
-    .from("profiles")
-    .select("id, user_id, display_name")
-    .eq("profile_type", "artist")
-    .ilike("display_name", cleanUsername.replaceAll("-", " "))
-    .maybeSingle()
+  // El @usuario suele escribirse con guiones ("nova-reyes") pero el
+  // display_name real lleva espacios ("Nova Reyes"). Se prueban ambas
+  // formas y se toma el primer perfil personal con cuenta real — sin
+  // maybeSingle(), que reventaba si dos perfiles compartían nombre.
+  const patterns = [cleanUsername, cleanUsername.replaceAll("-", " ")]
+  let target: { id: string; user_id: string | null; display_name: string | null } | null = null
 
-  if (lookupError) throw lookupError
-  if (!target?.user_id) throw new Error(`No se encontró ningún artista con el usuario @${cleanUsername}.`)
+  for (const pattern of patterns) {
+    const { data, error: lookupError } = await supabase
+      .from("profiles")
+      .select("id, user_id, display_name")
+      .eq("profile_type", "artist")
+      .ilike("display_name", pattern)
+      .limit(5)
+    if (lookupError) throw lookupError
+    target = (data ?? []).find((p) => p.user_id) ?? null
+    if (target) break
+  }
+
+  if (!target?.user_id) {
+    throw new Error(
+      `No se encontró ningún artista con el usuario @${cleanUsername}. Pídele que se registre y elija su nombre de artista en Configuración.`
+    )
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user && target.user_id === user.id) {
+    throw new Error("Ya eres parte del grupo como creador — no necesitas invitarte.")
+  }
 
   const { error } = await supabase.from("band_members").insert({
     band_profile_id: bandProfileId,
@@ -161,7 +181,18 @@ export async function inviteMember(bandProfileId: string, username: string, role
     invited_username: target.display_name,
   })
 
-  if (error) throw error
+  if (error) {
+    // 23505 = unique (band_profile_id, member_user_id): ya estaba invitado.
+    if (error.code === "23505") {
+      throw new Error(`@${cleanUsername} ya tiene una invitación a este grupo.`)
+    }
+    if (error.message.includes("row-level security")) {
+      throw new Error(
+        "Supabase rechazó la invitación: falta correr supabase/setup_decima.sql en el proyecto."
+      )
+    }
+    throw error
+  }
 }
 
 export async function updateMemberRole(membershipId: string, role: "admin" | "editor"): Promise<void> {

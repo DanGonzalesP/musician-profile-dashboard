@@ -129,6 +129,18 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_play_aria: "Reproducir",
     feed_pause_aria: "Pausar",
 
+    feed_comments_title: "Comentarios",
+    feed_comments_open_aria: "Ver comentarios",
+    feed_comments_empty: "Nadie ha comentado todavía. Sé la primera persona en decir algo.",
+    feed_comments_sample: "Esto es contenido de muestra: los comentarios se activan con las canciones reales.",
+    feed_comments_placeholder: "Escribe un comentario…",
+    feed_comments_send: "Enviar comentario",
+    feed_comments_login: "Inicia sesión para comentar",
+    feed_comments_error: "No se pudo publicar el comentario.",
+    feed_share_aria: "Compartir",
+    feed_share_copied: "¡Link copiado!",
+    feed_post_badge: "Publicación",
+
     feed_header_login: "Iniciar Sesión",
     feed_header_register: "Registrarse",
 
@@ -159,6 +171,8 @@ export const dictionaries: Record<Locale, Dict> = {
     auth_error_generic: "Error al registrar el usuario.",
     auth_error_invalid_credentials: "Credenciales inválidas. Por favor, verifica tus datos.",
     auth_success_registered: "¡Cuenta creada con éxito! Ya puedes iniciar sesión.",
+    auth_success_check_email:
+      "¡Cuenta creada! Revisa tu correo y confirma tu dirección para poder iniciar sesión.",
     auth_toggle_to_login: "¿Ya tienes cuenta? Inicia sesión aquí",
     auth_toggle_to_register: "¿No tienes cuenta? Regístrate aquí",
   },
@@ -281,6 +295,18 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_play_aria: "Play",
     feed_pause_aria: "Pause",
 
+    feed_comments_title: "Comments",
+    feed_comments_open_aria: "View comments",
+    feed_comments_empty: "No comments yet. Be the first to say something.",
+    feed_comments_sample: "This is sample content: comments unlock with real songs.",
+    feed_comments_placeholder: "Write a comment…",
+    feed_comments_send: "Send comment",
+    feed_comments_login: "Log in to comment",
+    feed_comments_error: "The comment could not be posted.",
+    feed_share_aria: "Share",
+    feed_share_copied: "Link copied!",
+    feed_post_badge: "Post",
+
     feed_header_login: "Log In",
     feed_header_register: "Sign Up",
 
@@ -311,6 +337,8 @@ export const dictionaries: Record<Locale, Dict> = {
     auth_error_generic: "Error creating the account.",
     auth_error_invalid_credentials: "Invalid credentials. Please check your details.",
     auth_success_registered: "Account created successfully! You can now log in.",
+    auth_success_check_email:
+      "Account created! Check your email and confirm your address before logging in.",
     auth_toggle_to_login: "Already have an account? Log in here",
     auth_toggle_to_register: "Don't have an account? Sign up here",
   },

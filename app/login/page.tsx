@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { ensureOwnProfile } from "@/lib/ensure-profile";
 import { useLocale } from "@/components/locale-provider";
 import { LogoMark } from "@/components/logo";
 
@@ -34,21 +35,30 @@ function LoginForm() {
     setExitoMensaje("");
 
     if (isRegistering) {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) {
         setErrorMensaje(error.message || t("auth_error_generic"));
         setLoading(false);
+      } else if (data.session && data.user) {
+        // Confirmación de correo desactivada: la sesión ya existe. Se crea
+        // la fila de perfil de inmediato y la cuenta entra directo al panel.
+        await ensureOwnProfile(data.user);
+        router.push("/dashboard");
       } else {
-        setExitoMensaje(t("auth_success_registered"));
+        // Confirmación de correo activada: hay que revisar la bandeja antes
+        // de poder iniciar sesión (el perfil lo crea el trigger de la DB).
+        setExitoMensaje(t("auth_success_check_email"));
         setIsRegistering(false);
         setLoading(false);
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         setErrorMensaje(t("auth_error_invalid_credentials"));
         setLoading(false);
       } else {
+        // Red de seguridad para cuentas creadas antes del trigger de la DB.
+        if (data.user) await ensureOwnProfile(data.user);
         router.push("/dashboard");
       }
     }
