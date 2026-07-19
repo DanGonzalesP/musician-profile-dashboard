@@ -51,6 +51,11 @@ export type Album = {
   releaseType?: ReleaseType
   genre?: string
   year?: string
+  // Hasta 3 descripciones del álbum completo (no de una pista puntual) que
+  // rotan en carrusel en el panel expandido — ej. una sobre el concepto
+  // general, otra sobre el proceso de grabación, otra sobre a quién va
+  // dirigido. Todas opcionales y las completa el propio artista.
+  descriptions?: string[]
 }
 
 export type HeroData = {
@@ -542,6 +547,7 @@ function normalizeAlbum(raw: unknown, index: number): Album {
     releaseType: RELEASE_TYPES.includes(a.releaseType as ReleaseType) ? (a.releaseType as ReleaseType) : "album",
     genre: String(a.genre ?? ""),
     year: String(a.year ?? ""),
+    descriptions: Array.isArray(a.descriptions) ? a.descriptions.map((d) => String(d ?? "")) : undefined,
   }
 }
 

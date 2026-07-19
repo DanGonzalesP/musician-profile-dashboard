@@ -25,8 +25,9 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
   const [duration, setDuration] = useState(0);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  // Pista cuyo panel de comentarios está abierto (null = cerrado).
-  const [commentsTrack, setCommentsTrack] = useState<FeedTrack | null>(null);
+  // En escritorio el panel de comentarios está siempre abierto y sigue a la
+  // pista activa; en móvil este estado controla la hoja inferior.
+  const [mobileCommentsOpen, setMobileCommentsOpen] = useState(false);
 
   const activeItem = items[activeIndex];
   const activeTrack = activeItem?.kind === "track" ? activeItem.track : null;
@@ -149,46 +150,49 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className="h-dvh w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth"
-    >
-      <audio ref={audioRef} preload="auto" />
-      {items.map((item, index) =>
-        item.kind === "track" ? (
-          <TrackScreen
-            key={item.id}
-            ref={registerSection(index)}
-            track={item.track}
-            isSample={isSampleFeed}
-            isActive={index === activeIndex}
-            isPlaying={index === activeIndex && isPlaying}
-            currentTime={index === activeIndex ? currentTime : 0}
-            duration={index === activeIndex ? duration : item.track.durationSeconds ?? 0}
-            isLiked={likedIds.has(item.id)}
-            commentCount={commentCounts[item.track.id] ?? 0}
-            onTogglePlay={togglePlay}
-            onSeek={seek}
-            onToggleLike={() => toggleLike(item.id)}
-            onOpenComments={() => setCommentsTrack(item.track)}
-          />
-        ) : (
-          <PostScreen
-            key={item.id}
-            ref={registerSection(index)}
-            post={item.post}
-            isActive={index === activeIndex}
-            isLiked={likedIds.has(item.id)}
-            onToggleLike={() => toggleLike(item.id)}
-          />
-        )
-      )}
+    <div className="flex h-dvh w-full">
+      <div
+        ref={containerRef}
+        className="h-dvh min-w-0 flex-1 snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth"
+      >
+        <audio ref={audioRef} preload="auto" />
+        {items.map((item, index) =>
+          item.kind === "track" ? (
+            <TrackScreen
+              key={item.id}
+              ref={registerSection(index)}
+              track={item.track}
+              isSample={isSampleFeed}
+              isActive={index === activeIndex}
+              isPlaying={index === activeIndex && isPlaying}
+              currentTime={index === activeIndex ? currentTime : 0}
+              duration={index === activeIndex ? duration : item.track.durationSeconds ?? 0}
+              isLiked={likedIds.has(item.id)}
+              commentCount={commentCounts[item.track.id] ?? 0}
+              onTogglePlay={togglePlay}
+              onSeek={seek}
+              onToggleLike={() => toggleLike(item.id)}
+              onOpenComments={() => setMobileCommentsOpen(true)}
+            />
+          ) : (
+            <PostScreen
+              key={item.id}
+              ref={registerSection(index)}
+              post={item.post}
+              isActive={index === activeIndex}
+              isLiked={likedIds.has(item.id)}
+              onToggleLike={() => toggleLike(item.id)}
+            />
+          )
+        )}
+      </div>
 
       <CommentsPanel
-        trackId={commentsTrack?.id ?? null}
-        trackTitle={commentsTrack ? `${commentsTrack.title} — ${commentsTrack.artistName}` : ""}
+        trackId={activeTrack?.id ?? null}
+        trackTitle={activeTrack ? `${activeTrack.title} — ${activeTrack.artistName}` : ""}
         isSample={isSampleFeed}
-        onClose={() => setCommentsTrack(null)}
+        mobileOpen={mobileCommentsOpen}
+        onCloseMobile={() => setMobileCommentsOpen(false)}
         onCountChange={handleCountChange}
       />
     </div>

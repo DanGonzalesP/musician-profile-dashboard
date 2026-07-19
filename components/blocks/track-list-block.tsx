@@ -61,6 +61,45 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`
 }
 
+const ALBUM_DESCRIPTION_ROTATE_MS = 6000
+
+function AlbumDescriptionCarousel({ descriptions }: { descriptions: string[] }) {
+  const { t } = useLocale()
+  const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    setIndex(0)
+    if (descriptions.length <= 1) return
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % descriptions.length)
+    }, ALBUM_DESCRIPTION_ROTATE_MS)
+    return () => clearInterval(interval)
+  }, [descriptions])
+
+  if (descriptions.length === 0) return null
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {t("album_about_title")}
+      </p>
+      <p key={index} className="animate-fade-in text-xs leading-relaxed text-muted-foreground">
+        {descriptions[index]}
+      </p>
+      {descriptions.length > 1 && (
+        <div className="mt-2 flex justify-center gap-1.5">
+          {descriptions.map((_, i) => (
+            <span
+              key={i}
+              className={`h-1.5 w-1.5 rounded-full transition-colors ${i === index ? "bg-primary" : "bg-muted"}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TypewriterText({ text }: { text: string }) {
   const [visibleChars, setVisibleChars] = useState(0)
 
@@ -523,6 +562,10 @@ export function TrackListBlock({ data }: { data: TracksData }) {
               )}
             </div>
           )}
+
+          <AlbumDescriptionCarousel
+            descriptions={(activeAlbum.descriptions || []).map((d) => d.trim()).filter(Boolean)}
+          />
         </div>
       )}
     </div>

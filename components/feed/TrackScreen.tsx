@@ -64,12 +64,6 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
       )}
 
       <div className="flex w-full max-w-sm flex-col items-center gap-6 sm:max-w-md">
-        {isSample && (
-          <span className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
-            {t("feed_sample_badge")}
-          </span>
-        )}
-
         <VinylCover coverImageUrl={track.coverImageUrl} isActive={isActive} isPlaying={isPlaying} onTap={onTogglePlay} />
 
         <div className="w-full text-center">

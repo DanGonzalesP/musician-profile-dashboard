@@ -8,6 +8,7 @@ import { type CatalogProduct, type CatalogService, newProduct, newService } from
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchYoutubeMetadata } from "@/lib/youtube"
+import { MUSICIAN_ROLES } from "@/lib/musician-roles"
 import { X, Trash2, Upload, Loader2, Plus, Music, Heart, Play, Pause, Disc3, Rocket, ArrowLeft, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { LegadoFields } from "@/components/inspector/legado-fields"
 import { PublicacionesFields } from "@/components/inspector/publicaciones-fields"
@@ -427,6 +428,45 @@ function SocialLinksFields({
   )
 }
 
+const ROLE_TAG_SEPARATOR = " · "
+
+function RoleTagPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const selectedLabels = value
+    .split(ROLE_TAG_SEPARATOR)
+    .map((label) => label.trim())
+    .filter(Boolean)
+
+  const toggleRole = (label: string) => {
+    const next = selectedLabels.includes(label)
+      ? selectedLabels.filter((l) => l !== label)
+      : [...selectedLabels, label]
+    onChange(next.join(ROLE_TAG_SEPARATOR))
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {MUSICIAN_ROLES.map((role) => {
+        const active = selectedLabels.includes(role.label)
+        return (
+          <button
+            key={role.id}
+            type="button"
+            title={role.description}
+            onClick={() => toggleRole(role.label)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              active
+                ? "border-primary/50 bg-primary/15 text-primary"
+                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            }`}
+          >
+            {role.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function HeroFields({
   data,
   onChange,
@@ -455,12 +495,10 @@ function HeroFields({
           blobRegistry={blobRegistry}
         />
       </Field>
-      <Field label="Frase de presentación">
-        <textarea
+      <Field label="¿Qué haces?">
+        <RoleTagPicker
           value={data.tagline || ""}
-          onChange={(e) => onChange({ ...data, tagline: e.target.value })}
-          rows={3}
-          className={inputClass}
+          onChange={(tagline) => onChange({ ...data, tagline })}
         />
       </Field>
       <Field label="Ubicación">
@@ -1099,6 +1137,31 @@ function TracksFields({
                 <p className="text-[11px] italic text-muted-foreground">Este álbum no tiene pistas todavía.</p>
               )}
             </div>
+
+            <div className="border-t border-sidebar-border pt-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Descripciones del álbum
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Hasta 3 textos sobre el álbum completo (no una pista puntual). En el perfil rotan en carrusel.
+              </p>
+              <div className="mt-2 space-y-2">
+                {ALBUM_DESCRIPTION_PLACEHOLDERS.map((placeholder, i) => (
+                  <textarea
+                    key={i}
+                    value={activeAlbum.descriptions?.[i] || ""}
+                    onChange={(e) => {
+                      const next = [...(activeAlbum.descriptions || ["", "", ""])]
+                      next[i] = e.target.value
+                      setAlbum(activeAlbumIndex, { descriptions: next })
+                    }}
+                    rows={2}
+                    className={inputClass}
+                    placeholder={placeholder}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         )}
         {albums.length === 0 && (
@@ -1108,6 +1171,12 @@ function TracksFields({
     </>
   )
 }
+
+const ALBUM_DESCRIPTION_PLACEHOLDERS = [
+  "Ej. concepto del álbum: de qué trata en conjunto, qué historia cuenta de principio a fin...",
+  "Ej. proceso de creación: dónde y cómo se grabó, con quién se hizo, cuánto tardó...",
+  "Ej. a quién va dirigido o qué querés que sienta quien lo escuche completo...",
+]
 
 // ─── CatalogFields — Bloque 3: carrusel de Álbumes/EPs/Singles ────────────
 // Reutiliza el mismo tipo Album/Track del bloque "tracks" (extendido con
