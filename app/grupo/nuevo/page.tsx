@@ -108,7 +108,15 @@ export default function NuevoGrupoPage() {
       setInviteWarnings(warnings)
       setCreatedGroupId(groupId)
     } catch (err) {
-      const raw = err instanceof Error ? err.message : ""
+      // Los errores de Supabase (PostgrestError) no son instancias de Error,
+      // así que había que leer .message directo del objeto o se perdía el
+      // motivo real y siempre se mostraba el mensaje genérico de abajo.
+      const raw =
+        err instanceof Error
+          ? err.message
+          : err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : ""
       // El error típico de RLS de Supabase es críptico — se traduce a algo accionable.
       setErrorMessage(
         raw.includes("row-level security")

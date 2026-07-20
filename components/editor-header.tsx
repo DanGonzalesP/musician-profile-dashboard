@@ -1,11 +1,13 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Layers, Users } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ProfileSwitcher } from "@/components/profile-switcher"
 import { Logo } from "@/components/logo"
+import { supabase } from "@/lib/supabase"
 import type { BandRole } from "@/lib/bands"
 
 export function EditorHeader({
@@ -29,6 +31,23 @@ export function EditorHeader({
   // pública real una vez publicada. Si todavía no hay slug (nunca se
   // publicó), cae de respaldo al draft de /perfil/preview.
   const previewHref = publicSlug ? `/${publicSlug}` : "/perfil/preview"
+
+  // "Grupos" solo se muestra si el artista ya creó más de un grupo musical
+  // — igual que en el panel (ver LayoutAdmin.tsx).
+  const [ownedBandCount, setOwnedBandCount] = useState(0)
+  useEffect(() => {
+    async function cargarBandas() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { count } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_user_id", user.id)
+        .eq("profile_type", "band")
+      setOwnedBandCount(count ?? 0)
+    }
+    cargarBandas()
+  }, [])
 
   return (
     <header className="glass-panel sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-sidebar-border px-4 py-3">
@@ -63,16 +82,18 @@ export function EditorHeader({
       </div>
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/"
+          href="/perfil/dashboard"
           className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
         >
           <ArrowLeft className="size-3.5" />
-          Volver al Feed
+          Volver al Panel
         </Link>
-        <Link href="/perfil/banda" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
-          <Users className="size-3.5" />
-          Grupos
-        </Link>
+        {ownedBandCount > 1 && (
+          <Link href="/perfil/banda" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
+            <Users className="size-3.5" />
+            Grupos
+          </Link>
+        )}
         <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
           Panel Admin
         </Link>

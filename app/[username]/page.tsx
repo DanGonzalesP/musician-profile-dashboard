@@ -162,20 +162,24 @@ function PerfilPublicoContent() {
     return () => controller.abort();
   }, [username]);
 
-  const backToFeedButton = (
-    <Link
-      href="/"
-      className="fixed left-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
-    >
-      <ArrowLeft className="size-3.5" />
-      {t("auth_back_to_feed")}
-    </Link>
-  );
-
   // Solo el dueño del perfil lo ve — cierra el loop que abre "Vista previa"
   // en el editor: esa vista abre esta misma página pública en una pestaña
   // nueva, y hasta ahora no había forma de volver al panel desde ahí.
   const isOwner = Boolean(ownerUserId && viewerUserId && ownerUserId === viewerUserId);
+
+  // Si es el propio artista viendo su portal público (ej. desde "Vista
+  // previa" del editor), la flecha vuelve a su panel en vez del feed
+  // principal — a cualquier otro visitante sí lo manda al feed.
+  const backToFeedButton = (
+    <Link
+      href={isOwner ? "/perfil/dashboard" : "/"}
+      className="fixed left-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
+    >
+      <ArrowLeft className="size-3.5" />
+      {isOwner ? "Volver al panel de artista" : t("auth_back_to_feed")}
+    </Link>
+  );
+
   const editPanelButton = isOwner ? (
     <Link
       href="/dashboard"

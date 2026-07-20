@@ -436,6 +436,13 @@ function RoleTagPicker({ value, onChange }: { value: string; onChange: (value: s
     .map((label) => label.trim())
     .filter(Boolean)
 
+  const knownLabels = MUSICIAN_ROLES.map((r) => r.label)
+  // Texto viejo (ej. taglines escritas a mano antes de este picker) que no
+  // coincide con ningún rol conocido — los botones de abajo no pueden
+  // quitarlo porque solo hacen toggle de labels exactos, así que se muestra
+  // aparte con su propia "x" para poder limpiarlo.
+  const strayLabels = selectedLabels.filter((l) => !knownLabels.includes(l))
+
   const toggleRole = (label: string) => {
     const next = selectedLabels.includes(label)
       ? selectedLabels.filter((l) => l !== label)
@@ -443,26 +450,55 @@ function RoleTagPicker({ value, onChange }: { value: string; onChange: (value: s
     onChange(next.join(ROLE_TAG_SEPARATOR))
   }
 
+  const removeStray = (label: string) => {
+    onChange(selectedLabels.filter((l) => l !== label).join(ROLE_TAG_SEPARATOR))
+  }
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {MUSICIAN_ROLES.map((role) => {
-        const active = selectedLabels.includes(role.label)
-        return (
+    <div className="space-y-2">
+      {strayLabels.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {strayLabels.map((label) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => removeStray(label)}
+              title="Quitar este texto"
+              className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive"
+            >
+              {label}
+              <X className="size-3" />
+            </button>
+          ))}
           <button
-            key={role.id}
             type="button"
-            title={role.description}
-            onClick={() => toggleRole(role.label)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-              active
-                ? "border-primary/50 bg-primary/15 text-primary"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-            }`}
+            onClick={() => onChange(selectedLabels.filter((l) => knownLabels.includes(l)).join(ROLE_TAG_SEPARATOR))}
+            className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
-            {role.label}
+            Borrar todo el texto anterior
           </button>
-        )
-      })}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {MUSICIAN_ROLES.map((role) => {
+          const active = selectedLabels.includes(role.label)
+          return (
+            <button
+              key={role.id}
+              type="button"
+              title={role.description}
+              onClick={() => toggleRole(role.label)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                active
+                  ? "border-primary/50 bg-primary/15 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {role.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

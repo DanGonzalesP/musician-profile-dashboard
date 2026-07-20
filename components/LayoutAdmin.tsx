@@ -10,7 +10,6 @@ import {
   Briefcase,
   Globe,
   LogOut,
-  Music,
   Package,
   Palette,
   Scale,
@@ -27,6 +26,9 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [publicSlug, setPublicSlug] = useState("");
+  // "Grupos Musicales" solo se muestra si el artista ya creó más de un
+  // grupo — con uno solo (el caso normal) el link sobra en el panel.
+  const [ownedBandCount, setOwnedBandCount] = useState(0);
 
   useEffect(() => {
     async function cargarPerfil() {
@@ -53,6 +55,15 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
       }
 
       setPublicSlug(name.trim().toLowerCase().replace(/\s+/g, "-"));
+
+      if (user) {
+        const { count } = await supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_user_id", user.id)
+          .eq("profile_type", "band");
+        setOwnedBandCount(count ?? 0);
+      }
     }
     cargarPerfil();
   }, []);
@@ -61,12 +72,11 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     { name: "Editor de Página", href: "/dashboard", icon: Palette },
     { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: Globe },
     { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: BarChart3 },
-    { name: "Grupos Musicales", href: "/perfil/banda", icon: Users },
+    ...(ownedBandCount > 1 ? [{ name: "Grupos Musicales", href: "/perfil/banda", icon: Users }] : []),
     { name: "Notificaciones de Créditos", href: "/perfil/notificaciones", icon: Bell },
     { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: Package },
     { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: Shirt },
     { name: "Gestionar Servicios", href: "/perfil/admin-servicios", icon: Briefcase },
-    { name: "Feed de Música", href: "/perfil/admin-musica", icon: Music },
     { name: "Herramientas Legales", href: "/perfil/legal", icon: Scale },
     { name: "Configurar Perfil", href: "/perfil/config", icon: Settings },
   ];

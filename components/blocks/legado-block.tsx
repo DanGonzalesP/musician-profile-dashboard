@@ -17,11 +17,11 @@ import {
   GraduationCap,
   Guitar,
   Heart,
+  History,
   MapPin,
   Music2,
   Newspaper,
   Quote,
-  Sparkles,
   Ticket,
   Trophy,
   type LucideIcon,
@@ -298,7 +298,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full bg-primary/15 blur-[80px]"
                 />
-                <Eyebrow icon={Sparkles}>Trayectoria</Eyebrow>
+                <Eyebrow icon={History}>Trayectoria</Eyebrow>
                 <div style={{ transform: "translateZ(30px)" }}>
                   <Quote className="mt-6 size-8 text-primary/40 sm:size-10" />
                   <p className="mt-2 text-balance font-display text-2xl font-bold leading-tight text-foreground sm:text-4xl">
