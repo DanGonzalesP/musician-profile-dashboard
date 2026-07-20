@@ -1,8 +1,8 @@
 import { supabase } from "@/lib/supabase"
 
-// Búsqueda de canciones ya publicadas en la plataforma (bloques "tracks" y
-// "catalog" de CUALQUIER artista) para la opción "Colaboración con artista de
-// la plataforma" del Bloque 4. No hay una tabla normalizada de canciones —
+// Búsqueda de canciones ya publicadas en la plataforma (bloque "tracks" de
+// CUALQUIER artista) para la opción "Colaboración con artista de la
+// plataforma" del Bloque 4. No hay una tabla normalizada de canciones —
 // viven dentro del content JSONB de profile_blocks — así que se trae el
 // contenido visible de esos bloques y se filtra en el cliente. Para el
 // tamaño actual de la plataforma es suficiente; si el catálogo crece mucho
@@ -30,7 +30,7 @@ export async function searchPlatformSongs(query: string, excludeProfileId?: stri
   const { data, error } = await supabase
     .from("profile_blocks")
     .select("id, profile_id, content, profiles!inner(display_name)")
-    .in("block_type", ["tracks", "catalog"])
+    .in("block_type", ["tracks"])
     .eq("is_visible", true)
 
   if (error) throw error

@@ -23,7 +23,7 @@ type TabKey = "main" | "legado" | "publicaciones" | "store";
 // bloque de ese tipo. Merch y Servicios quedan en "Tienda", al final. Si el
 // artista activa "Unificar perfil" (profiles.unified_profile), se muestran
 // todos los bloques juntos en position_index, sin pestañas.
-const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "catalog", "credits", "donation"];
+const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "credits"];
 const EXTRA_TAB_TYPES: BlockType[] = ["legado", "publicaciones", "embeds"];
 
 export default function PerfilPublicoPage() {

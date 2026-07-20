@@ -13,7 +13,7 @@ function daysRemainingLabel(
   // Solo se llama cuando count > 0 (ver el guard "daysLeft > 0 &&" en el
   // punto de uso) — daysLeft es un número estático que pone el artista, no
   // una fecha límite, así que aquí no existe el caso "0 días = último día"
-  // ni "negativo = campaña finalizada" que sí tiene donation-block.tsx.
+  // ni "negativo = campaña finalizada".
   if (count === 1) return t("donation_day_one", { count: String(count) });
   return t("donation_day_other", { count: String(count) });
 }

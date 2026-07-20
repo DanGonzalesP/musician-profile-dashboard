@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Heart, Disc3, Rocket, Library, Users, Sparkles, GalleryHorizontalEnd } from "lucide-react"
+import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Disc3, Rocket, Users, Sparkles, GalleryHorizontalEnd } from "lucide-react"
 
 export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -8,11 +8,9 @@ export type BlockType =
   | "single"
   | "crowdfunding"
   | "tracks"
-  | "catalog"
   | "credits"
   | "merch"
   | "service"
-  | "donation"
   | "legado"
   | "publicaciones"
   | "embeds"
@@ -44,10 +42,9 @@ export type Album = {
   cover: string
   tracks: Track[]
   isExample?: boolean
-  // Campos usados por el bloque "catalog" (Bloque 3, carrusel de
-  // Álbumes/EPs/Singles) — quedan opcionales porque el bloque "tracks" ya
-  // existente sigue guardando Album sin ellos y no los necesita para nada.
-  // Un item "single" siempre trae exactamente 1 track en `tracks`.
+  // Metadata opcional que el bloque "tracks" muestra por álbum (género/año,
+  // descripciones rotativas). Un item "single" siempre trae exactamente 1
+  // track en `tracks`.
   releaseType?: ReleaseType
   genre?: string
   year?: string
@@ -74,10 +71,6 @@ export type TracksData = {
   albums: Album[]
 }
 
-export type CatalogData = {
-  albums: Album[]
-}
-
 export type CreditRole = "A" | "C" | "P" | "R" | "M" | "V" | "I"
 
 // "internal": colaboración en una canción de otro artista de la plataforma —
@@ -94,8 +87,15 @@ export type CreditItem = {
   title: string
   mainArtist: string
   role: CreditRole
-  // URL de YouTube — solo aplica cuando sourceType es "external".
+  // Enlace externo — solo aplica cuando sourceType es "external". Soporta
+  // YouTube, Spotify, SoundCloud, TikTok, Facebook e Instagram; la
+  // plataforma se detecta a partir de la URL (ver lib/oembed.ts), no se
+  // guarda por separado.
   externalUrl?: string
+  // Portada del carrusel vertical de créditos — la sube el artista o se
+  // autocompleta con la miniatura que devuelve el oEmbed del enlace externo
+  // (el artista puede reemplazarla subiendo la suya).
+  image?: string
   // "external" siempre queda "accepted" (no requiere aprobación de nadie).
   // "internal" nace "pending" y solo el dueño de la canción puede pasarlo a
   // "accepted"/"rejected" — ver resolveCreditRequest en lib/credit-requests.ts.
@@ -129,8 +129,8 @@ export type CrowdfundingData = {
   targetAmount: string
   // currentAmount, backerCount y hypeCount son bases de referencia: el fan
   // ve el total sumando sus propias interacciones de la sesión encima de
-  // esta base, pero esos incrementos nunca se guardan (misma simulación sin
-  // pasarela real que ya usa DonationData.currentAmount).
+  // esta base, pero esos incrementos nunca se guardan (simulación sin
+  // pasarela real).
   currentAmount: string
   daysLeft: string
   chosenStudio: string
@@ -144,17 +144,6 @@ export type MerchData = {
 
 export type ServiceData = {
   title: string
-}
-
-export type DonationData = {
-  title: string
-  description: string
-  buttonText: string
-  goalAmount: string
-  currency: string
-  // Monto acumulado y fecha límite de la campaña de apoyo (estilo Kickstarter).
-  currentAmount: string
-  deadline: string
 }
 
 // ─── Bloque "legado" — trayectoria del artista (reemplaza al "CV" genérico) ─
@@ -322,11 +311,9 @@ export type BlockData =
   | SingleData
   | CrowdfundingData
   | TracksData
-  | CatalogData
   | CreditsData
   | MerchData
   | ServiceData
-  | DonationData
   | LegadoData
   | PublicacionesData
   | EmbedsData
@@ -375,13 +362,6 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     category: "Music",
   },
   {
-    type: "catalog",
-    label: "Catálogo de Lanzamientos",
-    description: "Carrusel horizontal con tus álbumes, EPs y singles anteriores.",
-    icon: Library,
-    category: "Music",
-  },
-  {
     type: "credits",
     label: "Créditos y Colaboraciones",
     description: "Canciones de otros artistas en las que participaste, con tu rol exacto.",
@@ -414,13 +394,6 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     label: "Servicios",
     description: "Ofrece clases, sesiones y reservas.",
     icon: GraduationCap,
-    category: "Commerce",
-  },
-  {
-    type: "donation",
-    label: "Campaña de Apoyo",
-    description: "Deja que tus fans te apoyen directamente con un botón de aportes.",
-    icon: Heart,
     category: "Commerce",
   },
 ]
@@ -495,8 +468,6 @@ export function normalizeBlockData(
       }
       return { albums: [] }
     }
-    case "catalog":
-      return { albums: Array.isArray(content.albums) ? content.albums.map((a, i) => normalizeAlbum(a, i)) : [] }
     case "credits":
       return { credits: Array.isArray(content.credits) ? content.credits.map((c, i) => normalizeCreditItem(c, i)) : [] }
     case "single":
@@ -527,16 +498,6 @@ export function normalizeBlockData(
     case "service":
       return {
         title: String(content.title ?? ""),
-      }
-    case "donation":
-      return {
-        title: String(content.title ?? ""),
-        description: String(content.description ?? ""),
-        buttonText: String(content.buttonText ?? "Apoyar"),
-        goalAmount: String(content.goalAmount ?? ""),
-        currency: String(content.currency ?? "USD"),
-        currentAmount: String(content.currentAmount ?? "0"),
-        deadline: content.deadline ? String(content.deadline) : "",
       }
     case "legado":
       return {
@@ -631,6 +592,7 @@ function normalizeCreditItem(raw: unknown, index: number): CreditItem {
     mainArtist: String(c.mainArtist ?? ""),
     role: CREDIT_ROLES.includes(c.role as CreditRole) ? (c.role as CreditRole) : "M",
     externalUrl: c.externalUrl ? String(c.externalUrl) : undefined,
+    image: c.image ? String(c.image) : undefined,
     status,
     requestId: c.requestId ? String(c.requestId) : undefined,
     ownerProfileId: c.ownerProfileId ? String(c.ownerProfileId) : undefined,
@@ -760,11 +722,6 @@ export function dbBlockToBlock(dbBlock: DbProfileBlock, opts?: { isBand?: boolea
 
 function defaultData(type: BlockType): BlockData {
   switch (type) {
-    case "catalog":
-      // Sin álbumes de ejemplo a propósito, igual que "single" y
-      // "crowdfunding" — el carrusel público debe quedar vacío hasta que el
-      // artista cargue su catálogo real.
-      return { albums: [] }
     case "credits":
       return { credits: [] }
     case "crowdfunding":
@@ -881,16 +838,6 @@ function defaultData(type: BlockType): BlockData {
     case "service":
       return {
         title: "Lessons & Sessions",
-      }
-    case "donation":
-      return {
-        title: "Apoya Mi Música",
-        description: "Cada aporte me ayuda a crear más música, girar y conectar con fans como tú.",
-        buttonText: "Apoyar",
-        goalAmount: "1000",
-        currency: "USD",
-        currentAmount: "0",
-        deadline: "",
       }
     case "legado":
       return {

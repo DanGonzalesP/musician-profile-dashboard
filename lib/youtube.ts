@@ -1,6 +1,7 @@
-// Utilidades para el crédito "Externo (YouTube)" del Bloque 4: extraer el
-// videoId de cualquier formato de enlace de YouTube y consultar su oEmbed
-// público (sin API key) para autocompletar título/canal.
+// Utilidades para resolver el videoId de cualquier formato de enlace de
+// YouTube y construir su URL de embed — usado por los bloques que reproducen
+// YouTube en vivo (Publicaciones/Embeds, Créditos y Colaboraciones vía
+// lib/oembed.ts).
 
 function extractYoutubeVideoId(url: string): string | null {
   try {
@@ -20,25 +21,4 @@ function extractYoutubeVideoId(url: string): string | null {
 export function getYoutubeEmbedUrl(url: string): string | null {
   const videoId = extractYoutubeVideoId(url)
   return videoId ? `https://www.youtube.com/embed/${videoId}` : null
-}
-
-export type YoutubeMetadata = {
-  videoId: string
-  title: string
-  authorName: string
-}
-
-export async function fetchYoutubeMetadata(url: string): Promise<YoutubeMetadata | null> {
-  const videoId = extractYoutubeVideoId(url)
-  if (!videoId) return null
-
-  const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url.trim())}&format=json`)
-  if (!res.ok) return null
-
-  const data = (await res.json()) as { title?: string; author_name?: string }
-  return {
-    videoId,
-    title: String(data.title ?? ""),
-    authorName: String(data.author_name ?? ""),
-  }
 }

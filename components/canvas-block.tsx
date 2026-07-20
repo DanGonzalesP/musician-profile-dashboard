@@ -118,19 +118,15 @@ export function CanvasBlock({
       )}
 
       {/* Live preview content (non-interactive selection surface, salvo
-          "tracks", "single" y "catalog" que necesitan el mini-reproductor,
-          "credits" que necesita poder abrir sus enlaces externos, "hero"
-          que necesita el botón de Compartir clicable, y "donation" que
-          necesita el botón de Apoyar para poder probar el flujo de pago
-          simulado) */}
+          "tracks" y "single" que necesitan el mini-reproductor, "credits"
+          que necesita poder abrir sus enlaces/embeds externos, y "hero"
+          que necesita el botón de Compartir clicable) */}
       <div
         className={`overflow-hidden rounded-xl ${
           block.type === "tracks" ||
           block.type === "single" ||
-          block.type === "catalog" ||
           block.type === "credits" ||
-          block.type === "hero" ||
-          block.type === "donation"
+          block.type === "hero"
             ? ""
             : "pointer-events-none"
         }`}

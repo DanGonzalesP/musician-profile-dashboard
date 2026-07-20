@@ -106,20 +106,6 @@ export function ServiceSkeleton() {
   )
 }
 
-export function DonationSkeleton() {
-  return (
-    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
-      <Bone className="mb-3 h-3 w-40" />
-      <Bone className="mb-2 h-5 w-48" />
-      <Bone className="mb-1.5 h-3.5 w-full" />
-      <Bone className="mb-4 h-3.5 w-2/3" />
-      <Bone className="mb-2 h-1.5 w-full rounded-full" />
-      <Bone className="mb-4 h-3 w-1/2" />
-      <Bone className="h-9 w-28 rounded-full" />
-    </div>
-  )
-}
-
 /**
  * Skeleton de página completa — imita el orden por defecto de bloques
  * (hero + tracks + merch) que usa createBlock al inicializar un perfil.
