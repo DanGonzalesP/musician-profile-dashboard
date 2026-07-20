@@ -76,7 +76,7 @@ function BuyButton({ product, big = false }: { product: CatalogProduct; big?: bo
 }
 
 function VariantChips({ product, max = 6 }: { product: CatalogProduct; max?: number }) {
-  const group = product.variants[0]
+  const group = product.variants?.[0]
   if (!group || group.options.length === 0) return null
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -165,7 +165,7 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
         >
           <div className="grid md:grid-cols-2">
             <div className="relative aspect-square overflow-hidden md:aspect-auto md:min-h-72">
-              {featured.images[0] ? (
+              {featured.images?.[0] ? (
                 <img
                   src={featured.images[0]}
                   alt={featured.name}
@@ -220,7 +220,7 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
               className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-background/40 transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_16px_40px_-16px_var(--primary)]"
             >
               <div className="relative aspect-square overflow-hidden">
-                {product.images[0] ? (
+                {product.images?.[0] ? (
                   <img
                     src={product.images[0]}
                     alt={product.name}
@@ -234,7 +234,7 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
                 <div className="absolute left-2 top-2">
                   <StockBadge product={product} />
                 </div>
-                {product.images[1] && (
+                {product.images?.[1] && (
                   <img
                     src={product.images[1]}
                     alt=""

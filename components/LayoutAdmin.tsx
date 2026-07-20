@@ -91,11 +91,11 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
       <aside className="glass-panel w-full shrink-0 border-b border-sidebar-border p-6 flex flex-col justify-between md:w-64 md:border-b-0 md:border-r">
         <div className="space-y-6">
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            Volver al Feed
+            Volver al Editor de Página
           </Link>
           <div className="space-y-3">
             <Logo showWordmark={false} markClassName="size-8" />

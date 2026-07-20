@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID } from "@/lib/blocks"
-import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog } from "@/lib/catalog"
+import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog"
 import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
@@ -340,8 +340,16 @@ export function ProfileEditor() {
               data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"],
             }))
           setBlocks(mergePublicacionesEmbeds(cleanBlocks))
-          setProducts((draft.products ?? []).map((p) => stripDeadBlobUrls(p as unknown as Record<string, unknown>) as unknown as CatalogProduct))
-          setServices((draft.services ?? []).map((s) => stripDeadBlobUrls(s as unknown as Record<string, unknown>) as unknown as CatalogService))
+          setProducts(
+            (draft.products ?? []).map((p) =>
+              normalizeDraftProduct(stripDeadBlobUrls(p as unknown as Record<string, unknown>))
+            )
+          )
+          setServices(
+            (draft.services ?? []).map((s) =>
+              normalizeDraftService(stripDeadBlobUrls(s as unknown as Record<string, unknown>))
+            )
+          )
         } else {
           const { data: dbBlocks, error } = await supabase
             .from("profile_blocks")

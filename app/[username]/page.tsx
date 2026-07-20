@@ -11,7 +11,7 @@ import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, Home, ArrowLeft, LayoutDashboard, Sparkles, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
+import { Store, ArrowLeft, LayoutDashboard, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 type TabKey = "main" | "legado" | "publicaciones" | "store";
@@ -250,8 +250,8 @@ function PerfilPublicoContent() {
   // Cada pestaña extra (Legado/Publicaciones/Embeds/Tienda) solo existe si
   // el artista tiene contenido de ese tipo — "Inicio" siempre está presente.
   const tabs: { key: TabKey; label: string; icon: LucideIcon; blocks: Block[] }[] = [
-    { key: "main", label: t("tab_home"), icon: Home, blocks: mainBlocks },
-    ...(legadoBlocks.length > 0 ? [{ key: "legado" as const, label: t("tab_legado"), icon: Sparkles, blocks: legadoBlocks }] : []),
+    { key: "main", label: t("tab_home"), icon: Sparkles, blocks: mainBlocks },
+    ...(legadoBlocks.length > 0 ? [{ key: "legado" as const, label: t("tab_legado"), icon: Milestone, blocks: legadoBlocks }] : []),
     ...(publicacionesBlocks.length > 0
       ? [{ key: "publicaciones" as const, label: t("tab_publicaciones"), icon: GalleryHorizontalEnd, blocks: publicacionesBlocks }]
       : []),

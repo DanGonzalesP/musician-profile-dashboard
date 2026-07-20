@@ -152,7 +152,7 @@ export function ServiceBlock({ data, services }: { data: ServiceData; services: 
               </p>
             )}
 
-            {service.features.length > 0 && (
+            {(service.features?.length ?? 0) > 0 && (
               <ul className="relative space-y-1">
                 {service.features.slice(0, 4).map((f, i) => (
                   <li key={`${f}-${i}`} className="flex items-start gap-1.5 text-xs text-foreground/85">

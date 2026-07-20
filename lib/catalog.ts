@@ -157,6 +157,57 @@ export function newService(): CatalogService {
   }
 }
 
+/**
+ * Repara productos/servicios guardados en profiles.draft_content ANTES del
+ * rediseño de tienda (2026-07-19), cuando CatalogProduct/CatalogService
+ * tenían menos campos (sin images[], variants[], features[]). Sin esto, un
+ * borrador viejo llega con esas propiedades undefined y rompe tanto el
+ * render (MerchBlock/ServiceBlock indexan images[0], features.length) como
+ * publishCatalog (productImages hace images.filter). Se aplica al leer
+ * cualquier draft — nunca hace falta tocar filas ya publicadas, esas siempre
+ * pasan por rowToProduct/rowToService.
+ */
+export function normalizeDraftProduct(raw: unknown): CatalogProduct {
+  const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  const images = Array.isArray(p.images) ? p.images.map(String).filter(Boolean) : []
+  return {
+    id: String(p.id ?? crypto.randomUUID()),
+    name: String(p.name ?? ""),
+    price: p.price != null ? String(p.price) : "0.00",
+    currency: typeof p.currency === "string" && p.currency ? p.currency : "USD",
+    imageUrl: typeof p.imageUrl === "string" ? p.imageUrl : images[0],
+    images,
+    description: typeof p.description === "string" ? p.description : "",
+    category: typeof p.category === "string" && p.category ? p.category : "otro",
+    kind: p.kind === "digital" ? "digital" : "fisico",
+    variants: normalizeVariants(p.variants),
+    purchaseUrl: typeof p.purchaseUrl === "string" ? p.purchaseUrl : "",
+    stock: typeof p.stock === "number" ? p.stock : Number(p.stock ?? 0) || 0,
+    isActive: p.isActive === undefined || p.isActive === null ? true : Boolean(p.isActive),
+    isFeatured: Boolean(p.isFeatured),
+  }
+}
+
+export function normalizeDraftService(raw: unknown): CatalogService {
+  const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    id: String(s.id ?? crypto.randomUUID()),
+    title: String(s.title ?? ""),
+    price: s.price != null ? String(s.price) : "0.00",
+    priceUnit: typeof s.priceUnit === "string" && s.priceUnit ? s.priceUnit : "proyecto",
+    description: typeof s.description === "string" ? s.description : "",
+    category: typeof s.category === "string" && s.category ? s.category : "otro",
+    modality: s.modality === "presencial" || s.modality === "online" ? s.modality : "ambas",
+    duration: typeof s.duration === "string" ? s.duration : "",
+    deliveryTime: typeof s.deliveryTime === "string" ? s.deliveryTime : "",
+    features: normalizeFeatures(s.features),
+    bookingUrl: typeof s.bookingUrl === "string" ? s.bookingUrl : "",
+    imageUrl: typeof s.imageUrl === "string" ? s.imageUrl : "",
+    isActive: s.isActive === undefined || s.isActive === null ? true : Boolean(s.isActive),
+    isFeatured: Boolean(s.isFeatured),
+  }
+}
+
 type Row = Record<string, unknown>
 
 function rowToProduct(p: Row): CatalogProduct {
@@ -227,9 +278,11 @@ export async function fetchCatalog(profileId: string) {
 function productImages(p: CatalogProduct): string[] {
   // El inspector del editor solo edita `imageUrl` (foto principal); el panel
   // admin edita `images` completo. La principal manda: si difiere de
-  // images[0], se antepone sin duplicar.
-  if (p.imageUrl) return [p.imageUrl, ...p.images.filter((u) => u && u !== p.imageUrl)]
-  return p.images.filter(Boolean)
+  // images[0], se antepone sin duplicar. Array.isArray por si llega un
+  // producto de un borrador viejo sin `images` (ver normalizeDraftProduct).
+  const images = Array.isArray(p.images) ? p.images : []
+  if (p.imageUrl) return [p.imageUrl, ...images.filter((u) => u && u !== p.imageUrl)]
+  return images.filter(Boolean)
 }
 
 function productFullPayload(p: CatalogProduct, profileId: string, i: number) {

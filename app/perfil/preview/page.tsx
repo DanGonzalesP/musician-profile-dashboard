@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { type Block, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID } from "@/lib/blocks";
-import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
+import { type CatalogProduct, type CatalogService, fetchCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { ArrowLeft } from "lucide-react";
@@ -53,8 +53,8 @@ export default function PerfilPreviewPage() {
 
         if (draft) {
           setBlocks(mergePublicacionesEmbeds((draft.blocks ?? []).filter((b) => isKnownBlockType(b.type))));
-          setProducts(draft.products ?? []);
-          setServices(draft.services ?? []);
+          setProducts((draft.products ?? []).map(normalizeDraftProduct));
+          setServices((draft.services ?? []).map(normalizeDraftService));
         } else {
           const { data: dbBlocks, error: blocksError } = await supabase
             .from("profile_blocks")
