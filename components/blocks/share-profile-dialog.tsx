@@ -2,35 +2,16 @@
 
 import { useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
-import { X, Copy, Check, Download, MapPin, Image as ImageIcon } from "lucide-react"
+import { X, Copy, Check, Download, MapPin, Image as ImageIcon, Upload, Loader2 } from "lucide-react"
 import type { HeroData } from "@/lib/blocks"
 import { socialIcons } from "./hero-block"
 import { useLocale } from "@/components/locale-provider"
-
-type ImageCandidate = {
-  key: string
-  label: string
-  url?: string
-}
-
-function useQrCandidates(
-  data: HeroData,
-  albumCovers: string[],
-  t: (key: string, vars?: Record<string, string | number>) => string
-): ImageCandidate[] {
-  const candidates: ImageCandidate[] = [{ key: "none", label: t("share_no_image") }]
-  if (data.image) candidates.push({ key: "avatar", label: t("share_profile_photo"), url: data.image })
-  if (data.banner) candidates.push({ key: "banner", label: "Banner", url: data.banner })
-  albumCovers.forEach((url, i) => {
-    if (url) candidates.push({ key: `album-${i}`, label: t("share_cover", { n: i + 1 }), url })
-  })
-  return candidates
-}
+import { generateBusinessCardPdf } from "@/lib/generate-business-card-pdf"
 
 export function ShareProfileDialog({
   shareUrl,
   data,
-  albumCovers,
+  albumCovers: _albumCovers,
   onClose,
 }: {
   shareUrl: string
@@ -39,12 +20,14 @@ export function ShareProfileDialog({
   onClose: () => void
 }) {
   const { t } = useLocale()
-  const candidates = useQrCandidates(data, albumCovers, t)
-  const [selectedKey, setSelectedKey] = useState(candidates[1]?.key ?? "none")
   const [copied, setCopied] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  // Imagen para el centro del QR: ahora es SIEMPRE una foto dedicada que el
+  // usuario sube acá mismo (blob local, nunca se publica ni se guarda) — ya
+  // no se puede elegir entre el avatar/banner/portadas ya subidas al perfil.
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-
-  const selectedImageUrl = candidates.find((c) => c.key === selectedKey)?.url
+  const qrImageUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -59,7 +42,7 @@ export function ShareProfileDialog({
       color: { dark: "#000000ff", light: "#ffffffff" },
     })
       .then(() => {
-        if (cancelled || !selectedImageUrl) return
+        if (cancelled || !qrImageUrl) return
 
         const img = new Image()
         img.crossOrigin = "anonymous"
@@ -88,14 +71,38 @@ export function ShareProfileDialog({
         }
         // Si la imagen no carga (ej. CORS bloqueado por el proveedor), se deja el QR limpio sin logo.
         img.onerror = () => {}
-        img.src = selectedImageUrl
+        img.src = qrImageUrl
       })
       .catch(() => {})
 
     return () => {
       cancelled = true
     }
-  }, [shareUrl, selectedImageUrl])
+  }, [shareUrl, qrImageUrl])
+
+  // Libera el blob anterior al reemplazarlo o al cerrar el diálogo — la
+  // imagen del QR nunca se sube a Storage, solo vive en esta pestaña.
+  useEffect(() => {
+    qrImageUrlRef.current = qrImageUrl
+  }, [qrImageUrl])
+  useEffect(() => {
+    return () => {
+      if (qrImageUrlRef.current) URL.revokeObjectURL(qrImageUrlRef.current)
+    }
+  }, [])
+
+  function handleQrImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || e.target.files.length === 0) return
+    const file = e.target.files[0]
+    if (qrImageUrlRef.current) URL.revokeObjectURL(qrImageUrlRef.current)
+    setQrImageUrl(URL.createObjectURL(file))
+    e.target.value = ""
+  }
+
+  function handleRemoveQrImage() {
+    if (qrImageUrlRef.current) URL.revokeObjectURL(qrImageUrlRef.current)
+    setQrImageUrl(null)
+  }
 
   async function handleCopyLink() {
     try {
@@ -108,13 +115,23 @@ export function ShareProfileDialog({
     }
   }
 
-  function handleDownload() {
+  async function handleDownloadCard() {
     const canvas = canvasRef.current
-    if (!canvas) return
-    const link = document.createElement("a")
-    link.download = `${(data.name || "perfil").toLowerCase().replace(/\s+/g, "-")}-qr.png`
-    link.href = canvas.toDataURL("image/png")
-    link.click()
+    if (!canvas || generating) return
+    setGenerating(true)
+    try {
+      await generateBusinessCardPdf({
+        artistName: data.name || t("share_artist_name_fallback"),
+        realName: data.realName,
+        location: data.location,
+        tagline: data.tagline,
+        shareUrl,
+        avatarUrl: data.image || undefined,
+        qrDataUrl: canvas.toDataURL("image/png"),
+      })
+    } finally {
+      setGenerating(false)
+    }
   }
 
   const socials = data.socials || []
@@ -145,31 +162,34 @@ export function ShareProfileDialog({
           <canvas ref={canvasRef} className="size-72 max-w-full" />
         </div>
 
-        {/* Selector de imagen para el centro del QR */}
+        {/* Imagen dedicada para el centro del QR — una sola foto que el
+            usuario sube acá, ya no se elige entre fotos ya subidas al perfil. */}
         <div className="mt-4">
           <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <ImageIcon className="size-3.5" /> {t("share_qr_image_label")}
           </p>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {candidates.map((c) => (
+          <div className="flex items-stretch gap-2">
+            {qrImageUrl && (
+              <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                <img src={qrImageUrl} alt="" className="size-full object-cover" />
+              </div>
+            )}
+            <label className="flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
+              <Upload className="size-3.5 text-muted-foreground" />
+              <span>{qrImageUrl ? t("share_qr_change_cta") : t("share_qr_upload_cta")}</span>
+              <input type="file" accept="image/*" onChange={handleQrImageChange} className="hidden" />
+            </label>
+            {qrImageUrl && (
               <button
-                key={c.key}
                 type="button"
-                onClick={() => setSelectedKey(c.key)}
-                className={`flex w-16 shrink-0 flex-col items-center gap-1 rounded-md p-1 transition-colors ${
-                  selectedKey === c.key ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-accent/50"
-                }`}
+                onClick={handleRemoveQrImage}
+                aria-label={t("share_qr_remove_cta")}
+                title={t("share_qr_remove_cta")}
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
               >
-                <span className="flex size-10 w-full items-center justify-center overflow-hidden rounded bg-muted">
-                  {c.url ? (
-                    <img src={c.url} alt="" className="size-full object-cover" />
-                  ) : (
-                    <X className="size-4 text-muted-foreground/40" />
-                  )}
-                </span>
-                <span className="w-full truncate text-center text-[9px] text-muted-foreground">{c.label}</span>
+                <X className="size-4" />
               </button>
-            ))}
+            )}
           </div>
         </div>
 
@@ -231,11 +251,12 @@ export function ShareProfileDialog({
           </button>
           <button
             type="button"
-            onClick={handleDownload}
-            className="flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            onClick={handleDownloadCard}
+            disabled={generating}
+            className="flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Download className="size-4" />
-            {t("share_download_qr")}
+            {generating ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {generating ? t("share_card_generating") : t("share_download_card")}
           </button>
         </div>
       </div>

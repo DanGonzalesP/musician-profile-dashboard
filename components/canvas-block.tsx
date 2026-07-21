@@ -1,10 +1,12 @@
 "use client"
 
-import type { Block } from "@/lib/blocks"
+import { useState } from "react"
+import type { Block, HeroData } from "@/lib/blocks"
 import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { BlockRenderer } from "@/components/blocks/block-renderer"
+import { ShareProfileDialog } from "@/components/blocks/share-profile-dialog"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
-import { GripVertical, Pencil, Trash2, ArrowUp, ArrowDown, Lock } from "lucide-react"
+import { GripVertical, Pencil, Trash2, ArrowUp, ArrowDown, Share2, Lock } from "lucide-react"
 
 type Props = {
   block: Block
@@ -46,6 +48,11 @@ export function CanvasBlock({
   locked = false,
 }: Props) {
   const label = BLOCK_LIBRARY.find((b) => b.type === block.type)?.label ?? block.type
+  // Atajo de "Compartir" en el propio control pill del bloque — solo visible
+  // en móvil (< sm), donde el botón que ya vive dentro del hero queda más
+  // abajo en el flujo de scroll. En escritorio no se toca nada: sigue solo
+  // el botón original dentro del bloque.
+  const [shareOpen, setShareOpen] = useState(false)
 
   return (
     <div
@@ -103,6 +110,16 @@ export function CanvasBlock({
           >
             <ArrowDown className="size-4" />
           </ControlButton>
+          {block.type === "hero" && shareUrl && (
+            <ControlButton
+              onClick={() => setShareOpen(true)}
+              title="Compartir"
+              label="Compartir perfil"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground sm:hidden"
+            >
+              <Share2 className="size-4" />
+            </ControlButton>
+          )}
           <ControlButton onClick={onSelect} title="Editar" label="Editar bloque">
             <Pencil className="size-4" />
           </ControlButton>
@@ -143,6 +160,15 @@ export function CanvasBlock({
 
       {/* Renderiza los componentes inyectados (como el MusicPlayer) */}
       {children}
+
+      {shareOpen && block.type === "hero" && shareUrl && (
+        <ShareProfileDialog
+          shareUrl={shareUrl}
+          data={block.data as HeroData}
+          albumCovers={albumCovers ?? []}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -52,7 +52,7 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
   return (
     <section
       ref={ref}
-      className="relative flex h-dvh w-full snap-start snap-always items-center justify-center overflow-hidden px-6 pb-28 pt-28 lg:pt-24"
+      className="relative flex h-dvh w-full snap-start snap-always items-center justify-center overflow-hidden px-6 pb-28 pt-36 lg:pt-24"
     >
       {track.coverImageUrl && (
         <div

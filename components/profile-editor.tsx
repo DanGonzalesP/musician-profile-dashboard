@@ -215,6 +215,20 @@ async function resolveEntityBlobs<T extends Record<string, unknown>>(
   return updated as T
 }
 
+/**
+ * El panel derecho (inspector) es estático y siempre visible desde xl
+ * (escritorio) — ahí sí conviene mostrar el primer bloque ya seleccionado.
+ * Por debajo de xl ese mismo panel se vuelve un overlay a pantalla completa
+ * (ver profile-editor.tsx / block-inspector.tsx), así que seleccionar algo
+ * por defecto en el celular tapaba TODA la pantalla apenas se entraba al
+ * editor, sin forma de llegar al lienzo ni a "Bloques". Por eso el
+ * auto-select solo aplica en escritorio.
+ */
+function defaultSelectedId(loadedBlocks: Block[]): string | null {
+  if (typeof window === "undefined" || window.innerWidth < 1280) return null
+  return loadedBlocks[0]?.id ?? null
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 
 export function ProfileEditor() {
@@ -341,9 +355,10 @@ export function ProfileEditor() {
             }))
           const loadedBlocks = mergePublicacionesEmbeds(cleanBlocks)
           setBlocks(loadedBlocks)
-          // El panel de la derecha se abre solo, con el primer elemento de la
-          // página (normalmente Perfil/Banner Principal) ya seleccionado.
-          setSelectedId(loadedBlocks[0]?.id ?? null)
+          // En escritorio el panel de la derecha se abre solo, con el primer
+          // elemento de la página (normalmente Perfil/Banner Principal) ya
+          // seleccionado. En móvil arranca cerrado (ver defaultSelectedId).
+          setSelectedId(defaultSelectedId(loadedBlocks))
           setProducts(
             (draft.products ?? []).map((p) =>
               normalizeDraftProduct(stripDeadBlobUrls(p as unknown as Record<string, unknown>))
@@ -372,7 +387,7 @@ export function ProfileEditor() {
                 )
               : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
           setBlocks(loadedBlocks)
-          setSelectedId(loadedBlocks[0]?.id ?? null)
+          setSelectedId(defaultSelectedId(loadedBlocks))
 
           const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId)
           setProducts(catalogProducts)
@@ -382,7 +397,7 @@ export function ProfileEditor() {
         console.error("Error cargando bloques iniciales:", err)
         const fallbackBlocks = [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
         setBlocks(fallbackBlocks)
-        setSelectedId(fallbackBlocks[0]?.id ?? null)
+        setSelectedId(defaultSelectedId(fallbackBlocks))
       } finally {
         setLoading(false)
       }
@@ -705,8 +720,6 @@ export function ProfileEditor() {
         isPublishing={publishing}
         publicSlug={publicSlug}
         activeRole={activeRole}
-        mobileBlocksOpen={mobileBlocksOpen}
-        onToggleBlocks={() => setMobileBlocksOpen((v) => !v)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -752,8 +765,9 @@ export function ProfileEditor() {
           </div>
         </aside>
 
-        {/* Center — live preview canvas */}
-        <main className="relative flex-1 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklch,var(--primary)_8%,transparent),transparent_60%)] p-4 sm:p-6 lg:p-8">
+        {/* Center — live preview canvas. Padding inferior extra en < xl para
+            no quedar tapado por la barra de acciones fija de móvil. */}
+        <main className="relative flex-1 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklch,var(--primary)_8%,transparent),transparent_60%)] p-4 pb-24 sm:p-6 sm:pb-24 lg:px-8 lg:pt-8 xl:pb-8">
           <PreviewCanvas
             blocks={blocks}
             selectedId={selectedId}
@@ -805,9 +819,35 @@ export function ProfileEditor() {
             onServicesChange={setServices}
             profileId={profileIdRef.current}
             isBand={isBandRef.current}
+            onClose={() => setSelectedId(null)}
           />
         </aside>
       </div>
+
+      {/* Barra de acciones inferior — solo < xl. Estilo TikTok/Instagram: las
+          dos acciones que más se necesitan a mano (agregar bloques y
+          publicar) fijas abajo, donde el pulgar llega sin tener que ir hasta
+          el header. En escritorio (xl+) no se renderiza: ahí "Bloques" ya es
+          un panel estático y "Publicar" vive en el header, como siempre. */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-sidebar-border bg-sidebar/95 px-4 py-2.5 backdrop-blur-md xl:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileBlocksOpen((v) => !v)}
+          aria-pressed={mobileBlocksOpen}
+          className="flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1 text-muted-foreground transition-colors active:text-foreground"
+        >
+          <Layers className="size-5" />
+          <span className="text-[10px] font-medium">Bloques</span>
+        </button>
+        <button
+          type="button"
+          onClick={handlePublish}
+          disabled={publishing}
+          className="flex-[2] rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {publishing ? "Publicando..." : "Publicar"}
+        </button>
+      </nav>
     </div>
   )
 }

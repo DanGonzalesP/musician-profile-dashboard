@@ -39,6 +39,9 @@ type Props = {
   onServicesChange: (services: CatalogService[]) => void
   profileId?: string | null
   isBand?: boolean
+  // Cierra el panel en móvil (vuelve al lienzo sin navegar fuera del
+  // editor) — en escritorio el panel es estático y esta prop no se usa.
+  onClose?: () => void
 }
 
 export function BlockInspector({
@@ -52,6 +55,7 @@ export function BlockInspector({
   onServicesChange,
   profileId,
   isBand = false,
+  onClose,
 }: Props) {
   if (!block) {
     return (
@@ -75,7 +79,19 @@ export function BlockInspector({
   return (
     <div className="flex h-full flex-col text-foreground">
       <div className="gradient-border relative border-b border-sidebar-border/60 bg-sidebar/80 px-4 py-3 backdrop-blur-md">
-        <BackToPanelLink />
+        <div className="flex items-center justify-between gap-2">
+          <BackToPanelLink />
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar y volver al lienzo"
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground xl:hidden"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
         <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary">Editando</p>
         <p className="text-sm font-semibold text-foreground">{def?.label}</p>
       </div>

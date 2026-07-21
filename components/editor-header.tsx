@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Layers, Users } from "lucide-react"
+import { ArrowLeft, MoreHorizontal, Users } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ProfileSwitcher } from "@/components/profile-switcher"
@@ -16,16 +16,12 @@ export function EditorHeader({
   isPublishing,
   publicSlug,
   activeRole = "owner",
-  mobileBlocksOpen = false,
-  onToggleBlocks,
 }: {
   blockCount: number
   onPublish: () => void
   isPublishing: boolean
   publicSlug?: string
   activeRole?: BandRole
-  mobileBlocksOpen?: boolean
-  onToggleBlocks?: () => void
 }) {
   // Mismo destino que "Ver Portal Público" en el panel admin: la página
   // pública real una vez publicada. Si todavía no hay slug (nunca se
@@ -35,6 +31,10 @@ export function EditorHeader({
   // "Grupos" solo se muestra si el artista ya creó más de un grupo musical
   // — igual que en el panel (ver LayoutAdmin.tsx).
   const [ownedBandCount, setOwnedBandCount] = useState(0)
+  // Menú "⋯" de acciones secundarias en móvil (< xl) — evita amontonar
+  // Volver/Grupos/Panel Admin/Vista previa en una fila angosta. Desde xl
+  // (escritorio) esas mismas acciones se muestran siempre en línea, sin menú.
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   useEffect(() => {
     async function cargarBandas() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -57,17 +57,6 @@ export function EditorHeader({
         <div className="text-sm font-semibold">
           Editor <span className="text-muted-foreground font-normal">({blockCount} bloques)</span>
         </div>
-        {onToggleBlocks && (
-          <button
-            type="button"
-            onClick={onToggleBlocks}
-            aria-pressed={mobileBlocksOpen}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5 xl:hidden")}
-          >
-            <Layers className="size-3.5" />
-            Bloques
-          </button>
-        )}
         <ProfileSwitcher />
         {activeRole === "editor" && (
           <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600">
@@ -80,30 +69,98 @@ export function EditorHeader({
           </span>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
-        >
-          <ArrowLeft className="size-3.5" />
-          Volver al feed
-        </Link>
-        {ownedBandCount > 1 && (
-          <Link href="/perfil/banda" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
-            <Users className="size-3.5" />
-            Grupos
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Escritorio (xl+): acciones secundarias siempre en línea, como antes. */}
+        <div className="hidden items-center gap-2 xl:flex">
+          <Link
+            href="/"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <ArrowLeft className="size-3.5" />
+            Volver al feed
           </Link>
-        )}
-        <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-          Panel Admin
-        </Link>
-        <Button variant="outline" size="sm" onClick={() => window.open(previewHref, '_blank')}>
-          Vista previa
-        </Button>
+          {ownedBandCount > 1 && (
+            <Link href="/perfil/banda" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
+              <Users className="size-3.5" />
+              Grupos
+            </Link>
+          )}
+          <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Panel Admin
+          </Link>
+          <Button variant="outline" size="sm" onClick={() => window.open(previewHref, '_blank')}>
+            Vista previa
+          </Button>
+        </div>
+
+        {/* Móvil (< xl): las mismas acciones secundarias colapsadas en un
+            menú "⋯", como el overflow de Instagram/TikTok — el header no se
+            llena de botones en una pantalla angosta. */}
+        <div className="relative xl:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            aria-label="Más opciones"
+            aria-expanded={mobileMenuOpen}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "size-8 p-0")}
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+          {mobileMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="absolute right-0 top-full z-40 mt-2 w-48 overflow-hidden rounded-lg border border-sidebar-border bg-popover p-1 shadow-xl">
+                <Link
+                  href="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  Volver al feed
+                </Link>
+                {ownedBandCount > 1 && (
+                  <Link
+                    href="/perfil/banda"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                  >
+                    <Users className="size-3.5" />
+                    Grupos
+                  </Link>
+                )}
+                <Link
+                  href="/perfil/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                >
+                  Panel Admin
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    window.open(previewHref, "_blank")
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent"
+                >
+                  Vista previa
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* En móvil "Publicar" vive en la barra fija inferior (más a mano
+            del pulgar) — acá solo se muestra desde xl, como siempre. */}
         <Button
           size="sm"
           onClick={onPublish}
           disabled={isPublishing}
+          className="hidden xl:inline-flex"
         >
           {isPublishing ? "Publicando..." : "Publicar"}
         </Button>
