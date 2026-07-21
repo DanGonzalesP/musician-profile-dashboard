@@ -157,8 +157,8 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_menu_my_profile_fallback: "Mi perfil",
 
     auth_back_to_feed: "Volver al feed",
-    auth_register_title: "Crea tu cuenta en vibra",
-    auth_login_title: "Bienvenido a vibra",
+    auth_register_title: "Crea tu cuenta en Vibe",
+    auth_login_title: "Bienvenido a Vibe",
     auth_register_subtitle: "Empieza a construir tu perfil de artista hoy.",
     auth_login_subtitle: "Ingresa para gestionar tu música y productos.",
     auth_email_label: "Correo Electrónico",
@@ -323,8 +323,8 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_menu_my_profile_fallback: "My profile",
 
     auth_back_to_feed: "Back to feed",
-    auth_register_title: "Create your vibra account",
-    auth_login_title: "Welcome to vibra",
+    auth_register_title: "Create your Vibe account",
+    auth_login_title: "Welcome to Vibe",
     auth_register_subtitle: "Start building your artist profile today.",
     auth_login_subtitle: "Sign in to manage your music and products.",
     auth_email_label: "Email",

@@ -4,8 +4,8 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 /**
- * Marca de vibra — logotipo de UNA sola palabra, sin ícono adosado.
- * La palabra completa "vibra" se escribe en el display de la casa con un
+ * Marca de Vibe — logotipo de UNA sola palabra, sin ícono adosado.
+ * La palabra completa "Vibe" se escribe en el display de la casa con un
  * degradado que termina en el color primario (la marca "se enciende" hacia
  * el final), y debajo lleva su firma sonora: un pulso de ecualizador de
  * cinco barras que hace de subrayado. Ese pulso es el mismo que usa
@@ -35,7 +35,7 @@ function PulseUnderline({ className }: { className?: string }) {
 }
 
 /**
- * La "v" de vibra ya no es una letra de molde con una raya de color debajo
+ * La "V" de Vibe ya no es una letra de molde con una raya de color debajo
  * (leía como "V subrayada"): ahora la propia v está construida con las
  * barras del pulso de ecualizador, de más altas en los extremos a la más
  * corta en el centro — a la vez una v y una onda de sonido, un solo gesto
@@ -102,7 +102,7 @@ export function Logo({
       className={cn("inline-flex flex-col items-start leading-none", className)}
     >
       <span className="bg-gradient-to-r from-foreground from-40% to-primary bg-clip-text font-display text-xl font-extrabold tracking-tight text-transparent">
-        vibra
+        Vibe
       </span>
       <PulseUnderline className={cn("mt-0.5 ml-0.5", markClassName)} />
     </Link>

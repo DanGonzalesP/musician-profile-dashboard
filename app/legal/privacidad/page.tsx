@@ -1,6 +1,6 @@
 import { LEGAL_CONTACT_EMAIL, LEGAL_JURISDICTION, SITE_NAME } from "@/lib/site"
 
-export const metadata = { title: "Política de Privacidad — vibra" }
+export const metadata = { title: "Política de Privacidad — Vibe" }
 
 export default function PrivacidadPage() {
   return (

@@ -28,7 +28,7 @@ const LOGO_MARK_BARS: Array<{ x: number; y: number; w: number; h: number; accent
   { x: 0.738, y: 0.3096, w: 0.0612, h: 0.408 },
 ]
 
-/** Dibuja la marca vibra (cuadrado negro redondeado + barras) en (x, y), del tamaño `size`. */
+/** Dibuja la marca Vibe (cuadrado negro redondeado + barras) en (x, y), del tamaño `size`. */
 function drawLogoMark(doc: jsPDF, x: number, y: number, size: number) {
   doc.setFillColor(...CARD_BG)
   doc.roundedRect(x, y, size, size, size * 0.22, size * 0.22, "F")

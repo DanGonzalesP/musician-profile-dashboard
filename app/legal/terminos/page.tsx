@@ -1,6 +1,6 @@
 import { LEGAL_CONTACT_EMAIL, LEGAL_JURISDICTION, SITE_NAME } from "@/lib/site"
 
-export const metadata = { title: "Términos y Condiciones — vibra" }
+export const metadata = { title: "Términos y Condiciones — Vibe" }
 
 export default function TerminosPage() {
   return (

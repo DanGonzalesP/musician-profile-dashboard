@@ -1,6 +1,6 @@
 import { SITE_NAME } from "@/lib/site"
 
-export const metadata = { title: "Política de Cookies — vibra" }
+export const metadata = { title: "Política de Cookies — Vibe" }
 
 export default function CookiesPage() {
   return (

@@ -1,14 +1,14 @@
 import Link from "next/link"
 import { FileText, Lock, Music2, Cookie, Users } from "lucide-react"
 
-export const metadata = { title: "Centro legal — vibra" }
+export const metadata = { title: "Centro legal — Vibe" }
 
 const DOCS = [
   {
     href: "/legal/terminos",
     icon: FileText,
     title: "Términos y Condiciones",
-    description: "Las reglas de uso de vibra: tu cuenta, tu contenido, la tienda y los servicios.",
+    description: "Las reglas de uso de Vibe: tu cuenta, tu contenido, la tienda y los servicios.",
   },
   {
     href: "/legal/privacidad",
@@ -41,7 +41,7 @@ export default function LegalHubPage() {
     <div>
       <h1 className="font-display text-3xl font-bold text-foreground">Centro legal</h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        vibra es una plataforma donde los músicos publican su obra, venden sus productos y ofrecen
+        Vibe es una plataforma donde los músicos publican su obra, venden sus productos y ofrecen
         sus servicios. Estos documentos explican cómo funciona todo eso de forma justa y segura para
         artistas y fans.
       </p>

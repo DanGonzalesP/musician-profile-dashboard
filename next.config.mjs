@@ -1,5 +1,5 @@
 // Cabeceras de seguridad para TODA la app. La CSP está calibrada para lo que
-// vibra realmente usa: Supabase (HTTPS + WebSocket), subidas directas a R2,
+// Vibe realmente usa: Supabase (HTTPS + WebSocket), subidas directas a R2,
 // imágenes/audio/video remotos, iframes de YouTube, ffmpeg.wasm (workers +
 // WebAssembly) y los scripts inline de Next.js. Si agregas un servicio de
 // terceros nuevo (otro CDN, otra API), amplía aquí la directiva que toque.

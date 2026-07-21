@@ -1,6 +1,6 @@
 import { LEGAL_CONTACT_EMAIL, SITE_NAME } from "@/lib/site"
 
-export const metadata = { title: "Política de Derechos de Autor — vibra" }
+export const metadata = { title: "Política de Derechos de Autor — Vibe" }
 
 export default function CopyrightPage() {
   return (

@@ -1,6 +1,6 @@
 import { LEGAL_CONTACT_EMAIL, SITE_NAME } from "@/lib/site"
 
-export const metadata = { title: "Normas de Comunidad — vibra" }
+export const metadata = { title: "Normas de Comunidad — Vibe" }
 
 export default function ComunidadPage() {
   return (

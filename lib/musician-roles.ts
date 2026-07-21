@@ -1,4 +1,4 @@
-// Los 7 roles profesionales de vibra. Reemplazan a las 5 categorías
+// Los 7 roles profesionales de Vibe. Reemplazan a las 5 categorías
 // antiguas (autores/productores/directores/interpretes/tecnicos): ahora un
 // músico puede tener VARIOS roles a la vez (profiles.musician_roles text[])
 // y el feed se filtra por cualquiera de ellos desde la barra lateral.
