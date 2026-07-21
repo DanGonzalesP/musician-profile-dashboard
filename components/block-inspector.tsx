@@ -533,7 +533,7 @@ function HeroFields({
           blobRegistry={blobRegistry}
         />
       </Field>
-      <Field label="¿Qué haces?">
+      <Field label="¿Qué eres?">
         <RoleTagPicker
           value={data.tagline || ""}
           onChange={(tagline) => onChange({ ...data, tagline })}
