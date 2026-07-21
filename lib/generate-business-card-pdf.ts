@@ -15,6 +15,30 @@ export type BusinessCardInput = {
 const BRAND_RED: [number, number, number] = [240, 68, 51]
 const CARD_BG: [number, number, number] = [12, 12, 14]
 
+// Mismas 7 barras de ecualizador en v que components/logo.tsx (LogoMark) —
+// coordenadas relativas (0-1) sobre un cuadrado, para dibujar el ícono con
+// vectores de jsPDF en vez de rasterizarlo.
+const LOGO_MARK_BARS: Array<{ x: number; y: number; w: number; h: number; accent?: boolean }> = [
+  { x: 0.2008, y: 0.3096, w: 0.0612, h: 0.408 },
+  { x: 0.2926, y: 0.4048, w: 0.0612, h: 0.3128 },
+  { x: 0.3844, y: 0.5, w: 0.0612, h: 0.2176 },
+  { x: 0.4694, y: 0.5816, w: 0.0612, h: 0.136, accent: true },
+  { x: 0.5544, y: 0.5, w: 0.0612, h: 0.2176 },
+  { x: 0.6462, y: 0.4048, w: 0.0612, h: 0.3128 },
+  { x: 0.738, y: 0.3096, w: 0.0612, h: 0.408 },
+]
+
+/** Dibuja la marca vibra (cuadrado negro redondeado + barras) en (x, y), del tamaño `size`. */
+function drawLogoMark(doc: jsPDF, x: number, y: number, size: number) {
+  doc.setFillColor(...CARD_BG)
+  doc.roundedRect(x, y, size, size, size * 0.22, size * 0.22, "F")
+  for (const bar of LOGO_MARK_BARS) {
+    const bw = bar.w * size
+    doc.setFillColor(...(bar.accent ? BRAND_RED : ([255, 255, 255] as [number, number, number])))
+    doc.roundedRect(x + bar.x * size, y + bar.y * size, bw, bar.h * size, bw / 2, bw / 2, "F")
+  }
+}
+
 function slugify(text: string): string {
   return (
     text
@@ -85,7 +109,11 @@ export async function generateBusinessCardPdf(input: BusinessCardInput): Promise
     ? await loadImageCoverDataUrl(input.avatarUrl, 1000, Math.round((1000 * CARD_H) / CARD_W))
     : null
 
-  const doc = new jsPDF({ unit: "mm", format: [CARD_W, CARD_H] })
+  // jsPDF asume orientación "portrait" por defecto y, si no se declara
+  // explícitamente "landscape", intercambia width/height del `format` para
+  // forzar alto > ancho — la tarjeta terminaba en 55x85 en vez de 85x55, lo
+  // que además recortaba todo el contenido dibujado más allá de x=55mm.
+  const doc = new jsPDF({ unit: "mm", orientation: "landscape", format: [CARD_W, CARD_H] })
 
   // ───────────────────── Cara delantera ─────────────────────
   doc.setFillColor(...CARD_BG)
@@ -108,10 +136,7 @@ export async function generateBusinessCardPdf(input: BusinessCardInput): Promise
   }
   doc.setGState(new GState({ opacity: 1 }))
 
-  doc.setFont("helvetica", "bold")
-  doc.setFontSize(7)
-  doc.setTextColor(...BRAND_RED)
-  doc.text("vibra", 6, 8)
+  drawLogoMark(doc, 6, 4.5, 7)
 
   doc.setFont("helvetica", "bold")
   doc.setFontSize(15)
@@ -126,7 +151,7 @@ export async function generateBusinessCardPdf(input: BusinessCardInput): Promise
   }
 
   // ───────────────────── Cara trasera ─────────────────────
-  doc.addPage([CARD_W, CARD_H])
+  doc.addPage([CARD_W, CARD_H], "landscape")
   doc.setFillColor(...CARD_BG)
   doc.rect(0, 0, CARD_W, CARD_H, "F")
 
@@ -135,13 +160,7 @@ export async function generateBusinessCardPdf(input: BusinessCardInput): Promise
   const qrX = CARD_W - 6 - qrSize
   const textMaxWidth = qrX - 4 - leftX
 
-  doc.setFont("helvetica", "bold")
-  doc.setFontSize(6.5)
-  doc.setTextColor(...BRAND_RED)
-  doc.text("vibra", leftX, 8)
-  doc.setDrawColor(...BRAND_RED)
-  doc.setLineWidth(0.4)
-  doc.line(leftX, 10, leftX + 12, 10)
+  drawLogoMark(doc, leftX, 4, 6)
 
   let y = 17
   doc.setFont("helvetica", "bold")

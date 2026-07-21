@@ -9,6 +9,7 @@ import TrackScreen from "./TrackScreen";
 import PostScreen from "./PostScreen";
 import CommentsPanel from "./CommentsPanel";
 import FeedScrollNav from "./FeedScrollNav";
+import FeedShareButton from "./FeedShareButton";
 
 interface FeedContainerProps {
   items: FeedItem[];
@@ -154,6 +155,21 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
     sectionRefs.current[index]?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  // Info de compartir del ítem activo — el botón de compartir vive una sola
+  // vez, debajo de la cápsula de subir/bajar, en vez de repetirse dentro de
+  // cada tarjeta del feed.
+  const activeShare = activeItem
+    ? activeItem.kind === "track"
+      ? {
+          url: isSampleFeed ? "/" : `/${activeItem.track.artistName.trim().toLowerCase().replace(/\s+/g, "-")}`,
+          title: `${activeItem.track.title} — ${activeItem.track.artistName}`,
+        }
+      : {
+          url: `/${activeItem.post.authorName.trim().toLowerCase().replace(/\s+/g, "-")}`,
+          title: activeItem.post.caption || activeItem.post.authorName,
+        }
+    : null;
+
   return (
     <div className="flex h-dvh w-full">
       <div className="relative h-dvh min-w-0 flex-1">
@@ -168,13 +184,11 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
                 key={item.id}
                 ref={registerSection(index)}
                 track={item.track}
-                isSample={isSampleFeed}
                 isActive={index === activeIndex}
                 isPlaying={index === activeIndex && isPlaying}
                 currentTime={index === activeIndex ? currentTime : 0}
                 duration={index === activeIndex ? duration : item.track.durationSeconds ?? 0}
                 isLiked={likedIds.has(item.id)}
-                commentCount={commentCounts[item.track.id] ?? 0}
                 onTogglePlay={togglePlay}
                 onSeek={seek}
                 onToggleLike={() => toggleLike(item.id)}
@@ -193,12 +207,15 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
           )}
         </div>
 
-        <FeedScrollNav
-          canGoPrev={activeIndex > 0}
-          canGoNext={activeIndex < items.length - 1}
-          onPrev={() => scrollToIndex(activeIndex - 1)}
-          onNext={() => scrollToIndex(activeIndex + 1)}
-        />
+        <div className="pointer-events-none absolute right-4 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-3 sm:right-6">
+          <FeedScrollNav
+            canGoPrev={activeIndex > 0}
+            canGoNext={activeIndex < items.length - 1}
+            onPrev={() => scrollToIndex(activeIndex - 1)}
+            onNext={() => scrollToIndex(activeIndex + 1)}
+          />
+          {activeShare && <FeedShareButton shareUrl={activeShare.url} shareTitle={activeShare.title} />}
+        </div>
       </div>
 
       <CommentsPanel

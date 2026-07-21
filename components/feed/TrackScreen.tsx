@@ -12,13 +12,11 @@ import MarqueeText from "./MarqueeText";
 
 interface TrackScreenProps {
   track: FeedTrack;
-  isSample: boolean;
   isActive: boolean;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
   isLiked: boolean;
-  commentCount: number;
   onTogglePlay: () => void;
   onSeek: (time: number) => void;
   onToggleLike: () => void;
@@ -28,13 +26,11 @@ interface TrackScreenProps {
 const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackScreen(
   {
     track,
-    isSample,
     isActive,
     isPlaying,
     currentTime,
     duration,
     isLiked,
-    commentCount,
     onTogglePlay,
     onSeek,
     onToggleLike,
@@ -44,7 +40,6 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
 ) {
   const { t } = useLocale();
 
-  const artistSlug = track.artistName.trim().toLowerCase().replace(/\s+/g, "-");
   const roleLabels = track.roles
     .map((id) => MUSICIAN_ROLES.find((r) => r.id === id)?.label)
     .filter(Boolean) as string[];
@@ -67,15 +62,8 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
 
         <div className="w-full text-center">
           <MarqueeText text={track.title} className="text-xl font-bold text-foreground sm:text-2xl" />
-          <span className="mt-1 flex items-center justify-center gap-2">
-            <MarqueeText text={track.artistName} className="text-sm font-medium text-primary sm:text-base" />
-            {track.isGroup && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                <Users className="size-2.5" /> {t("profile_band_badge")}
-              </span>
-            )}
-          </span>
-          {roleLabels.length > 0 && (
+          <MarqueeText text={track.artistName} className="mt-1 text-sm font-medium text-primary sm:text-base" />
+          {(roleLabels.length > 0 || track.isGroup) && (
             <p className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
               {roleLabels.map((label) => (
                 <span
@@ -85,6 +73,11 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
                   {label}
                 </span>
               ))}
+              {track.isGroup && (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  <Users className="size-2.5" /> {t("profile_band_badge")}
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -96,12 +89,8 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
           onTogglePlay={onTogglePlay}
           onSeek={onSeek}
           isLiked={isLiked}
-          likeCount={isLiked ? 1 : 0}
           onToggleLike={onToggleLike}
-          commentCount={commentCount}
           onOpenComments={onOpenComments}
-          shareUrl={isSample ? "/" : `/${artistSlug}`}
-          shareTitle={`${track.title} — ${track.artistName}`}
         />
       </div>
     </section>

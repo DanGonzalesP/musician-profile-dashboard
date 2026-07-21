@@ -20,7 +20,7 @@ export default function FeedScrollNav({
   const { t } = useLocale()
 
   return (
-    <div className="pointer-events-auto absolute right-4 top-1/2 z-20 flex -translate-y-1/2 flex-col overflow-hidden rounded-full border border-border/60 bg-card/50 backdrop-blur-xl sm:right-6">
+    <div className="pointer-events-auto flex flex-col overflow-hidden rounded-full border border-border/60 bg-card/50 backdrop-blur-xl">
       <button
         type="button"
         aria-label={t("feed_scroll_prev_aria")}

@@ -1,24 +1,14 @@
 <svg width="180" height="180" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    @media (prefers-color-scheme: light) {
-      .background { fill: black; }
-    }
-    @media (prefers-color-scheme: dark) {
-      .background { fill: white; }
-    }
-  </style>
-  <!-- Monograma vibra: la "v" minúscula dibujada en trazo geométrico y,
-       debajo, el pulso de ecualizador de cinco barras que firma toda la
-       marca (el mismo de components/logo.tsx). El rojo escarlata neón se
-       mantiene fijo en ambos esquemas — solo el fondo invierte
-       negro/blanco para legibilidad. -->
-  <rect class="background" width="100" height="100" rx="22" />
-  <path d="M28 22 L50 66 L72 22" stroke="#FF2440" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-  <g fill="#FF2440">
-    <rect x="22" y="82" width="6" height="8" rx="3" />
-    <rect x="34" y="76" width="6" height="14" rx="3" />
-    <rect x="46" y="80" width="6" height="10" rx="3" />
-    <rect x="58" y="72" width="6" height="18" rx="3" />
-    <rect x="70" y="79" width="6" height="11" rx="3" />
-  </g>
+  <!-- Monograma vibra: las mismas 7 barras de ecualizador en v que
+       components/logo.tsx (LogoMark), la marca que se usa en toda la app
+       (panel de edición, feed, login). Fondo negro fijo, barra central roja
+       escarlata como acento — sin variante de esquema de color. -->
+  <rect width="100" height="100" rx="22" fill="#0a0a0a" />
+  <rect x="20.08" y="30.96" width="6.12" height="40.8" rx="3.06" fill="#ffffff" />
+  <rect x="29.26" y="40.48" width="6.12" height="31.28" rx="3.06" fill="#ffffff" />
+  <rect x="38.44" y="50" width="6.12" height="21.76" rx="3.06" fill="#ffffff" />
+  <rect x="46.94" y="58.16" width="6.12" height="13.6" rx="3.06" fill="#F04433" />
+  <rect x="55.44" y="50" width="6.12" height="21.76" rx="3.06" fill="#ffffff" />
+  <rect x="64.62" y="40.48" width="6.12" height="31.28" rx="3.06" fill="#ffffff" />
+  <rect x="73.8" y="30.96" width="6.12" height="40.8" rx="3.06" fill="#ffffff" />
 </svg>

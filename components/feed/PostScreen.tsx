@@ -37,8 +37,6 @@ const PostScreen = forwardRef<HTMLDivElement, PostScreenProps>(function PostScre
     }
   }, [isActive])
 
-  const authorSlug = post.authorName.trim().toLowerCase().replace(/\s+/g, "-")
-
   return (
     <section
       ref={ref}
@@ -102,13 +100,7 @@ const PostScreen = forwardRef<HTMLDivElement, PostScreenProps>(function PostScre
       </div>
 
       <div className="absolute bottom-28 right-4 z-20 sm:right-6">
-        <ActionRail
-          isLiked={isLiked}
-          likeCount={isLiked ? 1 : 0}
-          onToggleLike={onToggleLike}
-          shareUrl={`/${authorSlug}`}
-          shareTitle={post.caption || post.authorName}
-        />
+        <ActionRail isLiked={isLiked} onToggleLike={onToggleLike} />
       </div>
     </section>
   )
