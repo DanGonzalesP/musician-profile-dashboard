@@ -61,7 +61,6 @@ function slugify(text: string): string {
 function loadImageCoverDataUrl(url: string, targetW: number, targetH: number): Promise<string | null> {
   return new Promise((resolve) => {
     const img = new Image()
-    img.crossOrigin = "anonymous"
     img.onload = () => {
       try {
         const canvas = document.createElement("canvas")
@@ -91,7 +90,12 @@ function loadImageCoverDataUrl(url: string, targetW: number, targetH: number): P
       }
     }
     img.onerror = () => resolve(null)
-    img.src = url
+    // Las URLs remotas (http/https) se piden a través de nuestro propio
+    // proxy same-origin — así el <canvas> nunca las ve como cross-origin y
+    // no depende de que el bucket de R2 tenga CORS abierto para el dominio
+    // actual (ver app/api/image-proxy). Los blob:/data: (foto recién subida,
+    // aún sin publicar) ya son same-origin y se cargan directo.
+    img.src = /^https?:\/\//.test(url) ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url
   })
 }
 

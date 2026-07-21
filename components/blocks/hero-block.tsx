@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react"
 import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2, Send } from "lucide-react"
 import type { HeroData, SocialPlatform } from "@/lib/blocks"
+import { SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
 import { ShareProfileDialog } from "./share-profile-dialog"
 import { useLocale } from "@/components/locale-provider"
 
@@ -14,11 +15,9 @@ export const socialIcons: Record<SocialPlatform, typeof Camera> = {
   bandcamp: Disc3,
 }
 
-// Nombre real y créditos van "sueltos" (mismo texto plano, sin caja ni
-// color de acento) uno al lado del otro; la ubicación va debajo. Si solo
-// hay 2 de los 3 datos disponibles, esos dos se juntan en una sola línea
-// en vez de dejar una línea con un solo elemento — el nombre real, cuando
-// está presente, siempre encabeza esa línea.
+// Nombre real y ubicación van siempre juntos en la misma línea (igual que
+// en el panel de artista); los créditos son un dato aparte y van en su
+// propia línea debajo, nunca mezclados con nombre/ubicación.
 function IdentityRow({ items }: { items: { key: string; node: ReactNode }[] }) {
   if (items.length === 0) return null
   return (
@@ -49,18 +48,12 @@ export function HeroBlock({
   const socials = data.socials || []
   const [shareOpen, setShareOpen] = useState(false)
 
-  const identityItems: { key: string; node: ReactNode }[] = []
+  const identityLine1: { key: string; node: ReactNode }[] = []
   if (data.realName) {
-    identityItems.push({ key: "realName", node: <span>{data.realName}</span> })
-  }
-  if (creditsCount > 0) {
-    identityItems.push({
-      key: "credits",
-      node: <span>{creditsCount} {t(creditsCount === 1 ? "hero_credits_one" : "hero_credits_other")}</span>,
-    })
+    identityLine1.push({ key: "realName", node: <span>{data.realName}</span> })
   }
   if (data.location) {
-    identityItems.push({
+    identityLine1.push({
       key: "location",
       node: (
         <span className="inline-flex items-center gap-1.5">
@@ -70,10 +63,15 @@ export function HeroBlock({
       ),
     })
   }
-  // Con los 3 datos presentes, nombre real + créditos van en su propia línea y
-  // la ubicación queda debajo; con solo 2, se juntan en una única línea.
-  const identityLine1 = identityItems.length === 3 ? identityItems.slice(0, 2) : identityItems
-  const identityLine2 = identityItems.length === 3 ? identityItems.slice(2) : []
+  const identityLine2: { key: string; node: ReactNode }[] =
+    creditsCount > 0
+      ? [
+          {
+            key: "credits",
+            node: <span>{creditsCount} {t(creditsCount === 1 ? "hero_credits_one" : "hero_credits_other")}</span>,
+          },
+        ]
+      : []
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border">
@@ -130,7 +128,7 @@ export function HeroBlock({
               <nav aria-label={t("hero_social_aria")} className="flex flex-nowrap items-center justify-center gap-2 sm:flex-wrap sm:justify-end">
                 {socials.map((social, i) => {
                   const Icon = socialIcons[social.platform] ?? Music2
-                  const label = social.label || social.platform
+                  const label = social.label || SOCIAL_PLATFORM_LABELS[social.platform]
                   return (
                     <a
                       key={i}

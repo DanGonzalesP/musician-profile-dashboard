@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
 import { X, Copy, Check, Download, MapPin, Image as ImageIcon, Upload, Loader2 } from "lucide-react"
 import type { HeroData } from "@/lib/blocks"
+import { SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
 import { socialIcons } from "./hero-block"
 import { useLocale } from "@/components/locale-provider"
 import { generateBusinessCardPdf } from "@/lib/generate-business-card-pdf"
@@ -224,7 +225,7 @@ export function ShareProfileDialog({
                   className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] text-muted-foreground"
                 >
                   <Icon className="size-3" />
-                  {social.label || social.platform}
+                  {social.label || SOCIAL_PLATFORM_LABELS[social.platform]}
                 </span>
               )
             })}

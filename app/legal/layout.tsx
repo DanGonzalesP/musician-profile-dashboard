@@ -19,9 +19,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card/40">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <Link href="/">
-            <Logo />
-          </Link>
+          <Logo />
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"

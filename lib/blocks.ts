@@ -23,6 +23,17 @@ export type SocialLink = {
   href: string
 }
 
+// Nombre público de cada red — se usa como texto de respaldo donde se
+// muestra el enlace (ya no se puede escribir un texto propio, ver
+// SocialLinksFields en block-inspector.tsx).
+export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
+  instagram: "Instagram",
+  youtube: "YouTube",
+  twitter: "Twitter / X",
+  spotify: "Spotify",
+  bandcamp: "Bandcamp",
+}
+
 export type Track = {
   title: string
   duration: string

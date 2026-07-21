@@ -2,8 +2,7 @@
 
 // Pantalla de una publicación (foto/video de un usuario) dentro del feed
 // mixto. Mismo snap vertical que las canciones; el video se reproduce solo
-// mientras la pantalla está activa. El rail de acciones ofrece like y
-// compartir (los comentarios, por ahora, son solo de canciones).
+// mientras la pantalla está activa.
 
 import { forwardRef, useEffect, useRef } from "react"
 import { ImageIcon, Play, Users } from "lucide-react"
@@ -17,10 +16,11 @@ interface PostScreenProps {
   isActive: boolean
   isLiked: boolean
   onToggleLike: () => void
+  onOpenComments: () => void
 }
 
 const PostScreen = forwardRef<HTMLDivElement, PostScreenProps>(function PostScreen(
-  { post, isActive, isLiked, onToggleLike },
+  { post, isActive, isLiked, onToggleLike, onOpenComments },
   ref
 ) {
   const { t } = useLocale()
@@ -100,7 +100,7 @@ const PostScreen = forwardRef<HTMLDivElement, PostScreenProps>(function PostScre
       </div>
 
       <div className="absolute bottom-28 right-4 z-20 sm:right-6">
-        <ActionRail isLiked={isLiked} onToggleLike={onToggleLike} />
+        <ActionRail isLiked={isLiked} onToggleLike={onToggleLike} onOpenComments={onOpenComments} />
       </div>
     </section>
   )

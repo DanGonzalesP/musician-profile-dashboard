@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Bell } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import { Logo } from "@/components/logo";
 import ProfileMenu from "./ProfileMenu";
 import { supabase } from "@/lib/supabase";
 import { fetchMyProfiles, type MyProfileOption } from "@/lib/bands";
+import { fetchIncomingCreditRequests } from "@/lib/credit-requests";
+import { fetchUnreadQuestionCount } from "@/lib/profile-questions";
 
 export default function FeedHeader() {
   const { t } = useLocale();
@@ -14,6 +17,7 @@ export default function FeedHeader() {
   const [userId, setUserId] = useState<string | null>(null);
   const [personalDisplayName, setPersonalDisplayName] = useState("");
   const [bands, setBands] = useState<MyProfileOption[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -24,6 +28,15 @@ export default function FeedHeader() {
       const personal = profiles.find((p) => !p.isBand);
       setPersonalDisplayName(personal?.displayName ?? "");
       setBands(profiles.filter((p) => p.isBand));
+
+      if (personal) {
+        const [creditRequests, unreadQuestions] = await Promise.all([
+          fetchIncomingCreditRequests(personal.id).catch(() => []),
+          fetchUnreadQuestionCount(personal.id).catch(() => 0),
+        ]);
+        if (!active) return;
+        setUnreadCount(creditRequests.filter((r) => r.status === "pending").length + unreadQuestions);
+      }
     };
 
     supabase.auth.getUser().then(({ data }) => {
@@ -45,6 +58,7 @@ export default function FeedHeader() {
       } else {
         setPersonalDisplayName("");
         setBands([]);
+        setUnreadCount(0);
       }
     });
 
@@ -66,12 +80,27 @@ export default function FeedHeader() {
       <div className="pointer-events-auto flex items-center gap-3">
         {!checkingSession &&
           (userId ? (
-            <ProfileMenu
-              userId={userId}
-              personalDisplayName={personalDisplayName}
-              personalSlug={personalSlug}
-              bands={bands}
-            />
+            <>
+              <Link
+                href="/perfil/notificaciones"
+                aria-label={t("feed_notifications_aria")}
+                title={t("feed_notifications_aria")}
+                className="relative flex size-9 items-center justify-center rounded-full border border-border bg-card/70 text-foreground backdrop-blur transition-colors hover:bg-accent/40"
+              >
+                <Bell className="size-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+              <ProfileMenu
+                userId={userId}
+                personalDisplayName={personalDisplayName}
+                personalSlug={personalSlug}
+                bands={bands}
+              />
+            </>
           ) : (
             <>
               <Link

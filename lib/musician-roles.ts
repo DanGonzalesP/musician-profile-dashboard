@@ -18,13 +18,13 @@ export const MUSICIAN_ROLES: {
   label: string
   description: string
 }[] = [
-  { id: "autores", label: "Autores", description: "Letristas y creadores de la palabra" },
-  { id: "compositores", label: "Compositores", description: "Creadores de la música y la melodía" },
-  { id: "arreglistas", label: "Arreglistas", description: "Dan forma y color a cada versión" },
-  { id: "directores", label: "Directores", description: "Directores de orquesta, coro y ensamble" },
-  { id: "productores", label: "Productores", description: "Producción musical, beatmakers y topliners" },
-  { id: "mezclas", label: "Mezclas", description: "Ingenieros de grabación, mezcla y mastering" },
-  { id: "musicos", label: "Músicos", description: "Intérpretes, vocalistas y músicos de sesión" },
+  { id: "autores", label: "Autor", description: "Letrista y creador de la palabra" },
+  { id: "compositores", label: "Compositor", description: "Creador de la música y la melodía" },
+  { id: "arreglistas", label: "Arreglista", description: "Da forma y color a cada versión" },
+  { id: "directores", label: "Director", description: "Director de orquesta, coro o ensamble" },
+  { id: "productores", label: "Productor", description: "Producción musical, beatmaker o topliner" },
+  { id: "mezclas", label: "Mezcla", description: "Ingeniero de grabación, mezcla o mastering" },
+  { id: "musicos", label: "Músico", description: "Intérprete, vocalista o músico de sesión" },
 ]
 
 // Filtro extra del feed que no es un rol de persona: las páginas de grupos

@@ -11,12 +11,16 @@ import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
 import { Loader2, MessageCircle, Send, X } from "lucide-react"
 import { useLocale } from "@/components/locale-provider"
-import {
-  addTrackComment,
-  fetchTrackComments,
-  type TrackComment,
-} from "@/lib/track-comments"
+import { addTrackComment, fetchTrackComments, type TrackComment } from "@/lib/track-comments"
+import { addPostComment, fetchPostComments, type PostComment } from "@/lib/post-comments"
 import { supabase } from "@/lib/supabase"
+
+// Un elemento comentable del feed — canción o publicación. Cada uno vive en
+// su propia tabla (feed_comments / feed_post_comments, ver lib/track-comments
+// y lib/post-comments) porque una publicación no tiene fila propia contra la
+// cual poner una FK real; el panel solo elige qué par fetch/add usar.
+export type CommentTarget = { kind: "track" | "post"; id: string; title: string }
+type Comment = TrackComment | PostComment
 
 function timeAgo(iso: string, locale: "es" | "en"): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -30,24 +34,22 @@ function timeAgo(iso: string, locale: "es" | "en"): string {
 }
 
 export default function CommentsPanel({
-  trackId,
-  trackTitle,
+  target,
   isSample,
   mobileOpen,
   onCloseMobile,
   onCountChange,
 }: {
-  // null = sin canción activa con comentarios
-  trackId: string | null
-  trackTitle: string
+  // null = sin canción/publicación activa con comentarios
+  target: CommentTarget | null
   isSample: boolean
   // Controla la hoja inferior en móvil; en escritorio el panel siempre está visible.
   mobileOpen: boolean
   onCloseMobile: () => void
-  onCountChange: (trackId: string, count: number) => void
+  onCountChange: (id: string, count: number) => void
 }) {
   const { t, locale } = useLocale()
-  const [comments, setComments] = useState<TrackComment[]>([])
+  const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(false)
   const [hasSession, setHasSession] = useState(false)
   const [draft, setDraft] = useState("")
@@ -60,32 +62,34 @@ export default function CommentsPanel({
   }, [])
 
   useEffect(() => {
-    if (!trackId || isSample) {
+    if (!target || isSample) {
       setComments([])
       return
     }
     let active = true
     setLoading(true)
-    fetchTrackComments(trackId).then((list) => {
+    const fetchComments = target.kind === "track" ? fetchTrackComments : fetchPostComments
+    fetchComments(target.id).then((list) => {
       if (!active) return
       setComments(list)
       setLoading(false)
-      onCountChange(trackId, list.length)
+      onCountChange(target.id, list.length)
     })
     return () => {
       active = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackId, isSample])
+  }, [target?.kind, target?.id, isSample])
 
   const handleSend = async () => {
-    if (!trackId || !draft.trim() || sending) return
+    if (!target || !draft.trim() || sending) return
     setSending(true)
     setErrorMessage("")
     try {
-      const comment = await addTrackComment(trackId, draft)
+      const comment =
+        target.kind === "track" ? await addTrackComment(target.id, draft) : await addPostComment(target.id, draft)
       setComments((prev) => [comment, ...prev])
-      onCountChange(trackId, comments.length + 1)
+      onCountChange(target.id, comments.length + 1)
       setDraft("")
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : t("feed_comments_error"))
@@ -97,7 +101,7 @@ export default function CommentsPanel({
   const body = (
     <>
       <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-        {!trackId ? (
+        {!target ? (
           <EmptyState text={t("feed_comments_none_active")} />
         ) : isSample ? (
           <EmptyState text={t("feed_comments_sample")} />
@@ -138,7 +142,7 @@ export default function CommentsPanel({
         {errorMessage && (
           <p className="mb-2 text-xs font-medium text-destructive">{errorMessage}</p>
         )}
-        {!trackId || isSample ? null : hasSession ? (
+        {!target || isSample ? null : hasSession ? (
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
@@ -186,13 +190,13 @@ export default function CommentsPanel({
             <p className="flex items-center gap-2 text-sm font-bold text-foreground">
               <MessageCircle className="size-4 text-primary" />
               {t("feed_comments_title")}
-              {trackId && (
+              {target && (
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-bold tabular-nums text-muted-foreground">
                   {comments.length}
                 </span>
               )}
             </p>
-            {trackId && <p className="mt-0.5 truncate text-xs text-muted-foreground">{trackTitle}</p>}
+            {target && <p className="mt-0.5 truncate text-xs text-muted-foreground">{target.title}</p>}
           </div>
         </header>
         {body}
@@ -226,13 +230,13 @@ export default function CommentsPanel({
                   <p className="flex items-center gap-2 text-sm font-bold text-foreground">
                     <MessageCircle className="size-4 text-primary" />
                     {t("feed_comments_title")}
-                    {trackId && (
+                    {target && (
                       <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-bold tabular-nums text-muted-foreground">
                         {comments.length}
                       </span>
                     )}
                   </p>
-                  {trackId && <p className="mt-0.5 truncate text-xs text-muted-foreground">{trackTitle}</p>}
+                  {target && <p className="mt-0.5 truncate text-xs text-muted-foreground">{target.title}</p>}
                 </div>
                 <button
                   type="button"

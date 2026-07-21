@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 /**
@@ -42,8 +43,9 @@ function PulseUnderline({ className }: { className?: string }) {
  */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <span
-      aria-hidden="true"
+    <Link
+      href="/"
+      aria-label="Ir al feed principal"
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black",
         className
@@ -76,7 +78,7 @@ export function LogoMark({ className }: { className?: string }) {
           <rect x="85" y="22" width="9" height="60" rx="4.5" />
         </g>
       </svg>
-    </span>
+    </Link>
   )
 }
 
@@ -94,11 +96,15 @@ export function Logo({
   }
 
   return (
-    <span className={cn("inline-flex flex-col items-start leading-none", className)}>
+    <Link
+      href="/"
+      aria-label="Ir al feed principal"
+      className={cn("inline-flex flex-col items-start leading-none", className)}
+    >
       <span className="bg-gradient-to-r from-foreground from-40% to-primary bg-clip-text font-display text-xl font-extrabold tracking-tight text-transparent">
         vibra
       </span>
       <PulseUnderline className={cn("mt-0.5 ml-0.5", markClassName)} />
-    </span>
+    </Link>
   )
 }

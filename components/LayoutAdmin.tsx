@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PROFILE_ID } from "@/lib/blocks";
+import { fetchIncomingCreditRequests } from "@/lib/credit-requests";
+import { fetchUnreadQuestionCount } from "@/lib/profile-questions";
 import { Logo } from "@/components/logo";
 
 export default function LayoutAdmin({ children }: { children: React.ReactNode }) {
@@ -29,6 +31,9 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
   // "Grupos Musicales" solo se muestra si el artista ya creó más de un
   // grupo — con uno solo (el caso normal) el link sobra en el panel.
   const [ownedBandCount, setOwnedBandCount] = useState(0);
+  // Total de notificaciones sin resolver — solicitudes de crédito pendientes
+  // + preguntas de visitantes sin leer — para el badge del link de abajo.
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     async function cargarPerfil() {
@@ -36,11 +41,12 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("display_name")
+        .select("id, display_name")
         .eq("user_id", user?.id ?? PROFILE_ID)
         .maybeSingle();
 
       let name = profile?.display_name || "";
+      let profileId = profile?.id ?? null;
 
       // Si el usuario logueado todavía no tiene su propia fila en `profiles`
       // (el editor visual sigue publicando bajo el perfil semilla PROFILE_ID),
@@ -48,10 +54,11 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
       if (!name && user) {
         const { data: seedProfile } = await supabase
           .from("profiles")
-          .select("display_name")
+          .select("id, display_name")
           .eq("user_id", PROFILE_ID)
           .maybeSingle();
         name = seedProfile?.display_name || "";
+        profileId = profileId ?? seedProfile?.id ?? null;
       }
 
       setPublicSlug(name.trim().toLowerCase().replace(/\s+/g, "-"));
@@ -64,16 +71,24 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
           .eq("profile_type", "band");
         setOwnedBandCount(count ?? 0);
       }
+
+      if (profileId) {
+        const [creditRequests, unreadQuestions] = await Promise.all([
+          fetchIncomingCreditRequests(profileId).catch(() => []),
+          fetchUnreadQuestionCount(profileId).catch(() => 0),
+        ]);
+        setUnreadCount(creditRequests.filter((r) => r.status === "pending").length + unreadQuestions);
+      }
     }
     cargarPerfil();
   }, []);
 
-  const enlaces: { name: string; href: string; icon: LucideIcon }[] = [
+  const enlaces: { name: string; href: string; icon: LucideIcon; badge?: number }[] = [
     { name: "Editor de Página", href: "/dashboard", icon: Palette },
     { name: "Ver Portal Público", href: publicSlug ? `/${publicSlug}` : "#", icon: Globe },
     { name: "Métricas / Dashboard", href: "/perfil/dashboard", icon: BarChart3 },
     ...(ownedBandCount > 1 ? [{ name: "Grupos Musicales", href: "/perfil/banda", icon: Users }] : []),
-    { name: "Notificaciones de Créditos", href: "/perfil/notificaciones", icon: Bell },
+    { name: "Notificaciones", href: "/perfil/notificaciones", icon: Bell, badge: unreadCount },
     { name: "Historial de Pedidos", href: "/perfil/pedidos", icon: Package },
     { name: "Gestionar Merch", href: "/perfil/admin-merch", icon: Shirt },
     { name: "Gestionar Servicios", href: "/perfil/admin-servicios", icon: Briefcase },
@@ -119,7 +134,12 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
                   }`}
                 >
                   <Icon className="size-4 shrink-0" />
-                  <span>{enlace.name}</span>
+                  <span className="flex-1">{enlace.name}</span>
+                  {!!enlace.badge && (
+                    <span className="flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground">
+                      {enlace.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

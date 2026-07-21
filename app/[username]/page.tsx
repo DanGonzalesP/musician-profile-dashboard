@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Block, type BlockType, type TracksData, type CreditsData, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds } from "@/lib/blocks";
+import { type Block, type BlockType, type TracksData, type CreditsData, BLOCK_LIBRARY, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
+import { AskAboutBlock } from "@/components/blocks/ask-about-block";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
@@ -44,6 +45,7 @@ function PerfilPublicoContent() {
   const [unifiedProfile, setUnifiedProfile] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("main");
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const [isBand, setIsBand] = useState(false);
   const [profileAccent, setProfileAccent] = useState<AccentColor>("rojo");
@@ -96,6 +98,7 @@ function PerfilPublicoContent() {
 
         setUnifiedProfile(Boolean(profile.unified_profile));
         setOwnerUserId(profile.user_id ?? null);
+        setProfileId(profile.id);
         setIsBand(profile.profile_type === "band");
 
         // Acento elegido por el artista para SU página. Consulta aparte y
@@ -252,17 +255,38 @@ function PerfilPublicoContent() {
   const showTabBar = !unifiedProfile && tabs.length > 1;
   const activeBlocks = tabs.find((tab) => tab.key === activeTab)?.blocks ?? mainBlocks;
 
-  const renderBlock = (block: Block) => (
-    <BlockRenderer
-      key={block.id}
-      block={block}
-      products={products}
-      services={services}
-      shareUrl={shareUrl}
-      albumCovers={albumCovers}
-      creditsCount={creditsCount}
-    />
-  );
+  // A los visitantes (nunca al propio dueño) se les ofrece un botón flotante
+  // sobre cada bloque para preguntarle al artista sobre ese elemento puntual
+  // — llega a la barra de notificaciones del dueño (ver AskAboutBlock).
+  const renderBlock = (block: Block) => {
+    const rendered = (
+      <BlockRenderer
+        block={block}
+        products={products}
+        services={services}
+        shareUrl={shareUrl}
+        albumCovers={albumCovers}
+        creditsCount={creditsCount}
+      />
+    );
+
+    if (isOwner || !profileId) {
+      return <div key={block.id}>{rendered}</div>;
+    }
+
+    const def = BLOCK_LIBRARY.find((b) => b.type === block.type);
+    return (
+      <AskAboutBlock
+        key={block.id}
+        profileId={profileId}
+        blockType={block.type}
+        blockLabel={def?.label ?? block.type}
+        hasSession={Boolean(viewerUserId)}
+      >
+        {rendered}
+      </AskAboutBlock>
+    );
+  };
 
   return (
     <div className={`min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8 ${accentClassName(profileAccent)}`}>

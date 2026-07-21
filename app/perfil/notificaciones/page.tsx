@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PROFILE_ID } from "@/lib/blocks";
 import { fetchIncomingCreditRequests, resolveCreditRequest, type CreditRequest } from "@/lib/credit-requests";
+import { fetchIncomingQuestions, markQuestionRead, type ProfileQuestion } from "@/lib/profile-questions";
 import LayoutAdmin from "@/components/LayoutAdmin";
-import { Loader2, Check, X as XIcon } from "lucide-react";
+import { Loader2, Check, HelpCircle, X as XIcon } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   A: "Autor (Letra)",
@@ -21,6 +22,7 @@ const ROLE_LABELS: Record<string, string> = {
 export default function NotificacionesPage() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<CreditRequest[]>([]);
+  const [questions, setQuestions] = useState<ProfileQuestion[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
@@ -48,8 +50,12 @@ export default function NotificacionesPage() {
       const profileId = profile?.id ?? PROFILE_ID;
 
       try {
-        const found = await fetchIncomingCreditRequests(profileId);
-        setRequests(found);
+        const [foundRequests, foundQuestions] = await Promise.all([
+          fetchIncomingCreditRequests(profileId),
+          fetchIncomingQuestions(profileId),
+        ]);
+        setRequests(foundRequests);
+        setQuestions(foundQuestions);
       } catch (err) {
         setErrorMessage(err instanceof Error ? err.message : "No se pudieron cargar las notificaciones.");
       } finally {
@@ -72,6 +78,15 @@ export default function NotificacionesPage() {
     }
   };
 
+  const handleMarkRead = async (questionId: string) => {
+    try {
+      await markQuestionRead(questionId);
+      setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, status: "read" } : q)));
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "No se pudo marcar la pregunta como leída.");
+    }
+  };
+
   if (loading) {
     return (
       <LayoutAdmin>
@@ -84,14 +99,15 @@ export default function NotificacionesPage() {
 
   const pendientes = requests.filter((r) => r.status === "pending");
   const resueltas = requests.filter((r) => r.status !== "pending");
+  const preguntasSinLeer = questions.filter((q) => q.status === "unread");
 
   return (
     <LayoutAdmin>
       <div className="p-8 max-w-4xl mx-auto space-y-6">
         <header className="border-b border-zinc-800 pb-4">
-          <h1 className="text-2xl font-bold text-white">Notificaciones de Créditos</h1>
+          <h1 className="text-2xl font-bold text-white">Notificaciones</h1>
           <p className="text-zinc-400 text-xs mt-1">
-            Otros artistas te etiquetaron como colaborador en sus canciones — decide si aparece en su perfil público.
+            Solicitudes de crédito de otros artistas y preguntas de visitantes sobre tu perfil.
           </p>
         </header>
 
@@ -101,7 +117,49 @@ export default function NotificacionesPage() {
 
         <section className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-            Pendientes ({pendientes.length})
+            Preguntas de visitantes ({preguntasSinLeer.length} sin leer)
+          </h2>
+          {questions.length === 0 ? (
+            <p className="text-zinc-500 text-sm text-center py-8 bg-zinc-950 rounded-xl border border-zinc-800">
+              Nadie te ha preguntado nada todavía.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {questions.map((q) => (
+                <div
+                  key={q.id}
+                  className={`flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-xl border p-4 ${
+                    q.status === "unread" ? "border-amber-500/30 bg-amber-500/5" : "border-zinc-800 bg-zinc-950"
+                  }`}
+                >
+                  <div className="min-w-0 flex items-start gap-2.5">
+                    <HelpCircle className="size-4 shrink-0 mt-0.5 text-amber-400" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-zinc-400">
+                        <span className="font-medium text-amber-400">{q.askerDisplayName}</span> preguntó sobre{" "}
+                        <span className="font-medium text-white">{q.blockLabel}</span>
+                      </p>
+                      <p className="text-sm text-white mt-1 whitespace-pre-wrap break-words">{q.message}</p>
+                    </div>
+                  </div>
+                  {q.status === "unread" && (
+                    <button
+                      type="button"
+                      onClick={() => handleMarkRead(q.id)}
+                      className="shrink-0 flex items-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-bold px-3 py-2 transition-colors"
+                    >
+                      <Check className="size-3.5" /> Marcar leída
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+            Solicitudes de crédito pendientes ({pendientes.length})
           </h2>
           {pendientes.length === 0 ? (
             <p className="text-zinc-500 text-sm text-center py-8 bg-zinc-950 rounded-xl border border-zinc-800">

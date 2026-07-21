@@ -5,9 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeedItem } from "@/lib/feed/publicPosts";
 import type { FeedTrack } from "@/lib/musicFeed";
 import { fetchCommentCounts } from "@/lib/track-comments";
+import { fetchPostCommentCounts } from "@/lib/post-comments";
 import TrackScreen from "./TrackScreen";
 import PostScreen from "./PostScreen";
-import CommentsPanel from "./CommentsPanel";
+import CommentsPanel, { type CommentTarget } from "./CommentsPanel";
 import FeedScrollNav from "./FeedScrollNav";
 import FeedShareButton from "./FeedShareButton";
 
@@ -34,11 +35,23 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
   const activeItem = items[activeIndex];
   const activeTrack = activeItem?.kind === "track" ? activeItem.track : null;
 
-  // Conteos de comentarios de todas las pistas visibles, en una sola consulta.
+  // Elemento comentable activo (canción o publicación) — el panel de
+  // comentarios sigue a cualquiera de los dos, no solo a canciones.
+  const activeCommentsTarget: CommentTarget | null =
+    activeItem?.kind === "track"
+      ? { kind: "track", id: activeItem.track.id, title: `${activeItem.track.title} — ${activeItem.track.artistName}` }
+      : activeItem?.kind === "post"
+        ? { kind: "post", id: activeItem.post.id, title: activeItem.post.caption || activeItem.post.authorName }
+        : null;
+
+  // Conteos de comentarios de todas las pistas y publicaciones visibles, en
+  // una sola consulta por tipo.
   useEffect(() => {
     if (isSampleFeed) return;
     const trackIds = items.filter((i) => i.kind === "track").map((i) => (i as { track: FeedTrack }).track.id);
-    fetchCommentCounts(trackIds).then(setCommentCounts);
+    const postIds = items.filter((i) => i.kind === "post").map((i) => (i as Extract<FeedItem, { kind: "post" }>).post.id);
+    fetchCommentCounts(trackIds).then((counts) => setCommentCounts((prev) => ({ ...prev, ...counts })));
+    fetchPostCommentCounts(postIds).then((counts) => setCommentCounts((prev) => ({ ...prev, ...counts })));
   }, [items, isSampleFeed]);
 
   useEffect(() => {
@@ -202,6 +215,7 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
                 isActive={index === activeIndex}
                 isLiked={likedIds.has(item.id)}
                 onToggleLike={() => toggleLike(item.id)}
+                onOpenComments={() => setMobileCommentsOpen(true)}
               />
             )
           )}
@@ -219,8 +233,7 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
       </div>
 
       <CommentsPanel
-        trackId={activeTrack?.id ?? null}
-        trackTitle={activeTrack ? `${activeTrack.title} — ${activeTrack.artistName}` : ""}
+        target={activeCommentsTarget}
         isSample={isSampleFeed}
         mobileOpen={mobileCommentsOpen}
         onCloseMobile={() => setMobileCommentsOpen(false)}

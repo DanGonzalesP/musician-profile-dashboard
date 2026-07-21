@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, Album, Track, ReleaseType, SocialLink, SocialPlatform, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
-import { BLOCK_LIBRARY } from "@/lib/blocks"
+import { BLOCK_LIBRARY, SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
@@ -353,13 +353,9 @@ function AudioUploader({
 
 // ─── HeroFields ───────────────────────────────────────────────────────────
 
-const SOCIAL_PLATFORMS: { value: SocialPlatform; label: string }[] = [
-  { value: "instagram", label: "Instagram" },
-  { value: "youtube", label: "YouTube" },
-  { value: "twitter", label: "Twitter / X" },
-  { value: "spotify", label: "Spotify" },
-  { value: "bandcamp", label: "Bandcamp" },
-]
+const SOCIAL_PLATFORMS: { value: SocialPlatform; label: string }[] = (
+  Object.entries(SOCIAL_PLATFORM_LABELS) as [SocialPlatform, string][]
+).map(([value, label]) => ({ value, label }))
 
 function SocialLinksFields({
   socials,
@@ -416,11 +412,6 @@ function SocialLinksFields({
               <Trash2 className="size-3.5" />
             </button>
           </div>
-          <TextInput
-            value={social.label}
-            onChange={(e) => setSocial(index, { label: e.target.value })}
-            placeholder="Texto a mostrar, ej. @novareyes"
-          />
           <TextInput
             value={social.href}
             onChange={(e) => setSocial(index, { href: e.target.value })}
