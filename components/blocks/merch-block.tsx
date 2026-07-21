@@ -47,7 +47,7 @@ function BuyButton({ product, big = false }: { product: CatalogProduct; big?: bo
   const soldOut = product.kind === "fisico" && product.stock <= 0
   const base = big
     ? "inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all"
-    : "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-all"
+    : "flex w-full items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all"
 
   if (soldOut) {
     return (
@@ -203,9 +203,12 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
         </motion.div>
       )}
 
-      {/* Grilla de productos */}
+      {/* Grilla de productos — auto-fill según el ancho real del contenedor
+          (no del viewport): en el lienzo angosto del editor esto evita que
+          sm:/lg: fuercen 3-4 columnas sobre un espacio que sigue siendo
+          angosto, lo que aplastaba cada tarjeta. */}
       <motion.div
-        className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+        className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true }}
@@ -243,16 +246,16 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
                   />
                 )}
               </div>
-              <div className="flex flex-1 flex-col gap-1.5 p-4">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-primary/80">
+              <div className="flex flex-1 flex-col gap-1 p-3">
+                <span className="text-[9px] font-semibold uppercase tracking-wide text-primary/80">
                   {productCategoryLabel(product.category).split(" (")[0]}
                 </span>
-                <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
+                <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
                   {product.name || t("merch_new_product")}
                 </p>
                 <VariantChips product={product} max={4} />
-                <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                  <p className="text-base font-semibold tabular-nums text-foreground">{formatPrice(product)}</p>
+                <div className="mt-auto flex flex-col gap-1.5 pt-2">
+                  <p className="text-sm font-semibold tabular-nums text-foreground">{formatPrice(product)}</p>
                   <BuyButton product={product} />
                 </div>
               </div>

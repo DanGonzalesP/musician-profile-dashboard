@@ -339,7 +339,11 @@ export function ProfileEditor() {
               ...b,
               data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"],
             }))
-          setBlocks(mergePublicacionesEmbeds(cleanBlocks))
+          const loadedBlocks = mergePublicacionesEmbeds(cleanBlocks)
+          setBlocks(loadedBlocks)
+          // El panel de la derecha se abre solo, con el primer elemento de la
+          // página (normalmente Perfil/Banner Principal) ya seleccionado.
+          setSelectedId(loadedBlocks[0]?.id ?? null)
           setProducts(
             (draft.products ?? []).map((p) =>
               normalizeDraftProduct(stripDeadBlobUrls(p as unknown as Record<string, unknown>))
@@ -359,21 +363,16 @@ export function ProfileEditor() {
 
           if (error) throw error
 
-          if (dbBlocks && dbBlocks.length > 0) {
-            setBlocks(
-              mergePublicacionesEmbeds(
-                dbBlocks
-                  .filter((b) => isKnownBlockType(b.block_type))
-                  .map((b) => dbBlockToBlock(b, { isBand }))
-              )
-            )
-          } else {
-            setBlocks([
-              createBlock("hero"),
-              createBlock("tracks"),
-              createBlock("merch"),
-            ])
-          }
+          const loadedBlocks =
+            dbBlocks && dbBlocks.length > 0
+              ? mergePublicacionesEmbeds(
+                  dbBlocks
+                    .filter((b) => isKnownBlockType(b.block_type))
+                    .map((b) => dbBlockToBlock(b, { isBand }))
+                )
+              : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
+          setBlocks(loadedBlocks)
+          setSelectedId(loadedBlocks[0]?.id ?? null)
 
           const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId)
           setProducts(catalogProducts)
@@ -381,11 +380,9 @@ export function ProfileEditor() {
         }
       } catch (err) {
         console.error("Error cargando bloques iniciales:", err)
-        setBlocks([
-          createBlock("hero"),
-          createBlock("tracks"),
-          createBlock("merch"),
-        ])
+        const fallbackBlocks = [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
+        setBlocks(fallbackBlocks)
+        setSelectedId(fallbackBlocks[0]?.id ?? null)
       } finally {
         setLoading(false)
       }
@@ -619,8 +616,15 @@ export function ProfileEditor() {
   }
 
   function deleteBlock(id: string) {
-    setBlocks((prev) => prev.filter((b) => b.id !== id))
-    setSelectedId((cur) => (cur === id ? null : cur))
+    setBlocks((prev) => {
+      const index = prev.findIndex((b) => b.id === id)
+      const next = prev.filter((b) => b.id !== id)
+      // El panel de la derecha siempre debe mostrar algo seleccionado — al
+      // borrar el bloque activo, se selecciona el que quedó en su lugar (o
+      // el anterior si era el último) en vez de dejar el panel vacío.
+      setSelectedId((cur) => (cur === id ? next[Math.min(index, next.length - 1)]?.id ?? null : cur))
+      return next
+    })
   }
 
   function moveBlock(id: string, dir: -1 | 1) {
@@ -773,31 +777,36 @@ export function ProfileEditor() {
           />
         </main>
 
-        {/* Right — inspector */}
+        {/* Right — inspector. Siempre montado en desktop (xl+): no se cierra
+            ni desaparece al seleccionar un bloque, muestra directamente el
+            primero seleccionado al entrar. En mobile/tablet sigue siendo un
+            overlay que se pisa tocando afuera, ya que ahí sí comparte
+            pantalla con el lienzo. */}
         {selectedBlock && (
-          <>
-            <div
-              className="fixed inset-0 z-30 bg-background/70 xl:hidden"
-              onClick={() => setSelectedId(null)}
-              aria-hidden="true"
-            />
-            <aside className="glass-panel fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-sidebar-border/60 xl:static xl:z-auto xl:w-96 xl:max-w-none 2xl:w-[27rem]">
-              <BlockInspector
-                block={selectedBlock}
-                onChange={updateBlock}
-                onClose={() => setSelectedId(null)}
-                onDelete={deleteBlock}
-                blobRegistry={blobRegistryRef}
-                products={products}
-                onProductsChange={setProducts}
-                services={services}
-                onServicesChange={setServices}
-                profileId={profileIdRef.current}
-                isBand={isBandRef.current}
-              />
-            </aside>
-          </>
+          <div
+            className="fixed inset-0 z-30 bg-background/70 xl:hidden"
+            onClick={() => setSelectedId(null)}
+            aria-hidden="true"
+          />
         )}
+        <aside
+          className={`glass-panel fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-sidebar-border/60 xl:static xl:z-auto xl:flex xl:w-96 xl:max-w-none 2xl:w-[27rem] ${
+            selectedBlock ? "flex" : "hidden xl:flex"
+          }`}
+        >
+          <BlockInspector
+            block={selectedBlock}
+            onChange={updateBlock}
+            onDelete={deleteBlock}
+            blobRegistry={blobRegistryRef}
+            products={products}
+            onProductsChange={setProducts}
+            services={services}
+            onServicesChange={setServices}
+            profileId={profileIdRef.current}
+            isBand={isBandRef.current}
+          />
+        </aside>
       </div>
     </div>
   )

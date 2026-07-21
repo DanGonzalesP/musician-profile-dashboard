@@ -329,7 +329,7 @@ export type BlockDefinition = {
   label: string
   description: string
   icon: LucideIcon
-  category: "Layout" | "Music" | "Perfil" | "Commerce"
+  category: "Music" | "Perfil" | "Commerce"
 }
 
 export const BLOCK_LIBRARY: BlockDefinition[] = [
@@ -338,7 +338,7 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
     label: "Banner Principal",
     description: "Encabezado grande con tu nombre, frase de presentación y foto.",
     icon: GalleryVerticalEnd,
-    category: "Layout",
+    category: "Perfil",
   },
   {
     type: "single",

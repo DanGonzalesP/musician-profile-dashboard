@@ -9,7 +9,6 @@ import { useLocale } from "@/components/locale-provider";
 import VinylCover from "./VinylCover";
 import PlaybackControls from "./PlaybackControls";
 import MarqueeText from "./MarqueeText";
-import ActionRail from "./ActionRail";
 
 interface TrackScreenProps {
   track: FeedTrack;
@@ -53,7 +52,7 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
   return (
     <section
       ref={ref}
-      className="relative flex h-dvh w-full snap-start snap-always items-center justify-center overflow-hidden px-6 pb-28 pt-24"
+      className="relative flex h-dvh w-full snap-start snap-always items-center justify-center overflow-hidden px-6 pb-28 pt-28 lg:pt-24"
     >
       {track.coverImageUrl && (
         <div
@@ -96,17 +95,10 @@ const TrackScreen = forwardRef<HTMLDivElement, TrackScreenProps>(function TrackS
           duration={duration}
           onTogglePlay={onTogglePlay}
           onSeek={onSeek}
-        />
-      </div>
-
-      {/* Rail de acciones estilo TikTok — como el panel de comentarios se
-          despliega a la derecha, el rail vive en ese mismo borde. */}
-      <div className="absolute bottom-32 right-4 z-20 sm:right-6">
-        <ActionRail
           isLiked={isLiked}
           likeCount={isLiked ? 1 : 0}
-          commentCount={commentCount}
           onToggleLike={onToggleLike}
+          commentCount={commentCount}
           onOpenComments={onOpenComments}
           shareUrl={isSample ? "/" : `/${artistSlug}`}
           shareTitle={`${track.title} — ${track.artistName}`}

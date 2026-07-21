@@ -14,6 +14,13 @@
 -- `profiles` automáticamente (la app también lo intenta desde el cliente,
 -- esto es el respaldo a nivel de base de datos). ──────────────────────────
 
+-- Las filas de grupo (profile_type = 'band') no tienen user_id (llevan
+-- owner_user_id en su lugar) — sin este ALTER, crear un grupo revienta con
+-- "null value in column user_id of relation profiles violates not-null
+-- constraint" apenas se hace el insert en createBand(), sin importar si se
+-- invita o no a alguien más.
+alter table profiles alter column user_id drop not null;
+
 -- Un solo perfil personal por usuario (las filas de grupos llevan user_id
 -- NULL y no entran en el índice).
 create unique index if not exists profiles_user_artist_unique

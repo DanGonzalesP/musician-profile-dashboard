@@ -31,7 +31,6 @@ export type BlobRegistry = React.MutableRefObject<Map<string, File>>
 type Props = {
   block: Block | null
   onChange: (id: string, data: Block["data"]) => void
-  onClose: () => void
   onDelete: (id: string) => void
   blobRegistry: BlobRegistry
   products: CatalogProduct[]
@@ -45,7 +44,6 @@ type Props = {
 export function BlockInspector({
   block,
   onChange,
-  onClose,
   onDelete,
   blobRegistry,
   products,
@@ -76,20 +74,10 @@ export function BlockInspector({
 
   return (
     <div className="flex h-full flex-col text-foreground">
-      <div className="gradient-border relative flex items-center justify-between border-b border-sidebar-border/60 bg-sidebar/80 px-4 py-3 backdrop-blur-md">
-        <div>
-          <BackToPanelLink />
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary">Editando</p>
-          <p className="text-sm font-semibold text-foreground">{def?.label}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Cerrar panel de edición"
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
+      <div className="gradient-border relative border-b border-sidebar-border/60 bg-sidebar/80 px-4 py-3 backdrop-blur-md">
+        <BackToPanelLink />
+        <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-primary">Editando</p>
+        <p className="text-sm font-semibold text-foreground">{def?.label}</p>
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto bg-sidebar/40 p-4">

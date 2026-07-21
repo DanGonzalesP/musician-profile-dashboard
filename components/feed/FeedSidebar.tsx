@@ -104,7 +104,7 @@ export function FeedSidebar({
       </aside>
 
       {/* ── Móvil: fila horizontal deslizable ─────────────────────────── */}
-      <div className="pointer-events-none absolute inset-x-0 top-14 z-40 sm:top-16 lg:hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-16 z-40 sm:top-20 lg:hidden">
         <div
           role="tablist"
           aria-label="Filtrar el feed por rol"

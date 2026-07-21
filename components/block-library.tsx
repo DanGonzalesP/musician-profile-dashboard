@@ -11,10 +11,9 @@ import { AnimatePresence, motion } from "framer-motion"
 import { BLOCK_LIBRARY, type BlockType } from "@/lib/blocks"
 import { Plus } from "lucide-react"
 
-const CATEGORIES = ["Layout", "Music", "Perfil", "Commerce"] as const
+const CATEGORIES = ["Music", "Perfil", "Commerce"] as const
 
 const CATEGORY_LABELS: Record<(typeof CATEGORIES)[number], string> = {
-  Layout: "Diseño",
   Music: "Música",
   Perfil: "Perfil",
   Commerce: "Comercio",

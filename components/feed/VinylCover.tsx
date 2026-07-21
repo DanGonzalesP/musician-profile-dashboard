@@ -47,17 +47,6 @@ export default function VinylCover({
       className="group relative flex aspect-square w-64 items-center justify-center sm:w-72"
       aria-label={isPlaying ? "Pausar" : "Reproducir"}
     >
-      {phase !== "idle" && (
-        <div
-          aria-hidden
-          className="absolute -right-2 -top-4 h-24 w-16 origin-top-right transition-transform duration-500 ease-out"
-          style={{ transform: isPlaying ? "rotate(18deg)" : "rotate(38deg)" }}
-        >
-          <div className="ml-auto h-full w-1.5 rounded-full bg-border" />
-          <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-primary" />
-        </div>
-      )}
-
       <div
         className={`relative h-full w-full overflow-hidden rounded-full border-4 border-border bg-card shadow-2xl ${animationClass} ${
           isPlaying ? "animate-spin" : ""

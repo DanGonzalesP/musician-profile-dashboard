@@ -11,7 +11,7 @@ import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, ArrowLeft, LayoutDashboard, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
+import { Store, ArrowLeft, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 type TabKey = "main" | "legado" | "publicaciones" | "store";
@@ -168,27 +168,19 @@ function PerfilPublicoContent() {
   const isOwner = Boolean(ownerUserId && viewerUserId && ownerUserId === viewerUserId);
 
   // Si es el propio artista viendo su portal público (ej. desde "Vista
-  // previa" del editor), la flecha vuelve a su panel en vez del feed
-  // principal — a cualquier otro visitante sí lo manda al feed.
+  // previa" del editor), la flecha vuelve a su panel de edición en vez del
+  // feed principal — a cualquier otro visitante sí lo manda al feed. Antes
+  // había un segundo botón aparte ("Volver a panel de edición") que llevaba
+  // al mismo lugar; se unificaron en este único botón.
   const backToFeedButton = (
     <Link
-      href={isOwner ? "/perfil/dashboard" : "/"}
+      href={isOwner ? "/dashboard" : "/"}
       className="fixed left-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
     >
       <ArrowLeft className="size-3.5" />
       {isOwner ? "Volver al panel de artista" : t("auth_back_to_feed")}
     </Link>
   );
-
-  const editPanelButton = isOwner ? (
-    <Link
-      href="/dashboard"
-      className="fixed right-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
-    >
-      <LayoutDashboard className="size-3.5" />
-      Volver a panel de edición
-    </Link>
-  ) : null;
 
   // UI States
   if (state === "loading") {
@@ -276,7 +268,6 @@ function PerfilPublicoContent() {
     <div className={`min-h-screen text-foreground px-4 py-6 sm:px-6 sm:py-8 ${accentClassName(profileAccent)}`}>
       <AudioReactiveBackground />
       {backToFeedButton}
-      {editPanelButton}
       {/* La pestaña de Trayectoria (CV) usa todo el espacio lateral disponible;
           el resto del perfil mantiene el ancho de lectura clásico. */}
       <main
