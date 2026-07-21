@@ -187,7 +187,7 @@ export function ShareProfileDialog({
                   {data.location}
                 </span>
               )}
-              {data.monthlyListeners && <span>{data.monthlyListeners}</span>}
+              {data.realName && <span>{data.realName}</span>}
             </div>
           </div>
         </div>

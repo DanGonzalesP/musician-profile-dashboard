@@ -82,11 +82,11 @@ export function EditorHeader({
       </div>
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/perfil/dashboard"
+          href="/"
           className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
         >
           <ArrowLeft className="size-3.5" />
-          Volver al Panel
+          Volver al feed
         </Link>
         {ownedBandCount > 1 && (
           <Link href="/perfil/banda" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>

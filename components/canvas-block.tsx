@@ -66,8 +66,8 @@ export function CanvasBlock({
         </div>
       ) : (
         <div
-          className={`absolute -top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-popover px-1 py-1 shadow-lg transition-opacity ${
-            selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          className={`absolute -top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-popover px-1 py-1 opacity-100 shadow-lg transition-opacity sm:opacity-0 sm:group-hover:opacity-100 ${
+            selected ? "sm:opacity-100" : ""
           }`}
         >
           <button

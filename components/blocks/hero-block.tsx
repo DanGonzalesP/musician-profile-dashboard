@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2, Send } from "lucide-react"
 import type { HeroData, SocialPlatform } from "@/lib/blocks"
 import { ShareProfileDialog } from "./share-profile-dialog"
@@ -12,6 +12,25 @@ export const socialIcons: Record<SocialPlatform, typeof Camera> = {
   twitter: AtSign,
   spotify: Music2,
   bandcamp: Disc3,
+}
+
+// Nombre real y créditos van "sueltos" (mismo texto plano, sin caja ni
+// color de acento) uno al lado del otro; la ubicación va debajo. Si solo
+// hay 2 de los 3 datos disponibles, esos dos se juntan en una sola línea
+// en vez de dejar una línea con un solo elemento — el nombre real, cuando
+// está presente, siempre encabeza esa línea.
+function IdentityRow({ items }: { items: { key: string; node: ReactNode }[] }) {
+  if (items.length === 0) return null
+  return (
+    <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      {items.map((item, i) => (
+        <span key={item.key} className="inline-flex items-center gap-2">
+          {i > 0 && <span aria-hidden="true">·</span>}
+          {item.node}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 export function HeroBlock({
@@ -29,6 +48,32 @@ export function HeroBlock({
   const imagePreview = data.image || "/placeholder.svg"
   const socials = data.socials || []
   const [shareOpen, setShareOpen] = useState(false)
+
+  const identityItems: { key: string; node: ReactNode }[] = []
+  if (data.realName) {
+    identityItems.push({ key: "realName", node: <span>{data.realName}</span> })
+  }
+  if (creditsCount > 0) {
+    identityItems.push({
+      key: "credits",
+      node: <span>{creditsCount} {t(creditsCount === 1 ? "hero_credits_one" : "hero_credits_other")}</span>,
+    })
+  }
+  if (data.location) {
+    identityItems.push({
+      key: "location",
+      node: (
+        <span className="inline-flex items-center gap-1.5">
+          <MapPin className="size-4 text-primary" />
+          {data.location}
+        </span>
+      ),
+    })
+  }
+  // Con los 3 datos presentes, nombre real + créditos van en su propia línea y
+  // la ubicación queda debajo; con solo 2, se juntan en una única línea.
+  const identityLine1 = identityItems.length === 3 ? identityItems.slice(0, 2) : identityItems
+  const identityLine2 = identityItems.length === 3 ? identityItems.slice(2) : []
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border">
@@ -64,25 +109,8 @@ export function HeroBlock({
             <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl">
               {data.name || t("hero_artist_name_fallback")}
             </h2>
-            <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              {data.location && (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-4 text-primary" />
-                  {data.location}
-                </span>
-              )}
-              {data.monthlyListeners && (
-                <>
-                  {data.location && <span aria-hidden="true">·</span>}
-                  <span>{data.monthlyListeners}</span>
-                </>
-              )}
-            </div>
-            {creditsCount > 0 && (
-              <span className="mt-2 inline-flex items-center rounded-full border border-primary/30 bg-[color-mix(in_oklch,var(--primary)_12%,transparent)] px-2.5 py-0.5 text-xs font-medium text-primary">
-                {creditsCount} {t(creditsCount === 1 ? "hero_credits_one" : "hero_credits_other")}
-              </span>
-            )}
+            <IdentityRow items={identityLine1} />
+            <IdentityRow items={identityLine2} />
           </div>
 
           {/* Columna derecha — Acciones y redes */}
@@ -99,19 +127,21 @@ export function HeroBlock({
             )}
 
             {socials.length > 0 && (
-              <nav aria-label={t("hero_social_aria")} className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+              <nav aria-label={t("hero_social_aria")} className="flex flex-nowrap items-center justify-center gap-2 sm:flex-wrap sm:justify-end">
                 {socials.map((social, i) => {
                   const Icon = socialIcons[social.platform] ?? Music2
+                  const label = social.label || social.platform
                   return (
                     <a
                       key={i}
                       href={social.href || "#"}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                      aria-label={label}
+                      className="inline-flex size-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-background/60 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs"
                     >
-                      <Icon className="size-3.5" />
-                      {social.label || social.platform}
+                      <Icon className="size-4 sm:size-3.5" />
+                      <span className="hidden sm:inline">{label}</span>
                     </a>
                   )
                 })}

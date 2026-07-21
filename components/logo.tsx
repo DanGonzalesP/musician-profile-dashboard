@@ -33,6 +33,13 @@ function PulseUnderline({ className }: { className?: string }) {
   )
 }
 
+/**
+ * La "v" de vibra ya no es una letra de molde con una raya de color debajo
+ * (leía como "V subrayada"): ahora la propia v está construida con las
+ * barras del pulso de ecualizador, de más altas en los extremos a la más
+ * corta en el centro — a la vez una v y una onda de sonido, un solo gesto
+ * en vez de letra + adorno.
+ */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <span
@@ -42,27 +49,31 @@ export function LogoMark({ className }: { className?: string }) {
         className
       )}
     >
-      <svg viewBox="0 0 100 100" className="size-[70%]" fill="currentColor">
-        {/* La "v" de vibra con su pulso de ecualizador debajo */}
-        <text
-          x="50"
-          y="56"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontFamily="var(--font-display, inherit)"
-          fontWeight="800"
-          fontSize="62"
-          className="text-white"
-          fill="currentColor"
-        >
-          v
-        </text>
-        <g className="text-primary">
-          <rect x="22" y="82" width="7" height="8" rx="3.5" />
-          <rect x="34" y="76" width="7" height="14" rx="3.5" />
-          <rect x="46" y="80" width="7" height="10" rx="3.5" />
-          <rect x="58" y="72" width="7" height="18" rx="3.5" />
-          <rect x="70" y="79" width="7" height="11" rx="3.5" />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: "radial-gradient(circle at 50% 0%, color-mix(in oklch, var(--primary) 35%, transparent), transparent 70%)",
+        }}
+      />
+      <svg viewBox="0 0 100 100" className="relative size-[68%]">
+        <defs>
+          <linearGradient id="vibraMarkGradient" x1="0" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#fff" />
+            <stop offset="38%" stopColor="#fff" />
+            <stop offset="50%" style={{ stopColor: "var(--primary)" }} />
+            <stop offset="62%" stopColor="#fff" />
+            <stop offset="100%" stopColor="#fff" />
+          </linearGradient>
+        </defs>
+        <g fill="url(#vibraMarkGradient)" style={{ filter: "drop-shadow(0 0 5px color-mix(in oklch, var(--primary) 55%, transparent))" }}>
+          <rect x="6" y="22" width="9" height="60" rx="4.5" />
+          <rect x="19.5" y="36" width="9" height="46" rx="4.5" />
+          <rect x="33" y="50" width="9" height="32" rx="4.5" />
+          <rect x="45.5" y="62" width="9" height="20" rx="4.5" />
+          <rect x="58" y="50" width="9" height="32" rx="4.5" />
+          <rect x="71.5" y="36" width="9" height="46" rx="4.5" />
+          <rect x="85" y="22" width="9" height="60" rx="4.5" />
         </g>
       </svg>
     </span>

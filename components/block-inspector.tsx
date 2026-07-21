@@ -13,14 +13,15 @@ import { X, Trash2, Upload, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, Ar
 import { LegadoFields } from "@/components/inspector/legado-fields"
 import { PublicacionesFields } from "@/components/inspector/publicaciones-fields"
 import { EmbedsFields } from "@/components/inspector/embeds-fields"
+import { LocationSelect } from "@/components/inspector/location-fields"
 
 function BackToPanelLink() {
   return (
     <Link
-      href="/perfil/dashboard"
+      href="/"
       className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
     >
-      <ArrowLeft className="size-3" /> Volver al Panel
+      <ArrowLeft className="size-3" /> Volver al feed
     </Link>
   )
 }
@@ -516,6 +517,13 @@ function HeroFields({
       <Field label="Nombre del artista">
         <TextInput value={data.name || ""} onChange={(e) => onChange({ ...data, name: e.target.value })} />
       </Field>
+      <Field label="Nombre real (opcional)">
+        <TextInput
+          value={data.realName || ""}
+          onChange={(e) => onChange({ ...data, realName: e.target.value })}
+          placeholder="Ej. Juan Pérez"
+        />
+      </Field>
       <Field label="Foto de perfil (avatar)">
         <ImageUploader
           currentImageUrl={data.image}
@@ -537,13 +545,9 @@ function HeroFields({
         />
       </Field>
       <Field label="Ubicación">
-        <TextInput value={data.location || ""} onChange={(e) => onChange({ ...data, location: e.target.value })} />
-      </Field>
-      <Field label="Oyentes mensuales (opcional)">
-        <TextInput
-          value={data.monthlyListeners || ""}
-          onChange={(e) => onChange({ ...data, monthlyListeners: e.target.value })}
-          placeholder="Ej. 12,400 oyentes mensuales"
+        <LocationSelect
+          value={data.location || ""}
+          onChange={(location) => onChange({ ...data, location })}
         />
       </Field>
       <SocialLinksFields

@@ -61,7 +61,7 @@ export type HeroData = {
   location: string
   image: string
   banner?: string
-  monthlyListeners?: string
+  realName?: string
   socials?: SocialLink[]
   contactUrl?: string
   contactLabel?: string
@@ -444,7 +444,7 @@ export function normalizeBlockData(
         location: String(content.location ?? ""),
         image: String(content.image ?? content.avatarUrl ?? content.coverUrl ?? "/hero-banner.png"),
         banner: content.banner ? String(content.banner) : "",
-        monthlyListeners: content.monthlyListeners ? String(content.monthlyListeners) : "",
+        realName: content.realName ? String(content.realName) : "",
         socials: Array.isArray(content.socials) ? content.socials.map(normalizeSocialLink) : [],
         contactUrl: content.contactUrl ? String(content.contactUrl) : "",
         contactLabel: content.contactLabel ? String(content.contactLabel) : "",
@@ -755,7 +755,7 @@ function defaultData(type: BlockType): BlockData {
         location: "Lisbon, PT",
         image: "/hero-banner.png",
         banner: "",
-        monthlyListeners: "",
+        realName: "",
         socials: [],
       }
     case "tracks":

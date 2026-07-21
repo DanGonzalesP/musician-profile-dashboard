@@ -316,13 +316,13 @@ function PerfilPublicoContent() {
                         key={tab.key}
                         type="button"
                         onClick={() => setActiveTab(tab.key)}
-                        className={`flex flex-1 min-w-fit items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
+                        className={`flex flex-1 min-w-fit items-center justify-center gap-1 whitespace-nowrap border-b-2 px-2 py-2.5 text-xs font-medium transition-colors sm:gap-1.5 sm:px-3 sm:py-3 sm:text-sm ${
                           activeTab === tab.key
                             ? "border-primary text-foreground"
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        <Icon className="size-4" />
+                        <Icon className="hidden size-4 sm:block" />
                         {tab.label}
                       </button>
                     );
