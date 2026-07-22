@@ -5,9 +5,9 @@
 // cualquier publicación abre el Media Viewer inmersivo tipo TikTok
 // (media-viewer.tsx) posicionado en ese elemento.
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { GalleryHorizontalEnd, Maximize2, Music2, Play, PlayCircle, X } from "lucide-react"
+import { GalleryHorizontalEnd, Music2, Play, PlayCircle, X } from "lucide-react"
 import { getYoutubeEmbedUrl } from "@/lib/youtube"
 import {
   computePublicacionRows,
@@ -201,11 +201,9 @@ function CarouselRow({
   rowIndex: number
   onOpen: (globalIndex: number) => void
 }) {
-  // Sin efecto de carrusel/auto-scroll: las publicaciones de la fila se
-  // reparten el ancho completo en partes iguales (más grandes cuantas menos
-  // haya), sin duplicar nada. Al seleccionar una con texto, esa publicación
-  // pasa a ocupar el primer lugar (CSS `order`), empujando a las demás, y su
-  // texto se despliega en un panel justo a su derecha.
+  // Al seleccionar una publicación con texto, pasa a ocupar el primer lugar
+  // (CSS `order`), empujando a las demás, y su texto se despliega en un panel
+  // justo a su derecha.
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const selectOrOpen = (item: PublicacionItem, globalIndex: number) => {
@@ -215,6 +213,51 @@ function CarouselRow({
       return
     }
     setActiveId((current) => (current === item.id ? null : item.id))
+  }
+
+  // Auto-scroll infinito SIN duplicar contenido: cada publicación se
+  // renderiza una sola vez. Al llegar al final, la posición salta al
+  // instante de vuelta al inicio (no es un loop "sin costura" como con
+  // contenido duplicado, pero nunca se ve la misma publicación repetida en
+  // pantalla). Si la fila entra completa (sin overflow — por ejemplo con
+  // exactamente 3 publicaciones grandes que ya llenan el ancho) simplemente
+  // no hay nada que desplazar y el efecto no hace nada, como corresponde.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const pausedRef = useRef(false)
+  const resumeTimer = useRef<number | null>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let raf = 0
+    const tick = () => {
+      raf = requestAnimationFrame(tick)
+      if (pausedRef.current || activeId !== null) return
+      const maxScroll = el.scrollWidth - el.clientWidth
+      if (maxScroll <= 1) return
+      el.scrollLeft += 0.5
+      if (el.scrollLeft >= maxScroll) el.scrollLeft = 0
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [activeId])
+
+  const pause = () => {
+    pausedRef.current = true
+    if (resumeTimer.current) {
+      window.clearTimeout(resumeTimer.current)
+      resumeTimer.current = null
+    }
+  }
+  const resume = () => {
+    pausedRef.current = false
+  }
+  const nudge = () => {
+    pausedRef.current = true
+    if (resumeTimer.current) window.clearTimeout(resumeTimer.current)
+    resumeTimer.current = window.setTimeout(() => {
+      pausedRef.current = false
+    }, 1600)
   }
 
   return (
@@ -228,7 +271,18 @@ function CarouselRow({
         </h3>
       </div>
 
-      <div className="flex items-stretch gap-4">
+      <div
+        ref={scrollRef}
+        onMouseEnter={pause}
+        onMouseLeave={resume}
+        onPointerDown={pause}
+        onPointerUp={resume}
+        onTouchStart={pause}
+        onTouchEnd={nudge}
+        onWheel={nudge}
+        style={{ scrollbarWidth: "none" }}
+        className="flex items-stretch gap-4 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden"
+      >
         {row.items.map(({ item, globalIndex }, i) => (
           <PublicacionCell
             key={item.id}
@@ -236,7 +290,6 @@ function CarouselRow({
             active={activeId === item.id}
             order={activeId !== null ? (activeId === item.id ? -1 : i) : undefined}
             onSelect={() => selectOrOpen(item, globalIndex)}
-            onOpen={() => onOpen(globalIndex)}
             onClose={() => setActiveId(null)}
           />
         ))}
@@ -246,18 +299,24 @@ function CarouselRow({
 }
 
 // ---------------------------------------------------------------------------
-// Celda de publicación — la imagen (3:4) ocupa todo el ancho que le toca en
-// la fila (más grande cuantas menos publicaciones haya) y, al seleccionarla,
-// un panel lateral a su derecha despliega el texto: nunca encima de la
-// imagen. Las demás publicaciones quedan empujadas a un costado.
+// Celda de publicación — la imagen (3:4) ocupa hasta 1/3 del ancho de la fila
+// (más grande cuantas menos publicaciones haya) y, al seleccionarla, un panel
+// lateral a su derecha despliega el texto: nunca encima de la imagen. Las
+// demás publicaciones quedan empujadas a un costado.
 // ---------------------------------------------------------------------------
+
+// Ancho/alto de la imagen cuando está SELECCIONADA — fijos (no fluidos) para
+// poder darle al panel de texto un alto EXACTO que igualar (h-full): sin un
+// número concreto acá, el panel no tiene de dónde tomar su alto y termina
+// creciendo con el texto en vez de scrollear internamente.
+const ACTIVE_IMG_W = "w-36 sm:w-44" // 144px / 176px
+const ACTIVE_IMG_H = "h-[192px] sm:h-[235px]" // width * 4/3
 
 function PublicacionCell({
   item,
   active,
   order,
   onSelect,
-  onOpen,
   onClose,
 }: {
   item: PublicacionItem
@@ -265,69 +324,74 @@ function PublicacionCell({
   /** CSS `order` — la publicación activa usa -1 para pasar a ser la primera. */
   order?: number
   onSelect: () => void
-  onOpen: () => void
   onClose: () => void
 }) {
   const preview = item.type === "video" ? item.thumbnail : item.url
 
-  return (
-    // Publicación NO activa: `flex-1` — reparte con las demás el ancho
-    // completo de la fila (más grande cuantas menos publicaciones haya).
-    // Activa: `flex-none` — dejar de crecer para hacerle lugar al panel de
-    // texto de al lado, sin afectar el alto (self-start en la imagen la
-    // libera del stretch de la fila; el panel se estira para igualarlo y
-    // scrollea internamente si el texto no entra — min-h-0 en el párrafo es
-    // la pieza clave para que esto funcione sin medir nada con JS).
-    <div
-      className={`flex items-stretch gap-3 ${active ? "flex-none" : "min-w-0 flex-1"}`}
-      style={order !== undefined ? { order } : undefined}
+  const image = (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`group relative shrink-0 overflow-hidden rounded-2xl border bg-card/60 text-left transition-shadow ${
+        active ? `${ACTIVE_IMG_W} h-full` : "aspect-[3/4] size-full"
+      } ${
+        active
+          ? "border-primary shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
+          : "border-border hover:shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
+      }`}
     >
-      <button
-        type="button"
-        onClick={onSelect}
-        className={`group relative aspect-[3/4] shrink-0 self-start overflow-hidden rounded-2xl border bg-card/60 text-left transition-shadow ${
-          active ? "w-36 sm:w-44" : "w-full"
-        } ${
-          active
-            ? "border-primary shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
-            : "border-border hover:shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
-        }`}
-      >
-        {preview ? (
-          <img
-            src={preview}
-            alt={item.caption ?? (item.type === "video" ? "Video" : "Publicación")}
-            className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : item.type === "video" ? (
-          <video src={item.url} muted playsInline preload="metadata" className="size-full object-cover" />
-        ) : (
-          <div className="size-full bg-gradient-to-br from-card via-background to-black" />
-        )}
+      {preview ? (
+        <img
+          src={preview}
+          alt={item.caption ?? (item.type === "video" ? "Video" : "Publicación")}
+          className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : item.type === "video" ? (
+        <video src={item.url} muted playsInline preload="metadata" className="size-full object-cover" />
+      ) : (
+        <div className="size-full bg-gradient-to-br from-card via-background to-black" />
+      )}
 
-        {item.type === "video" && (
-          <span className="absolute inset-0 flex items-center justify-center">
-            <span className="flex size-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-transform duration-300 group-hover:scale-110 sm:size-12">
-              <Play className="size-5 translate-x-0.5 fill-current sm:size-6" />
-            </span>
+      {item.type === "video" && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex size-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-transform duration-300 group-hover:scale-110 sm:size-12">
+            <Play className="size-5 translate-x-0.5 fill-current sm:size-6" />
           </span>
-        )}
-      </button>
+        </span>
+      )}
+    </button>
+  )
+
+  // No seleccionada: la celda ocupa hasta 1/3 del ancho de la fila (nunca
+  // depende de cuántas publicaciones haya realmente, para que el tamaño no
+  // salte al agregar/quitar una) — si hay más de 3 en la fila, sí se genera
+  // overflow real y el auto-scroll/deslizar cobra sentido.
+  if (!active) {
+    return (
+      <div className="aspect-[3/4] w-[min(20rem,calc((100%-2rem)/3))] flex-none" style={order !== undefined ? { order } : undefined}>
+        {image}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`flex flex-none items-stretch gap-3 ${ACTIVE_IMG_H}`} style={order !== undefined ? { order } : undefined}>
+      {image}
 
       <AnimatePresence initial={false}>
-        {active && item.caption && (
+        {item.caption && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            // Ancho fijo (no "auto" — Framer Motion animando a width:"auto"
-            // crecía hasta el ancho natural del texto, una línea larguísima
-            // fuera del contenedor). Alto: SIN fijar — se estira (align-self
-            // stretch por default) para igualar el alto natural de la imagen
-            // (self-start + aspect-ratio de al lado), gracias a min-h-0 en el
-            // párrafo de abajo.
-            className="flex w-52 flex-none flex-col overflow-hidden rounded-2xl border border-border bg-card/70 sm:w-64"
+            // Ancho Y ALTO fijos (no "auto"/no derivado del contenido):
+            // animar a width:"auto" hacía crecer el panel hasta el ancho
+            // natural del texto; dejar el alto a "auto"/derivado de
+            // items-stretch hacía crecer el panel con TODO el texto sin
+            // límite (nunca activaba su scroll interno). Con h-full (mismo
+            // alto fijo que la imagen) el texto queda contenido y scrollea.
+            className="flex h-full w-52 flex-none flex-col overflow-hidden rounded-2xl border border-border bg-card/70 sm:w-64"
           >
             <div className="flex items-start justify-between gap-2 p-4 pb-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Descripción</span>
@@ -343,19 +407,9 @@ function PublicacionCell({
             {/* Scrollbar visible a propósito: si el texto excede el alto
                 disponible, esta barra es la señal de que se puede subir y
                 bajar para leer el resto. */}
-            <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words px-4 pb-2 text-sm leading-relaxed text-foreground [scrollbar-width:thin]">
+            <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words px-4 pb-4 text-sm leading-relaxed text-foreground [scrollbar-width:thin]">
               {item.caption}
             </p>
-            <div className="p-4 pt-3">
-              <button
-                type="button"
-                onClick={onOpen}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"
-              >
-                {item.type === "video" ? <Play className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-                {item.type === "video" ? "Reproducir" : "Ver"}
-              </button>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
