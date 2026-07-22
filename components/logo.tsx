@@ -101,7 +101,7 @@ export function Logo({
       aria-label="Ir al feed principal"
       className={cn("inline-flex flex-col items-start leading-none", className)}
     >
-      <span className="bg-gradient-to-r from-foreground from-40% to-primary bg-clip-text font-display text-xl font-extrabold tracking-tight text-transparent">
+      <span className="bg-linear-to-r from-foreground from-40% to-primary bg-clip-text font-display text-xl font-extrabold tracking-tight text-transparent">
         Vibe
       </span>
       <PulseUnderline className={cn("mt-0.5 ml-0.5", markClassName)} />

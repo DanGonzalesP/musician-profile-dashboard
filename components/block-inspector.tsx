@@ -153,10 +153,25 @@ export function BlockInspector({
       </div>
 
       <div className="border-t border-sidebar-border p-4 bg-sidebar">
+        {/* Móvil (< xl): el panel es un overlay a pantalla completa que se
+            abre para editar UN bloque — el CTA de abajo debe ser "guardar y
+            volver", no un borrado grandote (eso ya se puede hacer desde el
+            control pill del bloque en el lienzo, visible también en móvil).
+            Los cambios ya se aplican en vivo con cada `onChange` y el
+            autoguardado los sube solo; este botón solo cierra el panel. */}
+        <button
+          type="button"
+          onClick={() => onClose?.()}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110 active:scale-95 xl:hidden"
+        >
+          Guardar cambios
+        </button>
+        {/* Escritorio (xl+): panel estático sin botón de cerrar — el borrado
+            se queda acá porque no hay "volver" que sirva de confirmación. */}
         <button
           type="button"
           onClick={() => onDelete(block.id)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20"
+          className="hidden w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 xl:flex"
         >
           <Trash2 className="size-4" />
           Eliminar bloque
@@ -588,19 +603,16 @@ function HeroFields({
         socials={data.socials || []}
         onChange={(socials) => onChange({ ...data, socials })}
       />
-      <Field label="Texto del botón de contacto (opcional)">
-        <TextInput
-          value={data.contactLabel || ""}
-          onChange={(e) => onChange({ ...data, contactLabel: e.target.value })}
-          placeholder="Ej. Contacto o Contratar"
-        />
-      </Field>
-      <Field label="Enlace de contacto (opcional)">
+      <Field label="Botón de contacto (opcional)">
         <TextInput
           value={data.contactUrl || ""}
           onChange={(e) => onChange({ ...data, contactUrl: e.target.value })}
-          placeholder="Ej. mailto:tu@correo.com o https://wa.me/..."
+          placeholder="Ej. 51987654321, @tuusuario o tu@correo.com"
         />
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          Un número muestra el ícono de WhatsApp, un usuario con "@" el de Telegram, y un correo el de Mail — el
+          botón en tu perfil se ve como un ícono, sin texto.
+        </p>
       </Field>
     </>
   )

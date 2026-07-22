@@ -55,7 +55,7 @@ function VerticalCreditsCarousel({ credits, t }: { credits: CreditItem[]; t: Tra
       axis="y"
       paused={expandedId !== null}
       ariaLabel={t("credits_eyebrow")}
-      className="max-h-[420px] sm:max-h-[480px]"
+      className="max-h-105 sm:max-h-120"
       innerClassName="flex flex-col gap-3 pb-3"
     >
       {credits.map((credit) => (

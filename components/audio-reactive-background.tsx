@@ -38,7 +38,7 @@ export function AudioReactiveBackground() {
           } as React.CSSProperties
         }
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/50 to-black" />
+      <div className="absolute inset-0 bg-linear-to-b from-transparent via-black/50 to-black" />
     </div>
   )
 }

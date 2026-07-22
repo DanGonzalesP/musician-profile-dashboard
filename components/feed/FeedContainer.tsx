@@ -188,7 +188,7 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
       <div className="relative h-dvh min-w-0 flex-1">
         <div
           ref={containerRef}
-          className="h-dvh w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="h-dvh w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
           <audio ref={audioRef} preload="auto" />
           {items.map((item, index) =>

@@ -139,7 +139,7 @@ export default function NotificacionesPage() {
                         <span className="font-medium text-amber-400">{q.askerDisplayName}</span> preguntó sobre{" "}
                         <span className="font-medium text-white">{q.blockLabel}</span>
                       </p>
-                      <p className="text-sm text-white mt-1 whitespace-pre-wrap break-words">{q.message}</p>
+                      <p className="text-sm text-white mt-1 whitespace-pre-wrap wrap-break-word">{q.message}</p>
                     </div>
                   </div>
                   {q.status === "unread" && (

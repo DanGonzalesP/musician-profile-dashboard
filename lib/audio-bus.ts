@@ -8,7 +8,7 @@ type TappedElement = HTMLAudioElement & {
 let audioCtx: AudioContext | null = null
 let analyser: AnalyserNode | null = null
 let sourceEl: HTMLAudioElement | null = null
-let dataArray: Uint8Array | null = null
+let dataArray: Uint8Array<ArrayBuffer> | null = null
 let rafId: number | null = null
 const listeners = new Set<Listener>()
 

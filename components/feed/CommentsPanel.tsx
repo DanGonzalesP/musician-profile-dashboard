@@ -119,7 +119,7 @@ export default function CommentsPanel({
               animate={{ opacity: 1, y: 0 }}
               className="flex gap-3"
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-secondary font-display text-sm font-bold text-primary">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary/30 to-secondary font-display text-sm font-bold text-primary">
                 {comment.authorName.charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0">
@@ -129,7 +129,7 @@ export default function CommentsPanel({
                     {timeAgo(comment.createdAt, locale)}
                   </span>
                 </p>
-                <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+                <p className="mt-0.5 whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/90">
                   {comment.content}
                 </p>
               </div>

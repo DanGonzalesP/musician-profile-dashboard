@@ -62,7 +62,7 @@ export async function ensureCompressedAudio(
     await ffmpeg.exec(["-i", inputName, "-c:a", "libmp3lame", "-b:a", "192k", outputName])
     const data = await ffmpeg.readFile(outputName)
     const mp3Name = file.name.replace(/\.\w+$/, "") + ".mp3"
-    return new File([data as Uint8Array], mp3Name, { type: "audio/mpeg" })
+    return new File([data as Uint8Array<ArrayBuffer>], mp3Name, { type: "audio/mpeg" })
   } finally {
     if (onProgress) ffmpeg.off("progress", onFFmpegProgress)
     // Limpieza best-effort: si el archivo nunca se llegó a escribir (falló

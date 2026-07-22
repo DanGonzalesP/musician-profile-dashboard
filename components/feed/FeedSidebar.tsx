@@ -12,9 +12,9 @@ import { motion } from "framer-motion"
 import {
   AudioWaveform,
   Feather,
+  FileMusic,
   Gem,
   Guitar,
-  Layers,
   Music4,
   Sparkles,
   SlidersHorizontal,
@@ -32,7 +32,7 @@ import {
 const ROLE_ICONS: Record<MusicianRole, ComponentType<{ className?: string }>> = {
   autores: Feather,
   compositores: Music4,
-  arreglistas: Layers,
+  arreglistas: FileMusic,
   directores: Wand2,
   productores: Disc3,
   mezclas: SlidersHorizontal,
@@ -67,7 +67,7 @@ export function FeedSidebar({
               pantalla baja igual no entran todos — así el usuario ve que hay
               más ítems para scrollear DENTRO del panel, sin confundirlo con
               el scroll de la página. */}
-          <div className="gradient-border-static relative max-h-[85dvh] overflow-y-auto rounded-3xl bg-card/55 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl [scrollbar-width:thin]">
+          <div className="gradient-border-static relative max-h-[85dvh] overflow-y-auto rounded-3xl bg-card/55 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl scrollbar-thin">
             <p className="flex items-center gap-1.5 px-3 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
               <AudioWaveform className="size-3" /> Explora
             </p>
@@ -111,7 +111,7 @@ export function FeedSidebar({
         <div
           role="tablist"
           aria-label="Filtrar el feed por rol"
-          className="pointer-events-auto flex items-center gap-2 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="pointer-events-auto flex items-center gap-2 overflow-x-auto px-4 pb-2 pt-1 scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
           <MobileChip
             icon={Sparkles}
@@ -123,8 +123,7 @@ export function FeedSidebar({
             <MobileChip
               key={role.id}
               icon={ROLE_ICONS[role.id]}
-              label={role.short}
-              title={role.label}
+              label={role.label}
               selected={active === role.id}
               onClick={() => toggle(role.id)}
             />

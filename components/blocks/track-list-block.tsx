@@ -397,11 +397,17 @@ export function TrackListBlock({ data }: { data: TracksData }) {
         {t("discography_title")}
       </div>
 
-      {/* Carrusel infinito de álbumes */}
+      {/* Carrusel infinito de álbumes — overflow-x-auto (en vez de hidden) para
+          que, igual que el de Créditos, también se pueda arrastrar/deslizar
+          con el dedo o el mouse; se pausa la animación/auto-avance mientras
+          se interactúa, igual que ya hacía con el hover en escritorio. */}
       <div
-        className="-mx-1 overflow-hidden px-1 pb-2"
+        className="-mx-1 overflow-x-auto px-1 pb-2 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: "none" }}
         onMouseEnter={() => setCarouselPaused(true)}
         onMouseLeave={() => setCarouselPaused(false)}
+        onPointerDown={pauseCarouselBriefly}
+        onTouchStart={pauseCarouselBriefly}
       >
         <div
           className={`flex w-max gap-3 ${selectedAlbum === null ? "animate-marquee" : ""}`}

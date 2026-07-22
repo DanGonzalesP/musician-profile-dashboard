@@ -74,8 +74,11 @@ export type HeroData = {
   banner?: string
   realName?: string
   socials?: SocialLink[]
+  // Un solo valor de contacto (WhatsApp, Telegram o correo) — el canal y el
+  // link final se resuelven en render vía lib/contact-channel.ts, así que
+  // acá se guarda tal cual lo escribió el artista (número, @usuario, correo,
+  // o un link ya armado de datos viejos).
   contactUrl?: string
-  contactLabel?: string
 }
 
 export type TracksData = {
@@ -430,6 +433,12 @@ export const BLOCK_LIBRARY: BlockDefinition[] = [
   },
 ]
 
+// Tipos que no admiten una segunda copia en la misma página — "hero" es la
+// sección de perfil (identidad, banner, contacto): no tiene sentido tener
+// dos. El editor usa esto tanto para apagar el tile en BlockLibrary como
+// para rechazar el add/drop igual (ver profile-editor.tsx).
+export const SINGLETON_BLOCK_TYPES: BlockType[] = ["hero"]
+
 // "embeds" ya no se ofrece en la librería (se fusionó con Publicaciones),
 // pero sigue siendo un tipo conocido para poder LEER los bloques guardados
 // antes de la fusión y plegarlos vía mergePublicacionesEmbeds().
@@ -479,7 +488,6 @@ export function normalizeBlockData(
         realName: content.realName ? String(content.realName) : "",
         socials: Array.isArray(content.socials) ? content.socials.map(normalizeSocialLink) : [],
         contactUrl: content.contactUrl ? String(content.contactUrl) : "",
-        contactLabel: content.contactLabel ? String(content.contactLabel) : "",
       }
     case "tracks": {
       if (Array.isArray(content.albums)) {
@@ -784,9 +792,9 @@ function defaultData(type: BlockType): BlockData {
       }
     case "hero":
       return {
-        name: "Nova Reyes",
-        tagline: "Analog dreamer making late-night synth pop.",
-        location: "Lisbon, PT",
+        name: "",
+        tagline: "",
+        location: "",
         image: "/hero-banner.png",
         banner: "",
         realName: "",

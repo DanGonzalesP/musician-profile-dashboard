@@ -35,7 +35,7 @@ export function HeroBanner({ block }: { block: HeroBlock }) {
           priority
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background from-35% via-background/75 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-background from-35% via-background/75 to-transparent" />
       </div>
 
       {/* Content */}

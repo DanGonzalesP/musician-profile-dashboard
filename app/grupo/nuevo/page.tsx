@@ -241,7 +241,7 @@ export default function NuevoGrupoPage() {
             ))}
           </div>
 
-          <div className="relative mt-8 min-h-[340px]">
+          <div className="relative mt-8 min-h-85">
             <AnimatePresence mode="wait" custom={direction}>
               <motion.section
                 key={step}
@@ -426,7 +426,7 @@ export default function NuevoGrupoPage() {
           <div className="gradient-border relative overflow-hidden rounded-3xl bg-card/50 backdrop-blur-xl">
             <div className="h-28 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,var(--primary)_45%,transparent),transparent_65%)]" />
             <div className="-mt-10 px-6 pb-6">
-              <span className="flex size-20 items-center justify-center rounded-2xl border border-border bg-gradient-to-br from-primary/30 via-card to-background font-display text-2xl font-bold text-primary shadow-xl">
+              <span className="flex size-20 items-center justify-center rounded-2xl border border-border bg-linear-to-br from-primary/30 via-card to-background font-display text-2xl font-bold text-primary shadow-xl">
                 {name.trim() ? name.trim().charAt(0).toUpperCase() : <Music2 className="size-8" />}
               </span>
               <p className="mt-4 font-display text-xl font-bold text-foreground">

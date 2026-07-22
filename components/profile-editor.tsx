@@ -1,20 +1,21 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID } from "@/lib/blocks"
+import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID, SINGLETON_BLOCK_TYPES } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog"
 import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
 import { BlockInspector } from "@/components/block-inspector"
-import { Layers, X } from "lucide-react"
+import { Layers, LogOut, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { authedFetch } from "@/lib/authed-fetch"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
 import { ProfileSkeleton } from "@/components/blocks/skeletons"
+import { useToast } from "@/components/toast-provider"
 
 type DragPayload = { kind: "new"; type: BlockType } | { kind: "reorder"; index: number } | null
 
@@ -232,6 +233,7 @@ function defaultSelectedId(loadedBlocks: Block[]): string | null {
 // ─────────────────────────────────────────────────────────────────────────
 
 export function ProfileEditor() {
+  const { showToast } = useToast()
   const [blocks, setBlocks] = useState<Block[]>([])
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [services, setServices] = useState<CatalogService[]>([])
@@ -250,6 +252,12 @@ export function ProfileEditor() {
   // "editor" para un miembro de banda. Controla qué puede tocar en el
   // lienzo (ver bloqueo de bloques más abajo).
   const [activeRole, setActiveRole] = useState<BandRole>("owner")
+  // Aviso de salida al presionar "atrás" en el celular (ver efecto de
+  // bloqueo de historial más abajo) — la única salida real desde ese gesto
+  // es cerrar sesión; "Volver al feed" del header sigue funcionando normal
+  // porque navega con un Link, no dispara "popstate".
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const [loggingOutFromEditor, setLoggingOutFromEditor] = useState(false)
 
   /**
    * Registro de blob URLs → File real.
@@ -443,6 +451,36 @@ export function ProfileEditor() {
     return () => clearTimeout(timeout)
   }, [blocks, products, services, loading, publishing])
 
+  // ── Bloqueo del botón "atrás" del celular dentro del editor ────────────
+  // El editor es una app a pantalla completa: un "atrás" accidental (gesto
+  // o botón físico) no debe sacar de golpe al usuario de Vibe. Se arma una
+  // trampa de historial — cada "atrás" se absorbe con un pushState y en su
+  // lugar se muestra un aviso; la única forma real de salir desde ese gesto
+  // es cerrar sesión (ver handleExitLogout). Solo aplica en pantallas
+  // táctiles: en escritorio el botón "atrás" del navegador se deja intacto.
+  useEffect(() => {
+    if (loading) return
+    if (typeof window === "undefined" || !window.matchMedia("(pointer: coarse)").matches) return
+
+    history.pushState({ vibeEditorGuard: true }, "", window.location.href)
+
+    function handlePopState() {
+      history.pushState({ vibeEditorGuard: true }, "", window.location.href)
+      setShowExitConfirm(true)
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [loading])
+
+  async function handleExitLogout() {
+    setLoggingOutFromEditor(true)
+    await supabase.auth.signOut()
+    // Navegación dura (no router.push): así se sale de verdad de la trampa
+    // de historial de arriba en vez de quedar atrapado en el mismo ciclo.
+    window.location.href = "/"
+  }
+
   // ── Generación de banner con IA ──────────────────────────────────────
   async function generarBannerConIA(promptTexto: string) {
     try {
@@ -592,15 +630,32 @@ export function ProfileEditor() {
       await publishCatalog(profileId, publishProducts, publishServices)
 
       // Ya está publicado: se limpia el borrador para no recargarlo la
-      // próxima vez que se abra el editor.
+      // próxima vez que se abra el editor. Si esta llamada falla (ej. una red
+      // inestable en móvil justo después de subir fotos) y queda un borrador
+      // viejo en la base, la próxima vez que se monte el editor (por ejemplo
+      // al volver del feed) esa fila vieja pisaría lo recién publicado —de
+      // ahí las fotos "desaparecidas". Por eso se reintenta antes de rendirse.
       skipNextAutosaveRef.current = true
-      const { error: clearDraftError } = await supabase
-        .from("profiles")
-        .update({ draft_content: null })
-        .eq("id", profileId)
-      if (clearDraftError) console.error("[handlePublish] Error limpiando borrador:", clearDraftError)
+      let clearDraftError: { message: string } | null = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ draft_content: null })
+          .eq("id", profileId)
+        clearDraftError = error
+        if (!error) break
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+      if (clearDraftError) {
+        console.error("[handlePublish] Error limpiando borrador tras 3 intentos:", clearDraftError)
+        showToast(
+          "Se publicaron tus cambios, pero no se pudo limpiar el borrador. Si al volver ves contenido antiguo, vuelve a publicar.",
+          "error"
+        )
+        return
+      }
 
-      alert("¡Cambios publicados con éxito en tu perfil!")
+      showToast("¡Cambios publicados con éxito en tu perfil!", "success")
     } catch (err: unknown) {
       // Los errores de Supabase son PostgrestError, no Error estándar de JS.
       // String(postgrestError) devuelve "[object Object]" — usamos JSON.stringify.
@@ -616,7 +671,7 @@ export function ProfileEditor() {
         message = JSON.stringify(err)
       }
       console.error("[handlePublish] Error:", err)
-      alert("Ocurrido un error al publicar:\n" + message)
+      showToast("Ocurrió un error al publicar: " + message, "error")
     } finally {
       setPublishing(false)
     }
@@ -624,7 +679,12 @@ export function ProfileEditor() {
 
   // ── Gestión de bloques ────────────────────────────────────────────────
 
+  function canAddBlock(type: BlockType) {
+    return !SINGLETON_BLOCK_TYPES.includes(type) || !blocks.some((b) => b.type === type)
+  }
+
   function addBlock(type: BlockType) {
+    if (!canAddBlock(type)) return
     const block = createBlock(type)
     setBlocks((prev) => [...prev, block])
     setSelectedId(block.id)
@@ -661,6 +721,10 @@ export function ProfileEditor() {
   function handleDropAt(index: number) {
     if (!dragPayload) return
     if (dragPayload.kind === "new") {
+      if (!canAddBlock(dragPayload.type)) {
+        setDragPayload(null)
+        return
+      }
       const block = createBlock(dragPayload.type)
       setBlocks((prev) => {
         const next = [...prev]
@@ -761,6 +825,7 @@ export function ProfileEditor() {
               onDragStart={(type) => setDragPayload({ kind: "new", type })}
               onDragEnd={() => setDragPayload(null)}
               locked={activeRole === "editor"}
+              disabledTypes={SINGLETON_BLOCK_TYPES.filter((type) => blocks.some((b) => b.type === type))}
             />
           </div>
         </aside>
@@ -848,6 +913,42 @@ export function ProfileEditor() {
           {publishing ? "Publicando..." : "Publicar"}
         </button>
       </nav>
+
+      {showExitConfirm && (
+        <div
+          className="fixed inset-0 z-100 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+          onClick={() => setShowExitConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-2 text-lg font-semibold text-foreground">¿Salir del editor?</h3>
+            <p className="mb-5 text-sm text-muted-foreground">
+              Tu progreso se guarda solo. Para salir del editor con el botón atrás, primero cierra sesión — o usa
+              "Volver al feed" desde el menú de arriba.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleExitLogout}
+                disabled={loggingOutFromEditor}
+                className="flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <LogOut className="size-4" />
+                {loggingOutFromEditor ? "Cerrando sesión..." : "Cerrar sesión y salir"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowExitConfirm(false)}
+                className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              >
+                Seguir editando
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

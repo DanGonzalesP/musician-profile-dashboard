@@ -172,7 +172,7 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
                   className="size-full object-cover transition-transform duration-700 hover:scale-105"
                 />
               ) : (
-                <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/20 via-card to-background">
+                <div className="flex size-full items-center justify-center bg-linear-to-br from-primary/20 via-card to-background">
                   <Package className="size-14 text-primary/50" />
                 </div>
               )}
@@ -230,7 +230,7 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
                     className={`size-full object-cover transition-transform duration-500 group-hover:scale-105 ${soldOut ? "grayscale" : ""}`}
                   />
                 ) : (
-                  <div className="flex size-full items-center justify-center bg-gradient-to-br from-card via-background to-black">
+                  <div className="flex size-full items-center justify-center bg-linear-to-br from-card via-background to-black">
                     <Package className="size-8 text-muted-foreground/40" />
                   </div>
                 )}

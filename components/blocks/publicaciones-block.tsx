@@ -158,15 +158,15 @@ function EmbedsRows({ embeds, startNumber }: { embeds: EmbedItem[]; startNumber:
             {tiktokItems.map((item) => (
               <motion.div key={item.id} variants={embedVariants}>
                 <div className="flex w-48 shrink-0 flex-col gap-2 sm:w-56">
-                  <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl border border-border bg-card/60">
+                  <div className="relative aspect-9/16 w-full overflow-hidden rounded-xl border border-border bg-card/60">
                     {item.thumbnail ? (
                       <img src={item.thumbnail} alt={item.title ?? "Clip de TikTok"} className="size-full object-cover" />
                     ) : (
-                      <div className="flex size-full items-center justify-center bg-gradient-to-br from-card via-background to-black">
+                      <div className="flex size-full items-center justify-center bg-linear-to-br from-card via-background to-black">
                         <Music2 className="size-10 text-primary/80" />
                       </div>
                     )}
-                    <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-background/95 via-background/40 to-transparent p-3">
+                    <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-linear-to-t from-background/95 via-background/40 to-transparent p-3">
                       {item.title && <p className="line-clamp-2 text-xs font-medium text-foreground">{item.title}</p>}
                       <a
                         href={item.url}
@@ -329,7 +329,7 @@ function PublicacionCell({
           `self-start` no la estira el panel de al lado (que sí puede ser más
           alto o más bajo según cuánto texto tenga). */}
       <div
-        className="aspect-[3/4] w-[calc((100%-2rem)/3)] shrink-0 self-start"
+        className="aspect-3/4 w-[calc((100%-2rem)/3)] shrink-0 self-start"
         style={order !== undefined ? { order } : undefined}
       >
         <button
@@ -350,7 +350,7 @@ function PublicacionCell({
           ) : item.type === "video" ? (
             <video src={item.url} muted playsInline preload="metadata" className="size-full object-cover" />
           ) : (
-            <div className="size-full bg-gradient-to-br from-card via-background to-black" />
+            <div className="size-full bg-linear-to-br from-card via-background to-black" />
           )}
 
           {item.type === "video" && (
@@ -397,7 +397,7 @@ function PublicacionCell({
             {/* Scrollbar visible a propósito: si el texto excede el alto
                 disponible, esta barra es la señal de que se puede subir y
                 bajar para leer el resto. */}
-            <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words px-4 pb-4 text-sm leading-relaxed text-foreground [scrollbar-width:thin]">
+            <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap wrap-break-word px-4 pb-4 text-sm leading-relaxed text-foreground scrollbar-thin">
               {item.caption}
             </p>
           </motion.div>

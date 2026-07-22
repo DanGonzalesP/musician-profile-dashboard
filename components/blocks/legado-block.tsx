@@ -93,7 +93,7 @@ function DepthCard({
   }
 
   return (
-    <div className={`group/depth [perspective:1200px] ${className}`}>
+    <div className={`group/depth perspective-distant ${className}`}>
       <motion.div
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
@@ -168,10 +168,10 @@ function GalleryDepthImage({
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover/depth:opacity-100"
+          className="absolute inset-0 bg-linear-to-t from-background/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover/depth:opacity-100"
         />
         {item.caption && (
-          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent p-3 text-xs text-foreground opacity-0 transition-opacity duration-300 group-hover/depth:opacity-100">
+          <p className="absolute inset-x-0 bottom-0 bg-linear-to-t from-background/90 to-transparent p-3 text-xs text-foreground opacity-0 transition-opacity duration-300 group-hover/depth:opacity-100">
             {item.caption}
           </p>
         )}
@@ -205,7 +205,7 @@ function MilestoneCard({ milestone, index }: { milestone: LegadoMilestone; index
         ) : (
           <div
             aria-hidden="true"
-            className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/25 via-card to-background text-primary/60 sm:h-32 sm:w-32"
+            className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-primary/25 via-card to-background text-primary/60 sm:h-32 sm:w-32"
             style={{ transform: "translateZ(28px)" }}
           >
             <Music2 className="size-8" />
@@ -285,7 +285,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
   return (
     <div className="flex flex-col gap-14 sm:gap-20">
       {/* ── Bento principal ── */}
-      <div className="grid auto-rows-[minmax(0,auto)] grid-cols-1 gap-4 md:grid-cols-12 md:[grid-auto-flow:dense]">
+      <div className="grid auto-rows-[minmax(0,auto)] grid-cols-1 gap-4 md:grid-cols-12 md:grid-flow-dense">
         {/* Manifiesto / headline */}
         {data.headline ? (
           <Reveal className={heroImage ? "md:col-span-7" : "md:col-span-12"}>
@@ -305,7 +305,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
                     {data.headline}
                   </p>
                 </div>
-                <div aria-hidden="true" className="mt-6 h-px w-1/3 bg-gradient-to-r from-primary/60 to-transparent" />
+                <div aria-hidden="true" className="mt-6 h-px w-1/3 bg-linear-to-r from-primary/60 to-transparent" />
               </div>
             </DepthCard>
           </Reveal>
@@ -436,7 +436,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
           <div className="relative mt-6">
             <div
               aria-hidden="true"
-              className="absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 bg-gradient-to-b from-primary/50 via-border to-transparent md:block"
+              className="absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 bg-linear-to-b from-primary/50 via-border to-transparent md:block"
             />
             <div className="flex flex-col gap-8 md:gap-12">
               {data.timeline.map((milestone, i) => (
@@ -552,7 +552,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
                     style={{ transformStyle: "preserve-3d" }}
                   >
                     <span
-                      className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 via-card to-background font-display text-sm font-bold text-primary"
+                      className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary/30 via-card to-background font-display text-sm font-bold text-primary"
                       style={{ transform: "translateZ(20px)" }}
                     >
                       {show.year || <Ticket className="size-4" />}

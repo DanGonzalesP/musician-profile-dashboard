@@ -119,7 +119,7 @@ function YoutubeCard({ item, embedUrl }: { item: EmbedItem; embedUrl: string }) 
 function TikTokCard({ item }: { item: EmbedItem }) {
   return (
     <div className="flex w-48 shrink-0 flex-col gap-2 sm:w-56">
-      <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl border border-border bg-card/60">
+      <div className="relative aspect-9/16 w-full overflow-hidden rounded-xl border border-border bg-card/60">
         {item.thumbnail ? (
           <img
             src={item.thumbnail}
@@ -127,11 +127,11 @@ function TikTokCard({ item }: { item: EmbedItem }) {
             className="size-full object-cover"
           />
         ) : (
-          <div className="flex size-full items-center justify-center bg-gradient-to-br from-card via-background to-black">
+          <div className="flex size-full items-center justify-center bg-linear-to-br from-card via-background to-black">
             <Music2 className="size-10 text-primary/80" />
           </div>
         )}
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-background/95 via-background/40 to-transparent p-3">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-linear-to-t from-background/95 via-background/40 to-transparent p-3">
           {item.title && (
             <p className="line-clamp-2 text-xs font-medium text-foreground">{item.title}</p>
           )}

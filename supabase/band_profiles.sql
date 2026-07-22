@@ -78,11 +78,17 @@ using (
 -- de `profiles` — 'owner' para el dueño (perfil personal o banda propia),
 -- 'admin'/'editor' para un miembro de banda aceptado, o null si no tiene
 -- ningún vínculo. Centraliza la regla para no repetirla en cada política.
+-- security invoker (no definer): no hace falta saltarse RLS porque solo lee
+-- filas que el propio usuario que llama ya puede ver por sus propias
+-- políticas — su fila de profiles (lectura pública) y su propia fila de
+-- band_members (band_members_select_involved permite member_user_id =
+-- auth.uid()). Con invoker, el linter de Supabase deja de marcarla como
+-- "SECURITY DEFINER function executable by authenticated".
 create or replace function get_profile_role(target_profile_id uuid)
 returns text
 language sql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
   select case

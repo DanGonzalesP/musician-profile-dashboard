@@ -204,7 +204,7 @@ export default function GrupoPanelPage() {
         />
         <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-center gap-5">
-            <span className="flex size-20 shrink-0 items-center justify-center rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/30 via-card to-background font-display text-3xl font-bold text-primary shadow-2xl sm:size-24">
+            <span className="flex size-20 shrink-0 items-center justify-center rounded-3xl border border-primary/30 bg-linear-to-br from-primary/30 via-card to-background font-display text-3xl font-bold text-primary shadow-2xl sm:size-24">
               {name ? name.charAt(0).toUpperCase() : <Music2 className="size-9" />}
             </span>
             <div>

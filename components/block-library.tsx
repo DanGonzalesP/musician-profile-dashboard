@@ -34,9 +34,13 @@ type Props = {
   // true para el rol "Editor" de grupo — solo puede tocar el bloque "hero"
   // ya existente, no agregar bloques nuevos (ver Punto 4).
   locked?: boolean
+  // Tipos que ya existen en el lienzo y no admiten una segunda copia (ej.
+  // "hero": no tiene sentido tener 2 banners/secciones de perfil). El tile
+  // queda visualmente apagado y no responde a clic ni arrastre.
+  disabledTypes?: BlockType[]
 }
 
-export function BlockLibrary({ onAdd, onDragStart, onDragEnd, locked = false }: Props) {
+export function BlockLibrary({ onAdd, onDragStart, onDragEnd, locked = false, disabledTypes = [] }: Props) {
   const [tooltip, setTooltip] = useState<TooltipState>(null)
   const hideTimerRef = useRef<number | null>(null)
 
@@ -88,29 +92,42 @@ export function BlockLibrary({ onAdd, onDragStart, onDragEnd, locked = false }: 
             <div className="grid grid-cols-3 gap-1.5">
               {blocks.map((block) => {
                 const Icon = block.icon
+                const isDisabled = disabledTypes.includes(block.type)
                 return (
                   <div
                     key={block.type}
-                    draggable
+                    draggable={!isDisabled}
                     onDragStart={() => {
+                      if (isDisabled) return
                       setTooltip(null)
                       onDragStart(block.type)
                     }}
                     onDragEnd={onDragEnd}
-                    onMouseEnter={(e) => showTooltip(e, block)}
+                    onMouseEnter={(e) =>
+                      showTooltip(e, isDisabled ? { ...block, description: "Ya agregaste esta sección — no se puede repetir." } : block)
+                    }
                     onMouseLeave={hideTooltip}
                     onMouseMove={trackGlow}
-                    onClick={() => onAdd(block.type)}
+                    onClick={() => {
+                      if (isDisabled) return
+                      onAdd(block.type)
+                    }}
                     role="button"
-                    tabIndex={0}
+                    tabIndex={isDisabled ? -1 : 0}
+                    aria-disabled={isDisabled}
                     onKeyDown={(e) => {
+                      if (isDisabled) return
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault()
                         onAdd(block.type)
                       }
                     }}
                     aria-label={`Agregar bloque ${block.label}`}
-                    className="glow-border group relative flex cursor-grab flex-col items-center gap-1.5 rounded-xl border border-sidebar-border/60 bg-sidebar-accent/30 px-1 py-3 transition-colors hover:bg-sidebar-accent/70 active:cursor-grabbing"
+                    className={`glow-border group relative flex flex-col items-center gap-1.5 rounded-xl border border-sidebar-border/60 bg-sidebar-accent/30 px-1 py-3 transition-colors ${
+                      isDisabled
+                        ? "cursor-not-allowed opacity-40"
+                        : "cursor-grab hover:bg-sidebar-accent/70 active:cursor-grabbing"
+                    }`}
                   >
                     <span className="flex size-9 items-center justify-center rounded-lg bg-primary/12 text-primary transition-transform duration-200 group-hover:scale-110">
                       <Icon className="size-4.5" />
@@ -136,7 +153,7 @@ export function BlockLibrary({ onAdd, onDragStart, onDragEnd, locked = false }: 
             exit={{ opacity: 0, x: -6, scale: 0.97 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             style={{ top: tooltip.top, left: tooltip.left }}
-            className="glass-tooltip pointer-events-none fixed z-[60] w-60 -translate-y-1/2 rounded-2xl p-4"
+            className="glass-tooltip pointer-events-none fixed z-60 w-60 -translate-y-1/2 rounded-2xl p-4"
             role="tooltip"
           >
             <span

@@ -131,7 +131,7 @@ export function MediaViewer({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-sm"
+      className="fixed inset-0 z-70 flex items-center justify-center bg-black/95 backdrop-blur-sm"
       onWheel={handleWheel}
       role="dialog"
       aria-modal="true"
@@ -143,7 +143,7 @@ export function MediaViewer({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92, y: 32 }}
         transition={{ type: "spring", stiffness: 320, damping: 24, mass: 0.9 }}
-        className="relative h-full max-h-dvh w-full overflow-hidden bg-black sm:h-[92dvh] sm:w-auto sm:aspect-[9/16] sm:rounded-3xl sm:border sm:border-white/10"
+        className="relative h-full max-h-dvh w-full overflow-hidden bg-black sm:h-[92dvh] sm:w-auto sm:aspect-9/16 sm:rounded-3xl sm:border sm:border-white/10"
       >
         {/* Capa arrastrable: vuelve a 0 (constraints) y decide el cambio de
             página según distancia/velocidad — el rebote elástico lo da el
@@ -173,7 +173,7 @@ export function MediaViewer({
                 {!item.url ? (
                   <div
                     aria-hidden="true"
-                    className="size-full bg-gradient-to-br from-card via-background to-black"
+                    className="size-full bg-linear-to-br from-card via-background to-black"
                   />
                 ) : item.type === "video" ? (
                   <video
@@ -223,8 +223,8 @@ export function MediaViewer({
         )}
 
         {/* Degradados de legibilidad */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 to-transparent" />
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-black/70 to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-black/80 to-transparent" />
 
         {/* Barra superior: contador + cerrar */}
         <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4">

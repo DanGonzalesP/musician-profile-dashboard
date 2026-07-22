@@ -1,7 +1,9 @@
 "use client"
 
-// Selector de ubicación — país + ciudad, ambos elegidos de una lista
-// desplegable (ya no texto libre). El dataset de país/ciudad (country-state-city)
+// Selector de ubicación — país + departamento (estado/provincia), ambos
+// elegidos de una lista desplegable (ya no texto libre, y ya no ciudad: el
+// dataset de ciudades de country-state-city es demasiado granular/ruidoso
+// para este campo, un departamento alcanza). El dataset (country-state-city)
 // se carga de forma diferida (import dinámico) para no engordar el bundle
 // principal del editor; los nombres de país se muestran en español vía
 // Intl.DisplayNames, que es nativo del navegador y no requiere traducir
@@ -17,6 +19,15 @@ const countryDisplayNames =
     ? new Intl.DisplayNames(["es"], { type: "region" })
     : null
 
+// Perú es, por ahora, el único país con un orden especial: Lima va primero
+// (capital, donde vive la enorme mayoría de artistas de la plataforma) y el
+// resto de departamentos queda alfabético detrás — sin esto, "Amazonas"
+// salía antes que "Lima" solo por orden alfabético, forzando scroll extra al
+// caso más común.
+const PRIORITY_STATE_BY_COUNTRY: Record<string, string> = {
+  PE: "Lima",
+}
+
 export function LocationSelect({
   value,
   onChange,
@@ -25,11 +36,11 @@ export function LocationSelect({
   onChange: (location: string) => void
 }) {
   const [countries, setCountries] = useState<CountryOption[]>([])
-  const [cities, setCities] = useState<string[]>([])
+  const [states, setStates] = useState<string[]>([])
   const [countryCode, setCountryCode] = useState("")
-  const [city, setCity] = useState("")
+  const [state, setState] = useState("")
   const [loadingCountries, setLoadingCountries] = useState(true)
-  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingStates, setLoadingStates] = useState(false)
 
   // Carga la lista de países una sola vez, e intenta emparejar el valor
   // guardado (que puede venir de un borrador antiguo escrito a mano) contra
@@ -50,7 +61,7 @@ export function LocationSelect({
         const match = list.find((c) => c.name.toLowerCase() === guessCountryName)
         if (match) {
           setCountryCode(match.isoCode)
-          if (parts.length > 1) setCity(parts[0])
+          if (parts.length > 1) setState(parts[0])
         }
       }
     })
@@ -60,21 +71,28 @@ export function LocationSelect({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Carga las ciudades del país elegido cada vez que cambia.
+  // Carga los departamentos/estados del país elegido cada vez que cambia.
   useEffect(() => {
     if (!countryCode) {
-      setCities([])
+      setStates([])
       return
     }
     let cancelled = false
-    setLoadingCities(true)
-    import("country-state-city").then(({ City }) => {
+    setLoadingStates(true)
+    import("country-state-city").then(({ State }) => {
       if (cancelled) return
-      const list = (City.getCitiesOfCountry(countryCode) ?? [])
-        .map((c) => c.name)
-        .sort((a, b) => a.localeCompare(b, "es"))
-      setCities(list)
-      setLoadingCities(false)
+      const priority = PRIORITY_STATE_BY_COUNTRY[countryCode]
+      const list = (State.getStatesOfCountry(countryCode) ?? [])
+        .map((s) => s.name)
+        .sort((a, b) => {
+          if (priority) {
+            if (a === priority) return -1
+            if (b === priority) return 1
+          }
+          return a.localeCompare(b, "es")
+        })
+      setStates(list)
+      setLoadingStates(false)
     })
     return () => {
       cancelled = true
@@ -83,15 +101,15 @@ export function LocationSelect({
 
   function handleCountryChange(iso: string) {
     setCountryCode(iso)
-    setCity("")
+    setState("")
     const countryName = countries.find((c) => c.isoCode === iso)?.name ?? ""
     onChange(countryName)
   }
 
-  function handleCityChange(cityName: string) {
-    setCity(cityName)
+  function handleStateChange(stateName: string) {
+    setState(stateName)
     const countryName = countries.find((c) => c.isoCode === countryCode)?.name ?? ""
-    onChange(cityName && countryName ? `${cityName}, ${countryName}` : countryName)
+    onChange(stateName && countryName ? `${stateName}, ${countryName}` : countryName)
   }
 
   return (
@@ -110,13 +128,15 @@ export function LocationSelect({
         ))}
       </select>
       <select
-        value={city}
-        onChange={(e) => handleCityChange(e.target.value)}
-        disabled={!countryCode || loadingCities}
+        value={state}
+        onChange={(e) => handleStateChange(e.target.value)}
+        disabled={!countryCode || loadingStates}
         className={inputClass}
       >
-        <option value="">{!countryCode ? "Elige un país primero" : loadingCities ? "Cargando ciudades…" : "Ciudad"}</option>
-        {cities.map((name) => (
+        <option value="">
+          {!countryCode ? "Elige un país primero" : loadingStates ? "Cargando departamentos…" : "Departamento"}
+        </option>
+        {states.map((name) => (
           <option key={name} value={name}>
             {name}
           </option>

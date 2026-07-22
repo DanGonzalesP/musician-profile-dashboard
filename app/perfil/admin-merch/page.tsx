@@ -267,7 +267,7 @@ export default function AdminMerchPage() {
                   p.isActive ? "" : "opacity-55"
                 }`}
               >
-                <div className="relative aspect-[4/3] overflow-hidden bg-background/60">
+                <div className="relative aspect-4/3 overflow-hidden bg-background/60">
                   {p.images[0] ? (
                     <img src={p.images[0]} alt={p.name} className="size-full object-cover" />
                   ) : (

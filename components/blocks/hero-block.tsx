@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2, Send } from "lucide-react"
+import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2 } from "lucide-react"
 import type { HeroData, SocialPlatform } from "@/lib/blocks"
 import { SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
+import { resolveContactChannel, CONTACT_CHANNEL_ICONS, CONTACT_CHANNEL_LABELS } from "@/lib/contact-channel"
 import { ShareProfileDialog } from "./share-profile-dialog"
 import { useLocale } from "@/components/locale-provider"
 
@@ -48,6 +49,8 @@ export function HeroBlock({
   const imagePreview = data.image || "/placeholder.svg"
   const socials = data.socials || []
   const [shareOpen, setShareOpen] = useState(false)
+  const contact = data.contactUrl ? resolveContactChannel(data.contactUrl) : null
+  const ContactIcon = contact ? CONTACT_CHANNEL_ICONS[contact.channel] : null
 
   // Ubicación + obras comparten una sola línea (ubicación a la izquierda,
   // obras a su derecha). El nombre real se muestra aparte, más pequeño.
@@ -79,7 +82,7 @@ export function HeroBlock({
         ) : (
           <div className="size-full bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_70%)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent" />
       </div>
 
       {/* Cabecera de 3 columnas en escritorio (bio | identidad | acciones),
@@ -87,21 +90,8 @@ export function HeroBlock({
           ubicación → métrica → bio → redes/botones. */}
       <div className="relative px-6 pb-6 sm:px-8 sm:pb-8">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-8">
-          {/* Columna izquierda — Botón de contacto (a la misma altura que
-              "Compartir" pero en el lado opuesto) + biografía corta. */}
+          {/* Columna izquierda — biografía corta. */}
           <div className="order-2 flex flex-col items-center gap-3 sm:order-1 sm:items-start">
-            {data.contactUrl && (
-              <a
-                href={data.contactUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t("hero_contact_aria")}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-accent"
-              >
-                <Send className="size-4" />
-                {data.contactLabel || t("hero_contact_fallback")}
-              </a>
-            )}
             {data.tagline && (
               <p className="line-clamp-3 max-w-xs text-pretty text-center text-sm leading-relaxed text-muted-foreground sm:text-left">
                 {data.tagline}
@@ -125,18 +115,35 @@ export function HeroBlock({
             <IdentityRow items={metaRow} />
           </div>
 
-          {/* Columna derecha — Compartir y redes */}
+          {/* Columna derecha — Contacto + Compartir (uno al lado del otro) y redes.
+              Contacto siempre es solo-ícono (canal resuelto en lib/contact-channel.ts);
+              Compartir es solo-ícono en móvil y con texto desde sm (escritorio). */}
           <div className="order-3 flex flex-col items-center gap-3 sm:items-end">
-            {shareUrl && (
-              <button
-                type="button"
-                onClick={() => setShareOpen(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-accent"
-              >
-                <Share2 className="size-4" />
-                {t("hero_share")}
-              </button>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {contact && ContactIcon && (
+                <a
+                  href={contact.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t("hero_contact_aria")}
+                  title={CONTACT_CHANNEL_LABELS[contact.channel]}
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background/60 text-foreground transition-colors hover:border-primary/50 hover:bg-accent"
+                >
+                  <ContactIcon className="size-4" />
+                </a>
+              )}
+              {shareUrl && (
+                <button
+                  type="button"
+                  onClick={() => setShareOpen(true)}
+                  aria-label={t("hero_share")}
+                  className="inline-flex size-9 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-background/60 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-accent sm:h-auto sm:w-auto sm:px-4 sm:py-2"
+                >
+                  <Share2 className="size-4" />
+                  <span className="hidden sm:inline">{t("hero_share")}</span>
+                </button>
+              )}
+            </div>
 
             {socials.length > 0 && (
               <nav aria-label={t("hero_social_aria")} className="flex flex-nowrap items-center justify-center gap-2 sm:flex-wrap sm:justify-end">

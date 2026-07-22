@@ -192,7 +192,7 @@ export default function GruposPage() {
                   className="gradient-border gradient-border-static relative rounded-2xl bg-card/40 p-5"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/25 via-card to-background font-display text-lg font-bold text-primary">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-primary/25 via-card to-background font-display text-lg font-bold text-primary">
                       {group.displayName.charAt(0).toUpperCase()}
                     </span>
                     <div className="min-w-0">

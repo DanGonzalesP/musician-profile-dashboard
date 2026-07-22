@@ -32,7 +32,6 @@ export const dictionaries: Record<Locale, Dict> = {
     hero_artist_name_fallback: "Nombre del Artista",
     hero_credits_one: "Obra",
     hero_credits_other: "Obras",
-    hero_contact_fallback: "Contacto",
     hero_contact_aria: "Contactar al artista",
 
     discography_title: "Discografía",
@@ -198,7 +197,6 @@ export const dictionaries: Record<Locale, Dict> = {
     hero_artist_name_fallback: "Artist Name",
     hero_credits_one: "Work",
     hero_credits_other: "Works",
-    hero_contact_fallback: "Contact",
     hero_contact_aria: "Contact the artist",
 
     discography_title: "Discography",
