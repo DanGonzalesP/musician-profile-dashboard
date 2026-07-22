@@ -119,9 +119,18 @@ export function AutoScrollCarousel({
       style={{ scrollbarWidth: "none" }}
       className={`${isY ? "overflow-y-auto" : "overflow-x-auto"} [&::-webkit-scrollbar]:hidden ${className}`}
     >
-      <div className={innerClassName}>{children}</div>
-      <div className={innerClassName} aria-hidden="true">
-        {children}
+      {/* Envoltorio SIN gap propio que ubica los dos juegos uno junto al otro
+          en el eje del carrusel (fila para "x", columna para "y"). Sin este
+          `flex` explícito, dos <div> son bloques y se APILAN VERTICALMENTE
+          por default — eso rompía el carrusel horizontal (se veía como una
+          grilla de 2 filas en vez de una sola fila continua). El gap entre
+          juegos debe ser CERO (no llevarlo acá) para que la mitad exacta del
+          scroll coincida con el final del primer juego. */}
+      <div className={isY ? "flex flex-col" : "flex flex-row"}>
+        <div className={innerClassName}>{children}</div>
+        <div className={innerClassName} aria-hidden="true">
+          {children}
+        </div>
       </div>
     </div>
   )

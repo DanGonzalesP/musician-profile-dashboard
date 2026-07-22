@@ -258,6 +258,12 @@ export type PublicacionItem = {
   // resolver un frame o mostrar un ícono de reproducción sobre fondo sólido.
   thumbnail?: string
   caption?: string
+  // A qué fila del carrusel pertenece (0..PUBLICACIONES_ROWS-1) — así el
+  // panel de edición sabe qué publicaciones mostrar al elegir una fila. Los
+  // ítems viejos (guardados antes de este campo) no lo tienen: tanto el
+  // editor como el bloque público caen a un reparto posicional automático
+  // (ver computePublicacionRows) para no romper perfiles ya guardados.
+  row?: number
 }
 
 // Las publicaciones se muestran en 3 filas tipo carrusel (3 elementos por
@@ -266,6 +272,21 @@ export type PublicacionItem = {
 export const PUBLICACIONES_ROWS = 3
 
 export const PUBLICACIONES_DEFAULT_ROW_TITLES = ["Destacados", "En vivo", "Detrás de cámaras"]
+
+// Resuelve a qué fila (0..PUBLICACIONES_ROWS-1) pertenece cada publicación:
+// si el ítem ya trae `row` explícito (asignado desde el editor) se respeta;
+// si no lo trae (perfiles guardados antes de este campo), se reparte por
+// posición en bloques consecutivos — el mismo reparto que se usaba antes de
+// que existiera `row`, para que ningún perfil existente cambie de aspecto.
+export function computePublicacionRows(items: PublicacionItem[]): number[] {
+  const rowSize = Math.max(3, Math.ceil(items.length / PUBLICACIONES_ROWS))
+  return items.map((item, i) => {
+    if (typeof item.row === "number" && item.row >= 0 && item.row < PUBLICACIONES_ROWS) {
+      return item.row
+    }
+    return Math.min(PUBLICACIONES_ROWS - 1, Math.floor(i / rowSize))
+  })
+}
 
 export type PublicacionesData = {
   items: PublicacionItem[]
@@ -700,12 +721,14 @@ const PUBLICACION_TYPES = ["image", "video"] as const
 
 function normalizePublicacionItem(raw: unknown, index: number): PublicacionItem {
   const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  const rowNum = Number(p.row)
   return {
     id: String(p.id ?? `publicacion-${index + 1}`),
     type: PUBLICACION_TYPES.includes(p.type as (typeof PUBLICACION_TYPES)[number]) ? (p.type as "image" | "video") : "image",
     url: String(p.url ?? ""),
     thumbnail: p.thumbnail ? String(p.thumbnail) : undefined,
     caption: p.caption ? String(p.caption) : undefined,
+    row: Number.isInteger(rowNum) && rowNum >= 0 && rowNum < PUBLICACIONES_ROWS ? rowNum : undefined,
   }
 }
 

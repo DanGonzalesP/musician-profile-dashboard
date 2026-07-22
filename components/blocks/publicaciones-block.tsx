@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { GalleryHorizontalEnd, Maximize2, Music2, Play, PlayCircle, X } from "lucide-react"
 import { getYoutubeEmbedUrl } from "@/lib/youtube"
 import {
+  computePublicacionRows,
   PUBLICACIONES_DEFAULT_ROW_TITLES,
   PUBLICACIONES_ROWS,
   type EmbedItem,
@@ -26,17 +27,17 @@ export function PublicacionesBlock({ data }: { data: PublicacionesData }) {
   const embeds = data.embeds ?? []
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
 
-  // Reparte las publicaciones en PUBLICACIONES_ROWS filas consecutivas.
-  // Con el tope gratuito de 9 son 3 filas de 3; los perfiles de grupo (sin
-  // tope) reparten en 3 filas de igual tamaño.
+  // Reparte las publicaciones en PUBLICACIONES_ROWS filas según su `row`
+  // explícito (asignado en el editor) o, si no lo tienen (perfiles viejos),
+  // por posición — ver computePublicacionRows en lib/blocks.ts.
   const rows = useMemo<RowData[]>(() => {
-    const rowSize = Math.max(3, Math.ceil(items.length / PUBLICACIONES_ROWS))
+    const rowOf = computePublicacionRows(items)
     const titles = data.rowTitles?.length ? data.rowTitles : PUBLICACIONES_DEFAULT_ROW_TITLES
     return Array.from({ length: PUBLICACIONES_ROWS }, (_, rowIndex) => ({
       title: titles[rowIndex] ?? PUBLICACIONES_DEFAULT_ROW_TITLES[rowIndex] ?? "",
       items: items
-        .slice(rowIndex * rowSize, (rowIndex + 1) * rowSize)
-        .map((item, i) => ({ item, globalIndex: rowIndex * rowSize + i })),
+        .map((item, globalIndex) => ({ item, globalIndex }))
+        .filter((_, i) => rowOf[i] === rowIndex),
     })).filter((row) => row.items.length > 0)
   }, [items, data.rowTitles])
 
@@ -201,10 +202,34 @@ function CarouselRow({
   rowIndex: number
   onOpen: (globalIndex: number) => void
 }) {
-  // Publicación seleccionada dentro de esta fila: al seleccionarla, su texto
-  // se despliega en un panel a la derecha (empujando a las demás) y el
-  // auto-scroll se pausa.
+  // Publicación seleccionada dentro de esta fila: al seleccionarla, se
+  // desactiva el loop infinito (para no duplicarla en pantalla) y esa
+  // publicación pasa a ocupar el primer lugar de la fila (vía CSS `order`),
+  // empujando a las demás; su texto se despliega en un panel justo a su
+  // derecha. Al volver a tocarla se cierra el panel y todo vuelve a su lugar.
   const [activeId, setActiveId] = useState<string | null>(null)
+
+  const selectOrOpen = (item: PublicacionItem, globalIndex: number) => {
+    // Sin texto que mostrar → abrir directo el visor inmersivo.
+    if (!item.caption) {
+      onOpen(globalIndex)
+      return
+    }
+    setActiveId((current) => (current === item.id ? null : item.id))
+  }
+
+  const cellsFor = (paused: boolean) =>
+    row.items.map(({ item, globalIndex }, i) => (
+      <PublicacionCell
+        key={item.id}
+        item={item}
+        active={activeId === item.id}
+        order={paused ? (activeId === item.id ? -1 : i) : undefined}
+        onSelect={() => selectOrOpen(item, globalIndex)}
+        onOpen={() => onOpen(globalIndex)}
+        onClose={() => setActiveId(null)}
+      />
+    ))
 
   return (
     <section>
@@ -217,34 +242,23 @@ function CarouselRow({
         </h3>
       </div>
 
-      {/* Carrusel lateral con auto-scroll infinito: se desliza solo y también
-          a mano; se pausa al pasar el mouse, al interactuar o al seleccionar. */}
-      <AutoScrollCarousel
-        axis="x"
-        paused={activeId !== null}
-        ariaLabel={row.title}
-        innerClassName="flex items-stretch gap-4 pb-1"
-      >
-        {row.items.map(({ item, globalIndex }) => (
-          <PublicacionCell
-            key={item.id}
-            item={item}
-            active={activeId === item.id}
-            onSelect={() =>
-              setActiveId((current) => {
-                // Sin texto que mostrar → abrir directo el visor inmersivo.
-                if (!item.caption) {
-                  onOpen(globalIndex)
-                  return current
-                }
-                return current === item.id ? null : item.id
-              })
-            }
-            onOpen={() => onOpen(globalIndex)}
-            onClose={() => setActiveId(null)}
-          />
-        ))}
-      </AutoScrollCarousel>
+      {activeId === null ? (
+        // Modo normal: carrusel lateral con auto-scroll infinito (se desliza
+        // solo y también a mano; se pausa al pasar el mouse o al interactuar).
+        <AutoScrollCarousel axis="x" ariaLabel={row.title} innerClassName="flex items-stretch gap-4 pb-1">
+          {cellsFor(false)}
+        </AutoScrollCarousel>
+      ) : (
+        // Modo selección: SIN duplicar contenido (el loop infinito se
+        // desactiva) para poder reordenar con `order` sin que la publicación
+        // elegida aparezca dos veces en pantalla.
+        <div
+          style={{ scrollbarWidth: "none" }}
+          className="flex items-stretch gap-4 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden"
+        >
+          {cellsFor(true)}
+        </div>
+      )}
     </section>
   )
 }
@@ -258,12 +272,15 @@ function CarouselRow({
 function PublicacionCell({
   item,
   active,
+  order,
   onSelect,
   onOpen,
   onClose,
 }: {
   item: PublicacionItem
   active: boolean
+  /** CSS `order` — la publicación activa usa -1 para pasar a ser la primera. */
+  order?: number
   onSelect: () => void
   onOpen: () => void
   onClose: () => void
@@ -271,7 +288,7 @@ function PublicacionCell({
   const preview = item.type === "video" ? item.thumbnail : item.url
 
   return (
-    <div className="flex flex-none items-stretch gap-3">
+    <div className="flex flex-none items-stretch gap-3" style={order !== undefined ? { order } : undefined}>
       <button
         type="button"
         onClick={onSelect}
@@ -305,10 +322,14 @@ function PublicacionCell({
       <AnimatePresence initial={false}>
         {active && item.caption && (
           <motion.div
-            initial={{ opacity: 0, x: -10, width: 0 }}
-            animate={{ opacity: 1, x: 0, width: "auto" }}
-            exit={{ opacity: 0, x: -10, width: 0 }}
-            transition={{ duration: 0.28, ease: "easeOut" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            // Ancho FIJO (no "auto") — animar a width:"auto" con Framer Motion
+            // hace que el panel crezca hasta el ancho natural del texto (una
+            // sola línea larguísima que se salía del contenedor). Con un
+            // ancho fijo el texto se distribuye y ajusta dentro del recuadro.
             className="flex w-52 flex-none flex-col overflow-hidden rounded-2xl border border-border bg-card/70 sm:w-64"
           >
             <div className="flex items-start justify-between gap-2 p-4 pb-2">
@@ -322,7 +343,10 @@ function PublicacionCell({
                 <X className="size-4" />
               </button>
             </div>
-            <p className="flex-1 overflow-y-auto px-4 text-sm leading-relaxed text-foreground [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* Scrollbar visible a propósito: si el texto excede el alto
+                disponible, esta barra es la señal de que se puede subir y
+                bajar para leer el resto. */}
+            <p className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words px-4 pb-2 text-sm leading-relaxed text-foreground [scrollbar-width:thin]">
               {item.caption}
             </p>
             <div className="p-4 pt-3">

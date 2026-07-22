@@ -60,8 +60,15 @@ export function FeedSidebar({
         className="pointer-events-none absolute inset-y-0 left-0 z-40 hidden w-64 items-center pl-5 lg:flex"
       >
         <nav className="pointer-events-auto w-full">
-          <div className="gradient-border-static relative max-h-[85dvh] overflow-y-auto rounded-3xl bg-card/55 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <p className="flex items-center gap-1.5 px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
+          {/* Sin subtítulos "Roles"/"Comunidad": todos los ítems (Para ti +
+              roles + Grupos musicales) van en una sola lista continua, más
+              compacta, para que entren completos sin tener que arrastrar la
+              página. El scrollbar queda visible (fino) por si en una
+              pantalla baja igual no entran todos — así el usuario ve que hay
+              más ítems para scrollear DENTRO del panel, sin confundirlo con
+              el scroll de la página. */}
+          <div className="gradient-border-static relative max-h-[85dvh] overflow-y-auto rounded-3xl bg-card/55 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl [scrollbar-width:thin]">
+            <p className="flex items-center gap-1.5 px-3 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
               <AudioWaveform className="size-3" /> Explora
             </p>
 
@@ -74,9 +81,6 @@ export function FeedSidebar({
               onClick={() => onChange(null)}
             />
 
-            <p className="px-3 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground/70">
-              Roles
-            </p>
             {MUSICIAN_ROLES.map((role) => (
               <SidebarItem
                 key={role.id}
@@ -89,9 +93,6 @@ export function FeedSidebar({
               />
             ))}
 
-            <p className="px-3 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground/70">
-              Comunidad
-            </p>
             <SidebarItem
               icon={Users}
               label="Grupos musicales"
@@ -163,7 +164,7 @@ function SidebarItem({
       aria-pressed={selected}
       title={description}
       onClick={onClick}
-      className="group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors"
+      className="group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors"
     >
       {selected && (
         <motion.span
