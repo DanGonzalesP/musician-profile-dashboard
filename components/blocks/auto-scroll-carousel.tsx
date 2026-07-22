@@ -11,13 +11,19 @@
 // invisible. Como usa scroll nativo (no transform), el usuario puede además
 // deslizar/arrastrar/scrollear con el dedo o la rueda en cualquier momento; el
 // auto-scroll se pausa mientras interactúa o pasa el mouse por encima y se
-// reanuda solo. Respeta prefers-reduced-motion.
+// reanuda solo.
+//
+// A propósito NO respeta prefers-reduced-motion: es un carrusel decorativo
+// con su propio control manual (pausa al pasar el mouse/tocar), y el pedido
+// explícito es que se mueva siempre solo, sin depender de una preferencia de
+// accesibilidad del sistema operativo del visitante que además es invisible
+// para el usuario (parecía "roto"/estático sin ninguna pista de por qué).
 
 import { useEffect, useRef, type ReactNode } from "react"
 
 export function AutoScrollCarousel({
   axis = "x",
-  speed = 0.35,
+  speed = 0.5,
   paused = false,
   className = "",
   innerClassName = "",
@@ -25,7 +31,7 @@ export function AutoScrollCarousel({
   children,
 }: {
   axis?: "x" | "y"
-  /** px por frame (~60fps). 0.35 ≈ lento y elegante. */
+  /** px por frame (~60fps). 0.5 ≈ lento y elegante, pero bien perceptible. */
   speed?: number
   /** Pausa forzada desde afuera (ej. cuando una tarjeta está expandida). */
   paused?: boolean
@@ -50,7 +56,6 @@ export function AutoScrollCarousel({
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return
 
     let raf = 0
     const tick = () => {

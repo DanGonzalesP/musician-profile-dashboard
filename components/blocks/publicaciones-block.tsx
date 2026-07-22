@@ -245,7 +245,16 @@ function CarouselRow({
       {activeId === null ? (
         // Modo normal: carrusel lateral con auto-scroll infinito (se desliza
         // solo y también a mano; se pausa al pasar el mouse o al interactuar).
-        <AutoScrollCarousel axis="x" ariaLabel={row.title} innerClassName="flex items-stretch gap-4 pb-1">
+        // `sm:max-w` acota el ancho visible a exactamente 3 tarjetas + sus 2
+        // gaps — sin este tope, en pantallas anchas entraban más de 3
+        // tarjetas a la vez y se alcanzaba a ver el segundo juego duplicado
+        // (el que existe solo para el loop sin costuras) antes de scrollear.
+        <AutoScrollCarousel
+          axis="x"
+          ariaLabel={row.title}
+          className="sm:max-w-[44rem]"
+          innerClassName="flex items-stretch gap-4 pb-1"
+        >
           {cellsFor(false)}
         </AutoScrollCarousel>
       ) : (
@@ -254,7 +263,7 @@ function CarouselRow({
         // elegida aparezca dos veces en pantalla.
         <div
           style={{ scrollbarWidth: "none" }}
-          className="flex items-stretch gap-4 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden"
+          className="flex items-stretch gap-4 overflow-x-auto pb-1 sm:max-w-[44rem] [&::-webkit-scrollbar]:hidden"
         >
           {cellsFor(true)}
         </div>
@@ -288,11 +297,17 @@ function PublicacionCell({
   const preview = item.type === "video" ? item.thumbnail : item.url
 
   return (
-    <div className="flex flex-none items-stretch gap-3" style={order !== undefined ? { order } : undefined}>
+    // Alto FIJO (no derivado de "items-stretch" + contenido): antes, un
+    // texto largo hacía crecer el panel de descripción y, como la fila
+    // estiraba a todos sus hijos a la altura del más alto, la imagen se
+    // deformaba/agrandaba para igualarlo. Con un alto constante (el mismo
+    // que da el aspecto 3:4 a cada ancho de tarjeta) la imagen nunca cambia
+    // de tamaño y el panel de texto scrollea internamente si no entra.
+    <div className="flex h-[235px] flex-none gap-3 sm:h-[299px]" style={order !== undefined ? { order } : undefined}>
       <button
         type="button"
         onClick={onSelect}
-        className={`group relative aspect-[3/4] w-44 flex-none overflow-hidden rounded-2xl border bg-card/60 text-left transition-shadow sm:w-56 ${
+        className={`group relative h-full w-44 flex-none overflow-hidden rounded-2xl border bg-card/60 text-left transition-shadow sm:w-56 ${
           active
             ? "border-primary shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
             : "border-border hover:shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
@@ -326,11 +341,14 @@ function PublicacionCell({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            // Ancho FIJO (no "auto") — animar a width:"auto" con Framer Motion
-            // hace que el panel crezca hasta el ancho natural del texto (una
-            // sola línea larguísima que se salía del contenedor). Con un
-            // ancho fijo el texto se distribuye y ajusta dentro del recuadro.
-            className="flex w-52 flex-none flex-col overflow-hidden rounded-2xl border border-border bg-card/70 sm:w-64"
+            // Ancho Y ALTO fijos (no "auto"/no derivado del contenido):
+            // animar a width:"auto" hacía crecer el panel hasta el ancho
+            // natural del texto (una línea larguísima fuera del contenedor);
+            // dejar el alto "auto" hacía crecer la FILA entera (y con ella,
+            // por el items-stretch de arriba, también la imagen). Con h-full
+            // (mismo alto fijo que la imagen) el texto queda contenido y
+            // scrollea internamente si no entra completo.
+            className="flex h-full w-52 flex-none flex-col overflow-hidden rounded-2xl border border-border bg-card/70 sm:w-64"
           >
             <div className="flex items-start justify-between gap-2 p-4 pb-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Descripción</span>
