@@ -18,7 +18,6 @@ import {
   type PublicacionItem,
 } from "@/lib/blocks"
 import { MediaViewer } from "./media-viewer"
-import { AutoScrollCarousel } from "./auto-scroll-carousel"
 
 type RowData = { title: string; items: { item: PublicacionItem; globalIndex: number }[] }
 
@@ -202,11 +201,11 @@ function CarouselRow({
   rowIndex: number
   onOpen: (globalIndex: number) => void
 }) {
-  // Publicación seleccionada dentro de esta fila: al seleccionarla, se
-  // desactiva el loop infinito (para no duplicarla en pantalla) y esa
-  // publicación pasa a ocupar el primer lugar de la fila (vía CSS `order`),
-  // empujando a las demás; su texto se despliega en un panel justo a su
-  // derecha. Al volver a tocarla se cierra el panel y todo vuelve a su lugar.
+  // Sin efecto de carrusel/auto-scroll: las publicaciones de la fila se
+  // reparten el ancho completo en partes iguales (más grandes cuantas menos
+  // haya), sin duplicar nada. Al seleccionar una con texto, esa publicación
+  // pasa a ocupar el primer lugar (CSS `order`), empujando a las demás, y su
+  // texto se despliega en un panel justo a su derecha.
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const selectOrOpen = (item: PublicacionItem, globalIndex: number) => {
@@ -217,19 +216,6 @@ function CarouselRow({
     }
     setActiveId((current) => (current === item.id ? null : item.id))
   }
-
-  const cellsFor = (paused: boolean) =>
-    row.items.map(({ item, globalIndex }, i) => (
-      <PublicacionCell
-        key={item.id}
-        item={item}
-        active={activeId === item.id}
-        order={paused ? (activeId === item.id ? -1 : i) : undefined}
-        onSelect={() => selectOrOpen(item, globalIndex)}
-        onOpen={() => onOpen(globalIndex)}
-        onClose={() => setActiveId(null)}
-      />
-    ))
 
   return (
     <section>
@@ -242,40 +228,28 @@ function CarouselRow({
         </h3>
       </div>
 
-      {activeId === null ? (
-        // Modo normal: carrusel lateral con auto-scroll infinito (se desliza
-        // solo y también a mano; se pausa al pasar el mouse o al interactuar).
-        // `sm:max-w` acota el ancho visible a exactamente 3 tarjetas + sus 2
-        // gaps — sin este tope, en pantallas anchas entraban más de 3
-        // tarjetas a la vez y se alcanzaba a ver el segundo juego duplicado
-        // (el que existe solo para el loop sin costuras) antes de scrollear.
-        <AutoScrollCarousel
-          axis="x"
-          ariaLabel={row.title}
-          className="sm:max-w-[44rem]"
-          innerClassName="flex items-stretch gap-4 pb-1"
-        >
-          {cellsFor(false)}
-        </AutoScrollCarousel>
-      ) : (
-        // Modo selección: SIN duplicar contenido (el loop infinito se
-        // desactiva) para poder reordenar con `order` sin que la publicación
-        // elegida aparezca dos veces en pantalla.
-        <div
-          style={{ scrollbarWidth: "none" }}
-          className="flex items-stretch gap-4 overflow-x-auto pb-1 sm:max-w-[44rem] [&::-webkit-scrollbar]:hidden"
-        >
-          {cellsFor(true)}
-        </div>
-      )}
+      <div className="flex items-stretch gap-4">
+        {row.items.map(({ item, globalIndex }, i) => (
+          <PublicacionCell
+            key={item.id}
+            item={item}
+            active={activeId === item.id}
+            order={activeId !== null ? (activeId === item.id ? -1 : i) : undefined}
+            onSelect={() => selectOrOpen(item, globalIndex)}
+            onOpen={() => onOpen(globalIndex)}
+            onClose={() => setActiveId(null)}
+          />
+        ))}
+      </div>
     </section>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Celda de publicación — la imagen (3:4) y, al seleccionarla, un panel lateral
-// a su derecha (dentro del carrusel) donde se despliega el texto: nunca encima
-// de la imagen. Las demás publicaciones quedan empujadas a un costado.
+// Celda de publicación — la imagen (3:4) ocupa todo el ancho que le toca en
+// la fila (más grande cuantas menos publicaciones haya) y, al seleccionarla,
+// un panel lateral a su derecha despliega el texto: nunca encima de la
+// imagen. Las demás publicaciones quedan empujadas a un costado.
 // ---------------------------------------------------------------------------
 
 function PublicacionCell({
@@ -297,17 +271,23 @@ function PublicacionCell({
   const preview = item.type === "video" ? item.thumbnail : item.url
 
   return (
-    // Alto FIJO (no derivado de "items-stretch" + contenido): antes, un
-    // texto largo hacía crecer el panel de descripción y, como la fila
-    // estiraba a todos sus hijos a la altura del más alto, la imagen se
-    // deformaba/agrandaba para igualarlo. Con un alto constante (el mismo
-    // que da el aspecto 3:4 a cada ancho de tarjeta) la imagen nunca cambia
-    // de tamaño y el panel de texto scrollea internamente si no entra.
-    <div className="flex h-[235px] flex-none gap-3 sm:h-[299px]" style={order !== undefined ? { order } : undefined}>
+    // Publicación NO activa: `flex-1` — reparte con las demás el ancho
+    // completo de la fila (más grande cuantas menos publicaciones haya).
+    // Activa: `flex-none` — dejar de crecer para hacerle lugar al panel de
+    // texto de al lado, sin afectar el alto (self-start en la imagen la
+    // libera del stretch de la fila; el panel se estira para igualarlo y
+    // scrollea internamente si el texto no entra — min-h-0 en el párrafo es
+    // la pieza clave para que esto funcione sin medir nada con JS).
+    <div
+      className={`flex items-stretch gap-3 ${active ? "flex-none" : "min-w-0 flex-1"}`}
+      style={order !== undefined ? { order } : undefined}
+    >
       <button
         type="button"
         onClick={onSelect}
-        className={`group relative h-full w-44 flex-none overflow-hidden rounded-2xl border bg-card/60 text-left transition-shadow sm:w-56 ${
+        className={`group relative aspect-[3/4] shrink-0 self-start overflow-hidden rounded-2xl border bg-card/60 text-left transition-shadow ${
+          active ? "w-36 sm:w-44" : "w-full"
+        } ${
           active
             ? "border-primary shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
             : "border-border hover:shadow-[0_0_0_1px_var(--primary),0_16px_40px_-20px_var(--primary)]"
@@ -341,14 +321,13 @@ function PublicacionCell({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            // Ancho Y ALTO fijos (no "auto"/no derivado del contenido):
-            // animar a width:"auto" hacía crecer el panel hasta el ancho
-            // natural del texto (una línea larguísima fuera del contenedor);
-            // dejar el alto "auto" hacía crecer la FILA entera (y con ella,
-            // por el items-stretch de arriba, también la imagen). Con h-full
-            // (mismo alto fijo que la imagen) el texto queda contenido y
-            // scrollea internamente si no entra completo.
-            className="flex h-full w-52 flex-none flex-col overflow-hidden rounded-2xl border border-border bg-card/70 sm:w-64"
+            // Ancho fijo (no "auto" — Framer Motion animando a width:"auto"
+            // crecía hasta el ancho natural del texto, una línea larguísima
+            // fuera del contenedor). Alto: SIN fijar — se estira (align-self
+            // stretch por default) para igualar el alto natural de la imagen
+            // (self-start + aspect-ratio de al lado), gracias a min-h-0 en el
+            // párrafo de abajo.
+            className="flex w-52 flex-none flex-col overflow-hidden rounded-2xl border border-border bg-card/70 sm:w-64"
           >
             <div className="flex items-start justify-between gap-2 p-4 pb-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Descripción</span>
