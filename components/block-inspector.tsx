@@ -4,12 +4,23 @@ import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, Album, Track, ReleaseType, SocialLink, SocialPlatform, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
 import { BLOCK_LIBRARY, SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
-import { type CatalogProduct, type CatalogService, newProduct, newService } from "@/lib/catalog"
+import {
+  type CatalogProduct,
+  type CatalogService,
+  type ProductVariantGroup,
+  newProduct,
+  newService,
+  PRODUCT_CATEGORIES,
+  SERVICE_CATEGORIES,
+  PRICE_UNITS,
+  CURRENCIES,
+} from "@/lib/catalog"
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
 import { MUSICIAN_ROLES } from "@/lib/musician-roles"
-import { X, Trash2, Upload, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check } from "lucide-react"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { LegadoFields } from "@/components/inspector/legado-fields"
 import { PublicacionesFields } from "@/components/inspector/publicaciones-fields"
 import { EmbedsFields } from "@/components/inspector/embeds-fields"
@@ -34,6 +45,9 @@ type Props = {
   block: Block | null
   onChange: (id: string, data: Block["data"]) => void
   onDelete: (id: string) => void
+  // El "banner principal" (hero) nunca se elimina del todo — vacía su
+  // contenido en su lugar (ver confirmación antes de llamarlo).
+  onClearContent: (id: string) => void
   blobRegistry: BlobRegistry
   products: CatalogProduct[]
   onProductsChange: (products: CatalogProduct[]) => void
@@ -50,6 +64,7 @@ export function BlockInspector({
   block,
   onChange,
   onDelete,
+  onClearContent,
   blobRegistry,
   products,
   onProductsChange,
@@ -59,6 +74,8 @@ export function BlockInspector({
   isBand = false,
   onClose,
 }: Props) {
+  const [confirmClear, setConfirmClear] = useState(false)
+
   if (!block) {
     return (
       <div className="flex h-full flex-col">
@@ -134,6 +151,7 @@ export function BlockInspector({
             onChange={update}
             services={services}
             onServicesChange={onServicesChange}
+            blobRegistry={blobRegistry}
           />
         )}
         {block.type === "legado" && (
@@ -170,13 +188,26 @@ export function BlockInspector({
             se queda acá porque no hay "volver" que sirva de confirmación. */}
         <button
           type="button"
-          onClick={() => onDelete(block.id)}
+          onClick={() => (block.type === "hero" ? setConfirmClear(true) : onDelete(block.id))}
           className="hidden w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 xl:flex"
         >
           <Trash2 className="size-4" />
-          Eliminar bloque
+          {block.type === "hero" ? "Vaciar banner principal" : "Eliminar bloque"}
         </button>
       </div>
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="¿Vaciar el banner principal?"
+          description="Se borrará todo el contenido de esta sección (nombre, frase, foto, redes) — el bloque se queda en tu página, pero vacío para que empieces de nuevo."
+          confirmLabel="Vaciar contenido"
+          onConfirm={() => {
+            onClearContent(block.id)
+            setConfirmClear(false)
+          }}
+          onCancel={() => setConfirmClear(false)}
+        />
+      )}
     </div>
   )
 }
@@ -1690,6 +1721,135 @@ function ExternalCreditFields({
   )
 }
 
+// ─── MultiImageUploader — hasta N fotos, blob URL para preview inmediato ──
+
+function MultiImageUploader({
+  images,
+  onChange,
+  blobRegistry,
+  max = 5,
+}: {
+  images: string[]
+  onChange: (images: string[]) => void
+  blobRegistry: BlobRegistry
+  max?: number
+}) {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || e.target.files.length === 0) return
+    const file = e.target.files[0]
+    const blobUrl = URL.createObjectURL(file)
+    blobRegistry.current.set(blobUrl, file)
+    onChange([...images, blobUrl].slice(0, max))
+    e.target.value = ""
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {images.map((url, i) => (
+        <div key={`${url}-${i}`} className="group relative size-14 shrink-0 overflow-hidden rounded-lg border border-sidebar-border">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="" className="size-full object-cover" />
+          <button
+            type="button"
+            onClick={() => onChange(images.filter((_, idx) => idx !== i))}
+            title="Quitar foto"
+            aria-label="Quitar foto"
+            className="absolute inset-0 hidden items-center justify-center bg-black/60 text-white group-hover:flex"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      ))}
+      {images.length < max && (
+        <label className="flex size-14 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed border-input text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary">
+          <ImagePlus className="size-4" />
+          <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+        </label>
+      )}
+    </div>
+  )
+}
+
+// ─── VariantAdder — arma un grupo de variante (ej. "Talla": S, M, L) ──────
+
+function VariantAdder({ onAdd }: { onAdd: (variant: ProductVariantGroup) => void }) {
+  const [name, setName] = useState("")
+  const [options, setOptions] = useState("")
+
+  const submit = () => {
+    const trimmedName = name.trim()
+    const parsedOptions = options.split(",").map((o) => o.trim()).filter(Boolean)
+    if (!trimmedName || parsedOptions.length === 0) return
+    onAdd({ name: trimmedName, options: parsedOptions })
+    setName("")
+    setOptions("")
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 sm:flex-row">
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className={inputClass}
+        placeholder="Nombre, ej. Talla"
+      />
+      <input
+        type="text"
+        value={options}
+        onChange={(e) => setOptions(e.target.value)}
+        className={inputClass}
+        placeholder="Opciones separadas por coma, ej. S, M, L, XL"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        className="flex shrink-0 items-center justify-center rounded-lg border border-sidebar-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Plus className="size-3.5" />
+      </button>
+    </div>
+  )
+}
+
+// ─── FeatureAdder — agrega un ítem de "qué incluye" a un servicio ─────────
+
+function FeatureAdder({ onAdd }: { onAdd: (feature: string) => void }) {
+  const [value, setValue] = useState("")
+
+  const submit = () => {
+    const trimmed = value.trim()
+    if (!trimmed) return
+    onAdd(trimmed)
+    setValue("")
+  }
+
+  return (
+    <div className="flex gap-1.5">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault()
+            submit()
+          }
+        }}
+        className={inputClass}
+        placeholder="Ej. Archivo WAV master + versión para redes"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        className="flex shrink-0 items-center justify-center rounded-lg border border-sidebar-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Plus className="size-3.5" />
+      </button>
+    </div>
+  )
+}
+
 // ─── MerchFields ──────────────────────────────────────────────────────────
 
 function MerchFields({
@@ -1726,8 +1886,8 @@ function MerchFields({
         href="/perfil/admin-merch"
         className="block rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-[11px] leading-snug text-primary transition-colors hover:bg-primary/10"
       >
-        Aquí editas lo básico. Para categorías, variantes (tallas/colores), fotos múltiples,
-        productos digitales y enlaces de compra, abre la <strong>gestión completa de la tienda →</strong>
+        Todas las opciones de tu tienda también viven acá abajo — esta es solo una vía más
+        rápida para ver el <strong>listado completo y el stock →</strong>
       </a>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Productos</p>
@@ -1741,7 +1901,7 @@ function MerchFields({
       </div>
       <div className="space-y-4">
         {products.map((product, i) => (
-          <div key={product.id} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
+          <div key={product.id} className="space-y-2.5 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-muted-foreground">Producto #{i + 1}</span>
               <button
@@ -1759,10 +1919,50 @@ function MerchFields({
                 placeholder="Nombre del producto"
               />
             </Field>
-            <Field label="Imagen">
-              <ImageUploader
-                currentImageUrl={product.imageUrl}
-                onUploadReady={(url) => setProduct(i, { imageUrl: url })}
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Categoría">
+                <select
+                  value={product.category || "otro"}
+                  onChange={(e) => setProduct(i, { category: e.target.value })}
+                  className={inputClass}
+                >
+                  {PRODUCT_CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Tipo">
+                <div className="flex gap-1 rounded-lg border border-input bg-background p-0.5">
+                  {(["fisico", "digital"] as const).map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => setProduct(i, { kind })}
+                      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors ${
+                        product.kind === kind
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {kind === "fisico" ? "Físico" : "Digital"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </div>
+            <Field label="Descripción">
+              <textarea
+                value={product.description || ""}
+                onChange={(e) => setProduct(i, { description: e.target.value })}
+                rows={2}
+                className={inputClass}
+                placeholder="Materiales, qué incluye, formato de descarga..."
+              />
+            </Field>
+            <Field label="Fotos (hasta 5)">
+              <MultiImageUploader
+                images={product.images ?? []}
+                onChange={(images) => setProduct(i, { images, imageUrl: images[0] })}
                 blobRegistry={blobRegistry}
               />
             </Field>
@@ -1774,17 +1974,80 @@ function MerchFields({
                   placeholder="89.90"
                 />
               </Field>
-              <Field label="Stock">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={product.stock}
-                  onChange={(e) => setProduct(i, { stock: Math.max(0, Number(e.target.value) || 0) })}
+              <Field label="Moneda">
+                <select
+                  value={product.currency || "USD"}
+                  onChange={(e) => setProduct(i, { currency: e.target.value })}
                   className={inputClass}
-                  aria-label={`Stock de ${product.name || `producto ${i + 1}`}`}
-                />
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </Field>
+              {product.kind !== "digital" && (
+                <Field label="Stock">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={product.stock}
+                    onChange={(e) => setProduct(i, { stock: Math.max(0, Number(e.target.value) || 0) })}
+                    className={inputClass}
+                    aria-label={`Stock de ${product.name || `producto ${i + 1}`}`}
+                  />
+                </Field>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium text-muted-foreground">
+                Variantes (tallas, colores, formatos...)
+              </span>
+              {(product.variants ?? []).map((v, vi) => (
+                <div
+                  key={`${v.name}-${vi}`}
+                  className="flex items-center justify-between rounded-lg border border-sidebar-border bg-background/50 px-2.5 py-1.5 text-[11px]"
+                >
+                  <span className="text-foreground">
+                    <strong>{v.name}:</strong> {v.options.join(", ")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setProduct(i, { variants: product.variants.filter((_, idx) => idx !== vi) })}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+              <VariantAdder onAdd={(variant) => setProduct(i, { variants: [...(product.variants ?? []), variant] })} />
+            </div>
+            <Field label="Enlace de compra (checkout externo, opcional)">
+              <TextInput
+                value={product.purchaseUrl || ""}
+                onChange={(e) => setProduct(i, { purchaseUrl: e.target.value })}
+                placeholder="https://tu-tienda.com/producto — o déjalo vacío para 'Consultar'"
+              />
+            </Field>
+            <div className="flex items-center gap-4 pt-1">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={product.isActive}
+                  onChange={(e) => setProduct(i, { isActive: e.target.checked })}
+                  className="size-3.5 accent-[var(--primary)]"
+                />
+                Visible en la tienda
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={product.isFeatured}
+                  onChange={(e) => setProduct(i, { isFeatured: e.target.checked })}
+                  className="size-3.5 accent-[var(--primary)]"
+                />
+                Destacado
+              </label>
             </div>
           </div>
         ))}
@@ -1800,14 +2063,16 @@ function ServiceFields({
   onChange,
   services,
   onServicesChange,
+  blobRegistry,
 }: {
   data: ServiceData
   onChange: (d: ServiceData) => void
   services: CatalogService[]
   onServicesChange: (services: CatalogService[]) => void
+  blobRegistry: BlobRegistry
 }) {
-  const setService = (i: number, key: "title" | "price" | "description", value: string) => {
-    onServicesChange(services.map((s, idx) => (idx === i ? { ...s, [key]: value } : s)))
+  const setService = (i: number, changes: Partial<CatalogService>) => {
+    onServicesChange(services.map((s, idx) => (idx === i ? { ...s, ...changes } : s)))
   }
 
   const addService = () => {
@@ -1827,8 +2092,8 @@ function ServiceFields({
         href="/perfil/admin-servicios"
         className="block rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-[11px] leading-snug text-primary transition-colors hover:bg-primary/10"
       >
-        Aquí editas lo básico. Para categorías, modalidad, duración, qué incluye y enlaces de
-        reserva, abre la <strong>gestión completa de servicios →</strong>
+        Todas las opciones de tus servicios también viven acá abajo — esta es solo una vía más
+        rápida para ver el <strong>listado completo →</strong>
       </a>
       <div className="flex items-center justify-between border-b border-sidebar-border pb-1.5 pt-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ofertas</p>
@@ -1842,7 +2107,7 @@ function ServiceFields({
       </div>
       <div className="space-y-3">
         {services.map((service, i) => (
-          <div key={service.id} className="space-y-2 rounded-lg border border-sidebar-border p-3 bg-background/50">
+          <div key={service.id} className="space-y-2.5 rounded-lg border border-sidebar-border p-3 bg-background/50">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-muted-foreground">Oferta #{i + 1}</span>
               <button
@@ -1853,23 +2118,146 @@ function ServiceFields({
                 <Trash2 className="size-3.5" />
               </button>
             </div>
-            <TextInput
-              value={service.title || ""}
-              onChange={(e) => setService(i, "title", e.target.value)}
-              placeholder="Título del servicio"
-            />
-            <TextInput
-              value={service.price || ""}
-              onChange={(e) => setService(i, "price", e.target.value)}
-              placeholder="Precio"
-            />
-            <textarea
-              value={service.description || ""}
-              onChange={(e) => setService(i, "description", e.target.value)}
-              rows={2}
-              className={inputClass}
-              placeholder="Descripción"
-            />
+            <Field label="Nombre del servicio">
+              <TextInput
+                value={service.title || ""}
+                onChange={(e) => setService(i, { title: e.target.value })}
+                placeholder="Ej. Clases de guitarra / Mezcla profesional"
+              />
+            </Field>
+            <Field label="Categoría">
+              <select
+                value={service.category || "otro"}
+                onChange={(e) => setService(i, { category: e.target.value })}
+                className={inputClass}
+              >
+                {SERVICE_CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Descripción">
+              <textarea
+                value={service.description || ""}
+                onChange={(e) => setService(i, { description: e.target.value })}
+                rows={2}
+                className={inputClass}
+                placeholder="Qué ofreces exactamente, para quién es, cómo se trabaja..."
+              />
+            </Field>
+            <div className="flex gap-2">
+              <Field label="Precio">
+                <TextInput
+                  value={service.price || ""}
+                  onChange={(e) => setService(i, { price: e.target.value })}
+                  placeholder="150.00"
+                />
+              </Field>
+              <Field label="Cobras...">
+                <select
+                  value={service.priceUnit || "proyecto"}
+                  onChange={(e) => setService(i, { priceUnit: e.target.value })}
+                  className={inputClass}
+                >
+                  {PRICE_UNITS.map((u) => (
+                    <option key={u.id} value={u.id}>{u.label}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field label="Modalidad">
+              <div className="flex gap-1 rounded-lg border border-input bg-background p-0.5">
+                {(["presencial", "online", "ambas"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setService(i, { modality: m })}
+                    className={`flex-1 rounded-md px-1.5 py-1.5 text-[11px] font-medium capitalize transition-colors ${
+                      service.modality === m
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {m === "presencial" ? "Presencial" : m === "online" ? "Online" : "Ambas"}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <div className="flex gap-2">
+              <Field label="Duración (opcional)">
+                <TextInput
+                  value={service.duration || ""}
+                  onChange={(e) => setService(i, { duration: e.target.value })}
+                  placeholder="Ej. 60 min por clase"
+                />
+              </Field>
+              <Field label="Tiempo de entrega (opcional)">
+                <TextInput
+                  value={service.deliveryTime || ""}
+                  onChange={(e) => setService(i, { deliveryTime: e.target.value })}
+                  placeholder="Ej. 5 días hábiles"
+                />
+              </Field>
+            </div>
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium text-muted-foreground">Qué incluye</span>
+              {service.features.length > 0 && (
+                <ul className="space-y-1">
+                  {service.features.map((f, fi) => (
+                    <li
+                      key={`${f}-${fi}`}
+                      className="flex items-center justify-between rounded-lg border border-sidebar-border bg-background/50 px-2.5 py-1.5 text-[11px] text-foreground"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Check className="size-3 text-primary" /> {f}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setService(i, { features: service.features.filter((_, idx) => idx !== fi) })}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <FeatureAdder onAdd={(feature) => setService(i, { features: [...service.features, feature] })} />
+            </div>
+            <Field label="Enlace de reserva o cotización (opcional)">
+              <TextInput
+                value={service.bookingUrl || ""}
+                onChange={(e) => setService(i, { bookingUrl: e.target.value })}
+                placeholder="https://calendly.com/... o tu WhatsApp wa.me/..."
+              />
+            </Field>
+            <Field label="Imagen (opcional)">
+              <ImageUploader
+                currentImageUrl={service.imageUrl}
+                onUploadReady={(url) => setService(i, { imageUrl: url })}
+                blobRegistry={blobRegistry}
+              />
+            </Field>
+            <div className="flex items-center gap-4 pt-1">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={service.isActive}
+                  onChange={(e) => setService(i, { isActive: e.target.checked })}
+                  className="size-3.5 accent-[var(--primary)]"
+                />
+                Visible
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={service.isFeatured}
+                  onChange={(e) => setService(i, { isFeatured: e.target.checked })}
+                  className="size-3.5 accent-[var(--primary)]"
+                />
+                Destacado
+              </label>
+            </div>
           </div>
         ))}
       </div>

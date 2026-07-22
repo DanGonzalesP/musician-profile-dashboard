@@ -7,7 +7,7 @@
 // acento en el borde izquierdo. En móvil se colapsa a una fila horizontal
 // deslizable bajo el header, con los mismos ítems.
 
-import type { ComponentType } from "react"
+import { useEffect, useRef, useState, type ComponentType } from "react"
 import { motion } from "framer-motion"
 import {
   AudioWaveform,
@@ -51,6 +51,31 @@ export function FeedSidebar({
 }) {
   const toggle = (id: FeedFilterId | null) =>
     onChange(active === id ? null : id)
+
+  // ── Carrusel lento en móvil: la fila avanza sola de derecha a izquierda
+  // (scrollLeft creciente) y se pausa apenas el usuario la toca, para no
+  // pelearse con un swipe manual. Al llegar al final vuelve al inicio.
+  const mobileRowRef = useRef<HTMLDivElement | null>(null)
+  const [autoScrollPaused, setAutoScrollPaused] = useState(false)
+
+  useEffect(() => {
+    if (autoScrollPaused) return
+    const el = mobileRowRef.current
+    if (!el) return
+
+    let raf = 0
+    const SPEED_PX_PER_FRAME = 0.4
+
+    const step = () => {
+      if (el.scrollWidth > el.clientWidth) {
+        const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1
+        el.scrollLeft = atEnd ? 0 : el.scrollLeft + SPEED_PX_PER_FRAME
+      }
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [autoScrollPaused])
 
   return (
     <>
@@ -106,11 +131,15 @@ export function FeedSidebar({
         </nav>
       </aside>
 
-      {/* ── Móvil: fila horizontal deslizable ─────────────────────────── */}
+      {/* ── Móvil: fila horizontal deslizable (carrusel lento automático) ── */}
       <div className="pointer-events-none absolute inset-x-0 top-16 z-40 sm:top-20 lg:hidden">
         <div
+          ref={mobileRowRef}
           role="tablist"
           aria-label="Filtrar el feed por rol"
+          onPointerDown={() => setAutoScrollPaused(true)}
+          onPointerUp={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
+          onPointerCancel={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
           className="pointer-events-auto flex items-center gap-2 overflow-x-auto px-4 pb-2 pt-1 scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
           <MobileChip

@@ -762,7 +762,7 @@ export function dbBlockToBlock(dbBlock: DbProfileBlock, opts?: { isBand?: boolea
   }
 }
 
-function defaultData(type: BlockType): BlockData {
+export function defaultData(type: BlockType): BlockData {
   switch (type) {
     case "credits":
       return { credits: [] }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ExternalLink, LayoutDashboard, Loader2, LogOut, Sparkles, Users } from "lucide-react";
+import { ChevronDown, ExternalLink, LayoutDashboard, Loader2, LogOut, Settings, Sparkles, Upload, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import { supabase } from "@/lib/supabase";
 import { setActiveBandId, type MyProfileOption } from "@/lib/bands";
@@ -64,17 +64,22 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
   };
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative flex items-center rounded-full border border-border bg-card/70 py-1 pl-1 pr-3 backdrop-blur transition-colors hover:bg-accent/40">
+      <Link
+        href="/perfil/dashboard"
+        title={t("feed_menu_admin_panel")}
+        aria-label={t("feed_menu_admin_panel")}
+        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
+      >
+        {initial}
+      </Link>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-full border border-border bg-card/70 py-1 pl-1 pr-3 backdrop-blur transition-colors hover:bg-accent/40"
+        className="flex items-center gap-2 pl-2"
       >
-        <span className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-          {initial}
-        </span>
         <span className="max-w-32 truncate text-sm font-medium text-foreground">{name}</span>
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -93,6 +98,14 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
 
           <div className="flex flex-col gap-1">
             <Link
+              href="/dashboard"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-accent/40"
+            >
+              <LayoutDashboard className="size-4 text-muted-foreground" />
+              {t("feed_menu_artist_panel")}
+            </Link>
+            <Link
               href={`/${personalSlug}`}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-accent/40"
@@ -101,12 +114,20 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
               {t("feed_menu_public_profile")}
             </Link>
             <Link
-              href="/dashboard"
+              href="/perfil/dashboard"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-accent/40"
             >
-              <LayoutDashboard className="size-4 text-muted-foreground" />
-              {t("feed_menu_artist_panel")}
+              <Settings className="size-4 text-muted-foreground" />
+              {t("feed_menu_admin_panel")}
+            </Link>
+            <Link
+              href="/dashboard?abrir=bloques"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-accent/40"
+            >
+              <Upload className="size-4 text-muted-foreground" />
+              {t("feed_menu_upload_content")}
             </Link>
           </div>
 

@@ -143,8 +143,10 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_header_register: "Registrarse",
     feed_notifications_aria: "Notificaciones",
 
+    feed_menu_artist_panel: "Perfil",
     feed_menu_public_profile: "Ver mi perfil público",
-    feed_menu_artist_panel: "Panel de Artista",
+    feed_menu_admin_panel: "Panel Admin",
+    feed_menu_upload_content: "Subir contenido",
     feed_menu_bands_title: "Mis grupos musicales",
     feed_menu_switch_to: "Cambiar a {name}",
     feed_menu_switching: "Cambiando...",
@@ -308,8 +310,10 @@ export const dictionaries: Record<Locale, Dict> = {
     feed_header_register: "Sign Up",
     feed_notifications_aria: "Notifications",
 
+    feed_menu_artist_panel: "Profile",
     feed_menu_public_profile: "View my public profile",
-    feed_menu_artist_panel: "Artist Dashboard",
+    feed_menu_admin_panel: "Admin Panel",
+    feed_menu_upload_content: "Upload content",
     feed_menu_bands_title: "My music groups",
     feed_menu_switch_to: "Switch to {name}",
     feed_menu_switching: "Switching...",

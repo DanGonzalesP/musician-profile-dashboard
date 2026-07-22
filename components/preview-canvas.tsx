@@ -12,6 +12,7 @@ type Props = {
   isDragging: boolean
   onSelect: (id: string) => void
   onDelete: (id: string) => void
+  onClearContent: (id: string) => void
   onMove: (id: string, dir: -1 | 1) => void
   onDropAt: (index: number) => void
   onReorderStart: (index: number) => void
@@ -32,6 +33,7 @@ export function PreviewCanvas({
   isDragging,
   onSelect,
   onDelete,
+  onClearContent,
   onMove,
   onDropAt,
   onReorderStart,
@@ -122,6 +124,7 @@ export function PreviewCanvas({
                     selected={selectedId === block.id}
                     onSelect={() => onSelect(block.id)}
                     onDelete={() => onDelete(block.id)}
+                    onClearContent={() => onClearContent(block.id)}
                     onMove={(dir) => onMove(block.id, dir)}
                     onDragStart={() => onReorderStart(i)}
                     onDragEnd={onDragEnd}

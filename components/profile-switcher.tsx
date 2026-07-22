@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { fetchMyProfiles, getActiveBandId, setActiveBandId, type MyProfileOption } from "@/lib/bands"
-import { Loader2, Mic2, Users } from "lucide-react"
+import { Loader2, User, Users } from "lucide-react"
 
 const ROLE_LABELS: Record<MyProfileOption["role"], string> = {
   owner: "Propietario",
@@ -65,7 +65,7 @@ export function ProfileSwitcher() {
       ) : options.find((p) => p.id === activeId)?.isBand ? (
         <Users className="size-3.5 shrink-0 text-primary" />
       ) : (
-        <Mic2 className="size-3.5 shrink-0 text-primary" />
+        <User className="size-3.5 shrink-0 text-primary" />
       )}
       <select
         value={activeId}

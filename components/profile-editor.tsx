@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID, SINGLETON_BLOCK_TYPES } from "@/lib/blocks"
+import { Suspense, useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
+import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, defaultData, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID, SINGLETON_BLOCK_TYPES } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog"
 import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
@@ -233,7 +234,16 @@ function defaultSelectedId(loadedBlocks: Block[]): string | null {
 // ─────────────────────────────────────────────────────────────────────────
 
 export function ProfileEditor() {
+  return (
+    <Suspense fallback={null}>
+      <ProfileEditorInner />
+    </Suspense>
+  )
+}
+
+function ProfileEditorInner() {
   const { showToast } = useToast()
+  const searchParams = useSearchParams()
   const [blocks, setBlocks] = useState<Block[]>([])
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [services, setServices] = useState<CatalogService[]>([])
@@ -241,7 +251,7 @@ export function ProfileEditor() {
   const [dragPayload, setDragPayload] = useState<DragPayload>(null)
   // Drawer de "Bloques" en mobile/tablet (< xl) — el aside se vuelve un
   // overlay a pantalla completa en vez de compartir espacio con el lienzo.
-  const [mobileBlocksOpen, setMobileBlocksOpen] = useState(false)
+  const [mobileBlocksOpen, setMobileBlocksOpen] = useState(searchParams.get("abrir") === "bloques")
   const [publishing, setPublishing] = useState(false)
   const [loading, setLoading] = useState(true)
   // Slug de la página pública ya publicada (deriva de profiles.display_name)
@@ -702,6 +712,12 @@ export function ProfileEditor() {
     })
   }
 
+  // El banner principal (hero) nunca se borra del lienzo — este botón vacía
+  // su contenido y lo deja en su lugar, en vez de eliminar el bloque.
+  function clearBlockContent(id: string) {
+    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, data: defaultData(b.type) } : b)))
+  }
+
   function moveBlock(id: string, dir: -1 | 1) {
     setBlocks((prev) => {
       const index = prev.findIndex((b) => b.id === id)
@@ -839,6 +855,7 @@ export function ProfileEditor() {
             isDragging={dragPayload !== null}
             onSelect={setSelectedId}
             onDelete={deleteBlock}
+            onClearContent={clearBlockContent}
             onMove={moveBlock}
             onDropAt={handleDropAt}
             onReorderStart={(index) => setDragPayload({ kind: "reorder", index })}
@@ -877,6 +894,7 @@ export function ProfileEditor() {
             block={selectedBlock}
             onChange={updateBlock}
             onDelete={deleteBlock}
+            onClearContent={clearBlockContent}
             blobRegistry={blobRegistryRef}
             products={products}
             onProductsChange={setProducts}

@@ -5,6 +5,7 @@ import type { Block, HeroData } from "@/lib/blocks"
 import type { CatalogProduct, CatalogService } from "@/lib/catalog"
 import { BlockRenderer } from "@/components/blocks/block-renderer"
 import { ShareProfileDialog } from "@/components/blocks/share-profile-dialog"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { BLOCK_LIBRARY } from "@/lib/blocks"
 import { GripVertical, Pencil, Trash2, ArrowUp, ArrowDown, Share2, Lock } from "lucide-react"
 
@@ -15,6 +16,9 @@ type Props = {
   selected: boolean
   onSelect: () => void
   onDelete: () => void
+  // El "banner principal" (hero) nunca se elimina del todo — este callback
+  // vacía su contenido en su lugar (ver confirmación más abajo).
+  onClearContent?: () => void
   onMove: (dir: -1 | 1) => void
   onDragStart: () => void
   onDragEnd: () => void
@@ -36,6 +40,7 @@ export function CanvasBlock({
   selected,
   onSelect,
   onDelete,
+  onClearContent,
   onMove,
   onDragStart,
   onDragEnd,
@@ -53,6 +58,10 @@ export function CanvasBlock({
   // abajo en el flujo de scroll. En escritorio no se toca nada: sigue solo
   // el botón original dentro del bloque.
   const [shareOpen, setShareOpen] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  // El banner principal es único en la página y no tiene sentido reordenarlo
+  // — se queda fijo donde está, sin flechas ni arrastre.
+  const isHero = block.type === "hero"
 
   return (
     <div
@@ -77,39 +86,52 @@ export function CanvasBlock({
             selected ? "sm:opacity-100" : ""
           }`}
         >
-          <button
-            type="button"
-            draggable
-            onDragStart={(e) => {
-              e.stopPropagation()
-              onDragStart()
-            }}
-            onDragEnd={onDragEnd}
-            onClick={(e) => e.stopPropagation()}
-            title="Arrastrar para reordenar"
-            aria-label="Arrastrar para reordenar bloque"
-            className="flex size-7 cursor-grab items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
-          >
-            <GripVertical className="size-4" />
-          </button>
+          {isHero ? (
+            <span
+              title="El banner principal queda fijo — no se puede reordenar"
+              className="flex size-7 items-center justify-center rounded-full text-muted-foreground/50"
+            >
+              <Lock className="size-3.5" />
+            </span>
+          ) : (
+            <button
+              type="button"
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation()
+                onDragStart()
+              }}
+              onDragEnd={onDragEnd}
+              onClick={(e) => e.stopPropagation()}
+              title="Arrastrar para reordenar"
+              aria-label="Arrastrar para reordenar bloque"
+              className="flex size-7 cursor-grab items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
+            >
+              <GripVertical className="size-4" />
+            </button>
+          )}
           <span className="px-1.5 text-[11px] font-medium text-muted-foreground">{label}</span>
           <div className="mx-0.5 h-4 w-px bg-border" />
-          <ControlButton
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-            title="Subir"
-            label="Subir bloque"
-          >
-            <ArrowUp className="size-4" />
-          </ControlButton>
-          <ControlButton
-            disabled={index === total - 1}
-            onClick={() => onMove(1)}
-            title="Bajar"
-            label="Bajar bloque"
-          >
-            <ArrowDown className="size-4" />
-          </ControlButton>
+          {!isHero && (
+            <>
+              <ControlButton
+                disabled={index === 0}
+                onClick={() => onMove(-1)}
+                title="Subir"
+                label="Subir bloque"
+              >
+                <ArrowUp className="size-4" />
+              </ControlButton>
+              <ControlButton
+                disabled={index === total - 1}
+                onClick={() => onMove(1)}
+                title="Bajar"
+                label="Bajar bloque"
+              >
+                <ArrowDown className="size-4" />
+              </ControlButton>
+            </>
+          )}
           {block.type === "hero" && shareUrl && (
             <ControlButton
               onClick={() => setShareOpen(true)}
@@ -124,14 +146,27 @@ export function CanvasBlock({
             <Pencil className="size-4" />
           </ControlButton>
           <ControlButton
-            onClick={onDelete}
-            title="Eliminar"
-            label="Eliminar bloque"
+            onClick={() => (isHero ? setConfirmClear(true) : onDelete())}
+            title={isHero ? "Vaciar banner principal" : "Eliminar"}
+            label={isHero ? "Vaciar contenido del banner principal" : "Eliminar bloque"}
             className="text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
           >
             <Trash2 className="size-4" />
           </ControlButton>
         </div>
+      )}
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="¿Vaciar el banner principal?"
+          description="Se borrará todo el contenido de esta sección (nombre, frase, foto, redes) — el bloque se queda en tu página, pero vacío para que empieces de nuevo."
+          confirmLabel="Vaciar contenido"
+          onConfirm={() => {
+            onClearContent?.()
+            setConfirmClear(false)
+          }}
+          onCancel={() => setConfirmClear(false)}
+        />
       )}
 
       {/* Live preview content (non-interactive selection surface, salvo
