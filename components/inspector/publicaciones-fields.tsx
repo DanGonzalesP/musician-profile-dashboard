@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, Upload, Video } from "lucide-react"
+import { Upload, Video } from "lucide-react"
 import {
   PUBLICACIONES_DEFAULT_ROW_TITLES,
   PUBLICACIONES_MAX_ITEMS,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/blocks"
 import { Field, TextInput, ImageUploader, type BlobRegistry } from "@/components/block-inspector"
 import { EmbedsFields } from "@/components/inspector/embeds-fields"
+import { ItemPager } from "@/components/inspector/item-pager"
 
 // ─── VideoUploader — mismo patrón que ImageUploader/AudioUploader, sin
 // transcodificación (el video se sube tal cual a la carpeta "video" de R2) ──
@@ -141,88 +142,80 @@ export function PublicacionesFields({
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {isBand ? `${items.length} publicaciones` : `${items.length} / ${PUBLICACIONES_MAX_ITEMS} publicaciones`}
-        </p>
-        <button
-          type="button"
-          onClick={addItem}
-          disabled={atLimit}
-          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
-        >
-          <Plus className="size-3" /> Agregar
-        </button>
-      </div>
-      {atLimit && (
-        <p className="text-[11px] text-muted-foreground">
-          Llegaste al máximo gratuito de {PUBLICACIONES_MAX_ITEMS}. Elegí tus mejores fotos y videos.
-        </p>
-      )}
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {isBand ? `${items.length} publicaciones` : `${items.length} / ${PUBLICACIONES_MAX_ITEMS} publicaciones`}
+      </p>
 
-      {items.map((item, index) => (
-        <div key={item.id} className="space-y-2 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex gap-1 rounded-lg border border-sidebar-border bg-background p-0.5">
-              <button
-                type="button"
-                onClick={() => setItem(index, { type: "image" })}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  item.type === "image" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Foto
-              </button>
-              <button
-                type="button"
-                onClick={() => setItem(index, { type: "video" })}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  item.type === "video" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Video
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => removeItem(index)}
-              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              title="Eliminar publicación"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-
-          {item.type === "image" ? (
-            <ImageUploader
-              currentImageUrl={item.url}
-              onUploadReady={(url) => setItem(index, { url })}
-              blobRegistry={blobRegistry}
-            />
-          ) : (
+      <ItemPager
+        label="Publicación"
+        count={items.length}
+        onAdd={addItem}
+        onRemove={removeItem}
+        addLabel="Agregar"
+        emptyLabel="Añade tu primera foto o video."
+        canAdd={!atLimit}
+        disabledAddHint={`Llegaste al máximo gratuito de ${PUBLICACIONES_MAX_ITEMS}. Elegí tus mejores fotos y videos.`}
+      >
+        {(index) => {
+          const item = items[index]
+          if (!item) return null
+          return (
             <>
-              <VideoUploader
-                currentVideoUrl={item.url}
-                onUploadReady={(url) => setItem(index, { url })}
-                blobRegistry={blobRegistry}
-              />
-              <Field label="Miniatura (opcional)">
-                <ImageUploader
-                  currentImageUrl={item.thumbnail}
-                  onUploadReady={(url) => setItem(index, { thumbnail: url })}
-                  blobRegistry={blobRegistry}
-                />
-              </Field>
-            </>
-          )}
+              <div className="flex gap-1 rounded-lg border border-sidebar-border bg-background p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setItem(index, { type: "image" })}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    item.type === "image" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Foto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setItem(index, { type: "video" })}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    item.type === "video" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Video
+                </button>
+              </div>
 
-          <TextInput
-            value={item.caption || ""}
-            onChange={(e) => setItem(index, { caption: e.target.value })}
-            placeholder="Descripción corta (opcional)"
-          />
-        </div>
-      ))}
+              {item.type === "image" ? (
+                <ImageUploader
+                  currentImageUrl={item.url}
+                  onUploadReady={(url) => setItem(index, { url })}
+                  blobRegistry={blobRegistry}
+                  aspect={3 / 4}
+                />
+              ) : (
+                <>
+                  <VideoUploader
+                    currentVideoUrl={item.url}
+                    onUploadReady={(url) => setItem(index, { url })}
+                    blobRegistry={blobRegistry}
+                  />
+                  <Field label="Miniatura (opcional)">
+                    <ImageUploader
+                      currentImageUrl={item.thumbnail}
+                      onUploadReady={(url) => setItem(index, { thumbnail: url })}
+                      blobRegistry={blobRegistry}
+                      aspect={3 / 4}
+                    />
+                  </Field>
+                </>
+              )}
+
+              <TextInput
+                value={item.caption || ""}
+                onChange={(e) => setItem(index, { caption: e.target.value })}
+                placeholder="Descripción corta (opcional)"
+              />
+            </>
+          )
+        }}
+      </ItemPager>
 
       {/* Embeds (YouTube/TikTok) — misma sección que Publicaciones: se
           muestran como filas extra al final del bloque público. */}

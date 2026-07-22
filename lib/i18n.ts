@@ -27,11 +27,11 @@ export const dictionaries: Record<Locale, Dict> = {
     ask_block_send: "Enviar pregunta",
     ask_block_error: "No se pudo enviar la pregunta.",
 
-    hero_share: "Compartir perfil",
+    hero_share: "Compartir",
     hero_social_aria: "Redes sociales",
     hero_artist_name_fallback: "Nombre del Artista",
-    hero_credits_one: "Crédito",
-    hero_credits_other: "Créditos",
+    hero_credits_one: "Obra",
+    hero_credits_other: "Obras",
     hero_contact_fallback: "Contacto",
     hero_contact_aria: "Contactar al artista",
 
@@ -193,11 +193,11 @@ export const dictionaries: Record<Locale, Dict> = {
     ask_block_send: "Send question",
     ask_block_error: "The question could not be sent.",
 
-    hero_share: "Share profile",
+    hero_share: "Share",
     hero_social_aria: "Social links",
     hero_artist_name_fallback: "Artist Name",
-    hero_credits_one: "Credit",
-    hero_credits_other: "Credits",
+    hero_credits_one: "Work",
+    hero_credits_other: "Works",
     hero_contact_fallback: "Contact",
     hero_contact_aria: "Contact the artist",
 

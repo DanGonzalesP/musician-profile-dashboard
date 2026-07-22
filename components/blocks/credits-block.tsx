@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ChevronDown, ChevronUp, ExternalLink, Music, Users } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ExternalLink, Music, Users } from "lucide-react";
 import type { CreditItem, CreditsData } from "@/lib/blocks";
 import { useLocale } from "@/components/locale-provider";
 import { detectOembedProvider, getExternalEmbedUrl } from "@/lib/oembed";
+import { AutoScrollCarousel } from "./auto-scroll-carousel";
 
 type Translate = (key: string, vars?: Record<string, string>) => string;
 
@@ -40,77 +41,34 @@ export function CreditsBlock({ data }: { data: CreditsData }) {
 }
 
 // ---------------------------------------------------------------------------
-// Carrusel vertical — mismo patrón de scroll+snap que CarouselRow en
-// components/blocks/publicaciones-block.tsx, con los ejes invertidos
-// (scrollTop/clientHeight en vez de scrollLeft/clientWidth, flex-col en vez
-// de flex-row, snap-y en vez de snap-x) y flechas arriba/abajo en vez de
-// izquierda/derecha, ubicadas en una columna a la derecha del carrusel.
+// Carrusel vertical con auto-scroll infinito (AutoScrollCarousel, eje "y"):
+// las tarjetas se desplazan solas hacia arriba en loop sin fin y el usuario
+// puede además deslizar a mano. Se pausa al pasar el mouse, al interactuar, o
+// cuando hay una tarjeta expandida reproduciendo un embed.
 // ---------------------------------------------------------------------------
 
 function VerticalCreditsCarousel({ credits, t }: { credits: CreditItem[]; t: Translate }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [canScroll, setCanScroll] = useState({ up: false, down: false });
-
-  const updateScrollState = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScroll({
-      up: el.scrollTop > 8,
-      down: el.scrollTop + el.clientHeight < el.scrollHeight - 8,
-    });
-  };
-
-  const scrollBy = (dir: -1 | 1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollBy({ top: dir * el.clientHeight * 0.9, behavior: "smooth" });
-  };
 
   return (
-    <div className="flex items-stretch gap-2">
-      <div
-        ref={(el) => {
-          scrollRef.current = el;
-          if (el) requestAnimationFrame(updateScrollState);
-        }}
-        onScroll={updateScrollState}
-        style={{ scrollbarWidth: "none" }}
-        className="flex max-h-[420px] flex-1 snap-y snap-mandatory flex-col gap-3 overflow-y-auto pr-1 sm:max-h-[480px] [&::-webkit-scrollbar]:hidden"
-      >
-        {credits.map((credit) => (
-          <div key={credit.id} className="shrink-0 snap-start">
-            <CreditCard
-              credit={credit}
-              t={t}
-              expanded={expandedId === credit.id}
-              onToggle={() => setExpandedId((current) => (current === credit.id ? null : credit.id))}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="hidden flex-col justify-between gap-1.5 sm:flex">
-        <button
-          type="button"
-          onClick={() => scrollBy(-1)}
-          disabled={!canScroll.up}
-          aria-label={t("credits_scroll_up_aria")}
-          className="flex size-7 items-center justify-center rounded-full border border-border bg-card/70 text-foreground transition-colors hover:bg-accent/60 disabled:opacity-30"
-        >
-          <ChevronUp className="size-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => scrollBy(1)}
-          disabled={!canScroll.down}
-          aria-label={t("credits_scroll_down_aria")}
-          className="flex size-7 items-center justify-center rounded-full border border-border bg-card/70 text-foreground transition-colors hover:bg-accent/60 disabled:opacity-30"
-        >
-          <ChevronDown className="size-4" />
-        </button>
-      </div>
-    </div>
+    <AutoScrollCarousel
+      axis="y"
+      paused={expandedId !== null}
+      ariaLabel={t("credits_eyebrow")}
+      className="max-h-[420px] sm:max-h-[480px]"
+      innerClassName="flex flex-col gap-3 pb-3"
+    >
+      {credits.map((credit) => (
+        <div key={credit.id} className="shrink-0">
+          <CreditCard
+            credit={credit}
+            t={t}
+            expanded={expandedId === credit.id}
+            onToggle={() => setExpandedId((current) => (current === credit.id ? null : credit.id))}
+          />
+        </div>
+      ))}
+    </AutoScrollCarousel>
   );
 }
 

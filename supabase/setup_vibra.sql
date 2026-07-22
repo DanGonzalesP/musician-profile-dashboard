@@ -57,7 +57,7 @@ do $$ begin
   alter table profiles add constraint profiles_musician_roles_check check (
     musician_roles <@ array[
       'autores', 'compositores', 'arreglistas', 'directores',
-      'productores', 'mezclas', 'musicos'
+      'productores', 'mezclas', 'masters', 'musicos'
     ]::text[]
   );
 exception when duplicate_object then null;

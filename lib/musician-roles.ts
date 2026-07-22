@@ -11,20 +11,26 @@ export type MusicianRole =
   | "directores"
   | "productores"
   | "mezclas"
+  | "masters"
   | "musicos"
 
+// `short` es la abreviatura que se muestra SOLO en móvil (en escritorio se usa
+// siempre el `label` completo). Las tres familias que empiezan con M (Mezcla,
+// Master, Músico) llevan dos letras para no colisionar.
 export const MUSICIAN_ROLES: {
   id: MusicianRole
   label: string
+  short: string
   description: string
 }[] = [
-  { id: "autores", label: "Autor", description: "Letrista y creador de la palabra" },
-  { id: "compositores", label: "Compositor", description: "Creador de la música y la melodía" },
-  { id: "arreglistas", label: "Arreglista", description: "Da forma y color a cada versión" },
-  { id: "directores", label: "Director", description: "Director de orquesta, coro o ensamble" },
-  { id: "productores", label: "Productor", description: "Producción musical, beatmaker o topliner" },
-  { id: "mezclas", label: "Mezcla", description: "Ingeniero de grabación, mezcla o mastering" },
-  { id: "musicos", label: "Músico", description: "Intérprete, vocalista o músico de sesión" },
+  { id: "autores", label: "Autor", short: "A", description: "Letrista y creador de la palabra" },
+  { id: "compositores", label: "Compositor", short: "C", description: "Creador de la música y la melodía" },
+  { id: "arreglistas", label: "Arreglista", short: "R", description: "Da forma y color a cada versión" },
+  { id: "directores", label: "Director", short: "D", description: "Director de orquesta, coro o ensamble" },
+  { id: "productores", label: "Productor", short: "P", description: "Producción musical, beatmaker o topliner" },
+  { id: "mezclas", label: "Mezcla", short: "Mz", description: "Ingeniero de grabación y mezcla" },
+  { id: "masters", label: "Master", short: "Ma", description: "Ingeniero de masterización" },
+  { id: "musicos", label: "Músico", short: "Mú", description: "Intérprete, vocalista o músico de sesión" },
 ]
 
 // Filtro extra del feed que no es un rol de persona: las páginas de grupos

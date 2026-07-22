@@ -12,6 +12,7 @@ import { motion } from "framer-motion"
 import {
   AudioWaveform,
   Feather,
+  Gem,
   Guitar,
   Layers,
   Music4,
@@ -35,6 +36,7 @@ const ROLE_ICONS: Record<MusicianRole, ComponentType<{ className?: string }>> = 
   directores: Wand2,
   productores: Disc3,
   mezclas: SlidersHorizontal,
+  masters: Gem,
   musicos: Guitar,
 }
 
@@ -120,7 +122,8 @@ export function FeedSidebar({
             <MobileChip
               key={role.id}
               icon={ROLE_ICONS[role.id]}
-              label={role.label}
+              label={role.short}
+              title={role.label}
               selected={active === role.id}
               onClick={() => toggle(role.id)}
             />
@@ -211,11 +214,13 @@ function SidebarItem({
 function MobileChip({
   icon: Icon,
   label,
+  title,
   selected,
   onClick,
 }: {
   icon: ComponentType<{ className?: string }>
   label: string
+  title?: string
   selected: boolean
   onClick: () => void
 }) {
@@ -223,6 +228,8 @@ function MobileChip({
     <button
       type="button"
       aria-pressed={selected}
+      aria-label={title ?? label}
+      title={title ?? label}
       onClick={onClick}
       className={`relative flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur transition-colors ${
         selected

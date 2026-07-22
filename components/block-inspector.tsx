@@ -9,11 +9,13 @@ import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
 import { MUSICIAN_ROLES } from "@/lib/musician-roles"
-import { X, Trash2, Upload, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, ArrowUp, ArrowDown, Search } from "lucide-react"
+import { X, Trash2, Upload, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move } from "lucide-react"
 import { LegadoFields } from "@/components/inspector/legado-fields"
 import { PublicacionesFields } from "@/components/inspector/publicaciones-fields"
 import { EmbedsFields } from "@/components/inspector/embeds-fields"
 import { LocationSelect } from "@/components/inspector/location-fields"
+import { ItemPager } from "@/components/inspector/item-pager"
+import { ImageAdjustModal } from "@/components/inspector/image-adjust-modal"
 
 function BackToPanelLink() {
   return (
@@ -188,12 +190,16 @@ export function ImageUploader({
   onUploadReady,
   currentImageUrl,
   blobRegistry,
+  aspect = 1,
 }: {
   onUploadReady: (blobUrl: string) => void
   currentImageUrl?: string
   blobRegistry: BlobRegistry
+  /** Relación de aspecto del recorte al acomodar la imagen (ancho/alto). */
+  aspect?: number
 }) {
   const [localPreview, setLocalPreview] = useState<string | null>(null)
+  const [adjusting, setAdjusting] = useState(false)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return
@@ -217,23 +223,62 @@ export function ImageUploader({
     e.target.value = ""
   }
 
+  // Al confirmar un recorte, el modal devuelve un blob URL nuevo; lo
+  // convertimos a File para registrarlo (así se sube al publicar) y lo usamos
+  // como nueva imagen.
+  async function handleAdjustConfirm(blobUrl: string) {
+    setAdjusting(false)
+    try {
+      const blob = await (await fetch(blobUrl)).blob()
+      const file = new File([blob], "recorte.jpg", { type: blob.type || "image/jpeg" })
+      blobRegistry.current.set(blobUrl, file)
+    } catch (err) {
+      console.error("[ImageUploader] No se pudo registrar el recorte:", err)
+    }
+    if (localPreview && localPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(localPreview)
+    }
+    setLocalPreview(blobUrl)
+    onUploadReady(blobUrl)
+  }
+
   const displayUrl = localPreview || currentImageUrl
 
   // Fila horizontal (miniatura + botón) en vez de apilar la vista previa
   // arriba del botón — el inspector aprovecha el ancho y se acorta el scroll.
   return (
-    <div className="flex items-stretch gap-2">
-      {displayUrl && (
-        <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-sidebar-border bg-muted">
-          <img src={displayUrl} alt="Vista previa" className="h-full w-full object-cover" />
-        </div>
+    <>
+      <div className="flex items-stretch gap-2">
+        {displayUrl && (
+          <button
+            type="button"
+            onClick={() => setAdjusting(true)}
+            title="Tocá para acomodar la imagen"
+            aria-label="Acomodar imagen"
+            className="group relative size-14 shrink-0 overflow-hidden rounded-lg border border-sidebar-border bg-muted"
+          >
+            <img src={displayUrl} alt="Vista previa" className="h-full w-full object-cover" />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
+              <Move className="size-4 text-white" />
+            </span>
+          </button>
+        )}
+        <label className="flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
+          <Upload className="size-3.5 text-muted-foreground" />
+          <span>{displayUrl ? "Cambiar imagen" : "Subir imagen"}</span>
+          <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+        </label>
+      </div>
+
+      {adjusting && displayUrl && (
+        <ImageAdjustModal
+          src={displayUrl}
+          aspect={aspect}
+          onCancel={() => setAdjusting(false)}
+          onConfirm={handleAdjustConfirm}
+        />
       )}
-      <label className="flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
-        <Upload className="size-3.5 text-muted-foreground" />
-        <span>{displayUrl ? "Cambiar imagen" : "Subir imagen"}</span>
-        <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-      </label>
-    </div>
+    </>
   )
 }
 
@@ -377,48 +422,41 @@ function SocialLinksFields({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between border-t border-sidebar-border pt-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Redes sociales</p>
-        <button
-          type="button"
-          onClick={addSocial}
-          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-        >
-          <Plus className="size-3" /> Agregar enlace
-        </button>
-      </div>
-
-      {socials.map((social, index) => (
-        <div key={index} className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-background/50">
-          <div className="flex items-center justify-between gap-2">
-            <select
-              value={social.platform}
-              onChange={(e) => setSocial(index, { platform: e.target.value as SocialPlatform })}
-              className={inputClass}
-            >
-              {SOCIAL_PLATFORMS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => removeSocial(index)}
-              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              title="Eliminar red social"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-          <TextInput
-            value={social.href}
-            onChange={(e) => setSocial(index, { href: e.target.value })}
-            placeholder="https://..."
-          />
-        </div>
-      ))}
+    <div className="space-y-2 border-t border-sidebar-border pt-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Redes sociales</p>
+      <ItemPager
+        label="Red"
+        count={socials.length}
+        onAdd={addSocial}
+        onRemove={removeSocial}
+        addLabel="Agregar enlace"
+        emptyLabel="Añade tu primera red social."
+      >
+        {(index) => {
+          const social = socials[index]
+          if (!social) return null
+          return (
+            <>
+              <select
+                value={social.platform}
+                onChange={(e) => setSocial(index, { platform: e.target.value as SocialPlatform })}
+                className={inputClass}
+              >
+                {SOCIAL_PLATFORMS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <TextInput
+                value={social.href}
+                onChange={(e) => setSocial(index, { href: e.target.value })}
+                placeholder="https://..."
+              />
+            </>
+          )
+        }}
+      </ItemPager>
     </div>
   )
 }
@@ -531,6 +569,7 @@ function HeroFields({
           currentImageUrl={data.banner}
           onUploadReady={(url) => onChange({ ...data, banner: url })}
           blobRegistry={blobRegistry}
+          aspect={16 / 9}
         />
       </Field>
       <Field label="¿Qué eres?">
@@ -1274,14 +1313,6 @@ function CreditsFields({
     updateCredits(credits.filter((_, i) => i !== index))
   }
 
-  const moveCredit = (index: number, dir: -1 | 1) => {
-    const target = index + dir
-    if (target < 0 || target >= credits.length) return
-    const next = [...credits]
-    ;[next[index], next[target]] = [next[target], next[index]]
-    updateCredits(next)
-  }
-
   // Al cambiar el tipo de origen se limpian los campos específicos del otro
   // tipo — así nunca queda un enlace de YouTube colgando en un crédito
   // interno, ni una referencia de canción/solicitud en uno externo.
@@ -1339,56 +1370,19 @@ function CreditsFields({
   }
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Créditos</p>
-        <button
-          type="button"
-          onClick={addCredit}
-          className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-        >
-          <Plus className="size-3" /> Agregar Crédito
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {credits.map((credit, index) => (
-          <div key={credit.id} className="space-y-2.5 rounded-lg border border-sidebar-border p-2.5 bg-background/50">
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-[11px] font-medium text-muted-foreground">Crédito {index + 1}</span>
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => moveCredit(index, -1)}
-                  disabled={index === 0}
-                  className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                  title="Subir"
-                  aria-label="Subir crédito"
-                >
-                  <ArrowUp className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveCredit(index, 1)}
-                  disabled={index === credits.length - 1}
-                  className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                  title="Bajar"
-                  aria-label="Bajar crédito"
-                >
-                  <ArrowDown className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeCredit(index)}
-                  className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  title="Eliminar crédito"
-                  aria-label="Eliminar crédito"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
-            </div>
-
+    <ItemPager
+      label="Crédito"
+      count={credits.length}
+      onAdd={addCredit}
+      onRemove={removeCredit}
+      addLabel="Agregar Crédito"
+      emptyLabel="Añade tu primer crédito para empezar."
+    >
+      {(index) => {
+        const credit = credits[index]
+        if (!credit) return null
+        return (
+          <>
             <Field label="Imagen de la tarjeta">
               <ImageUploader
                 currentImageUrl={credit.image}
@@ -1432,16 +1426,10 @@ function CreditsFields({
                 ))}
               </select>
             </Field>
-          </div>
-        ))}
-
-        {credits.length === 0 && (
-          <p className="rounded-lg border border-dashed border-sidebar-border p-3 text-center text-xs text-muted-foreground">
-            Añade tu primer crédito para empezar.
-          </p>
-        )}
-      </div>
-    </>
+          </>
+        )
+      }}
+    </ItemPager>
   )
 }
 

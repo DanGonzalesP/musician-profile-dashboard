@@ -18,8 +18,12 @@ const CONTENT_SECURITY_POLICY = [
   "font-src 'self' data:",
   // Workers de ffmpeg.wasm y browser-image-compression.
   "worker-src 'self' blob:",
-  // Solo se embebe YouTube (los TikTok son tarjetas propias, sin iframe).
-  "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
+  // Embeds reproducibles en el perfil (créditos/colaboraciones y embeds):
+  // YouTube, Spotify, SoundCloud, Facebook e Instagram exponen iframes
+  // públicos. TikTok NO se embebe (son tarjetas propias con botón "Ver en
+  // TikTok"). Cada dominio debe estar acá o el navegador bloquea el iframe
+  // con el cartel "Este contenido está bloqueado".
+  "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://open.spotify.com https://w.soundcloud.com https://www.facebook.com https://web.facebook.com https://www.instagram.com https://instagram.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

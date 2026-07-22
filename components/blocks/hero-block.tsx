@@ -15,9 +15,10 @@ export const socialIcons: Record<SocialPlatform, typeof Camera> = {
   bandcamp: Disc3,
 }
 
-// Nombre real y ubicación van siempre juntos en la misma línea (igual que
-// en el panel de artista); los créditos son un dato aparte y van en su
-// propia línea debajo, nunca mezclados con nombre/ubicación.
+// Fila de metadatos secundarios bajo la identidad: ubicación a la izquierda y
+// las obras (antes "créditos") a su derecha, separadas por un punto medio. El
+// nombre real ya no vive acá — va en su propia línea, más pequeño, justo bajo
+// el nombre artístico.
 function IdentityRow({ items }: { items: { key: string; node: ReactNode }[] }) {
   if (items.length === 0) return null
   return (
@@ -48,12 +49,11 @@ export function HeroBlock({
   const socials = data.socials || []
   const [shareOpen, setShareOpen] = useState(false)
 
-  const identityLine1: { key: string; node: ReactNode }[] = []
-  if (data.realName) {
-    identityLine1.push({ key: "realName", node: <span>{data.realName}</span> })
-  }
+  // Ubicación + obras comparten una sola línea (ubicación a la izquierda,
+  // obras a su derecha). El nombre real se muestra aparte, más pequeño.
+  const metaRow: { key: string; node: ReactNode }[] = []
   if (data.location) {
-    identityLine1.push({
+    metaRow.push({
       key: "location",
       node: (
         <span className="inline-flex items-center gap-1.5">
@@ -63,15 +63,12 @@ export function HeroBlock({
       ),
     })
   }
-  const identityLine2: { key: string; node: ReactNode }[] =
-    creditsCount > 0
-      ? [
-          {
-            key: "credits",
-            node: <span>{creditsCount} {t(creditsCount === 1 ? "hero_credits_one" : "hero_credits_other")}</span>,
-          },
-        ]
-      : []
+  if (creditsCount > 0) {
+    metaRow.push({
+      key: "credits",
+      node: <span>{creditsCount} {t(creditsCount === 1 ? "hero_credits_one" : "hero_credits_other")}</span>,
+    })
+  }
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border">
@@ -90,8 +87,21 @@ export function HeroBlock({
           ubicación → métrica → bio → redes/botones. */}
       <div className="relative px-6 pb-6 sm:px-8 sm:pb-8">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-8">
-          {/* Columna izquierda — Biografía corta */}
-          <div className="order-2 flex justify-center sm:order-1 sm:justify-end">
+          {/* Columna izquierda — Botón de contacto (a la misma altura que
+              "Compartir" pero en el lado opuesto) + biografía corta. */}
+          <div className="order-2 flex flex-col items-center gap-3 sm:order-1 sm:items-start">
+            {data.contactUrl && (
+              <a
+                href={data.contactUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("hero_contact_aria")}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-accent"
+              >
+                <Send className="size-4" />
+                {data.contactLabel || t("hero_contact_fallback")}
+              </a>
+            )}
             {data.tagline && (
               <p className="line-clamp-3 max-w-xs text-pretty text-center text-sm leading-relaxed text-muted-foreground sm:text-left">
                 {data.tagline}
@@ -107,11 +117,15 @@ export function HeroBlock({
             <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl">
               {data.name || t("hero_artist_name_fallback")}
             </h2>
-            <IdentityRow items={identityLine1} />
-            <IdentityRow items={identityLine2} />
+            {data.realName && (
+              <p className="mt-0.5 text-xs font-medium text-muted-foreground/90 sm:text-sm">
+                {data.realName}
+              </p>
+            )}
+            <IdentityRow items={metaRow} />
           </div>
 
-          {/* Columna derecha — Acciones y redes */}
+          {/* Columna derecha — Compartir y redes */}
           <div className="order-3 flex flex-col items-center gap-3 sm:items-end">
             {shareUrl && (
               <button
@@ -144,19 +158,6 @@ export function HeroBlock({
                   )
                 })}
               </nav>
-            )}
-
-            {data.contactUrl && (
-              <a
-                href={data.contactUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t("hero_contact_aria")}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary/90 px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
-              >
-                <Send className="size-4" />
-                {data.contactLabel || t("hero_contact_fallback")}
-              </a>
             )}
           </div>
         </div>

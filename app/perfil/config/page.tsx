@@ -20,6 +20,7 @@ import {
   Check,
   Disc3,
   Feather,
+  Gem,
   Guitar,
   Layers,
   Loader2,
@@ -40,6 +41,7 @@ const ROLE_ICONS: Record<MusicianRole, ComponentType<{ className?: string }>> = 
   directores: Wand2,
   productores: Disc3,
   mezclas: SlidersHorizontal,
+  masters: Gem,
   musicos: Guitar,
 };
 
