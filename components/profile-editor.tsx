@@ -166,16 +166,24 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
 }
 
 /**
- * Sube el File registrado para una blob URL y libera el registro. Si por
- * alguna razón el File ya no está (ej. recarga de página), devuelve la
- * misma blob URL tal cual — collectBlobPaths ya la habría filtrado antes en
- * ese caso, así que esto solo cubre el caso raro de registro perdido.
+ * Sube el File registrado para una blob URL y libera el registro.
+ *
+ * Si por alguna razón el File ya no está en el registro (ej. el editor se
+ * remontó a mitad de camino), ANTES esta función devolvía la misma blob URL
+ * tal cual, confiando en que collectBlobPaths ya la habría filtrado — pero
+ * esa blob URL vive solo en la pestaña que la creó, así que "publicar" con
+ * ese valor guardaba un link muerto para siempre en profile_blocks/products/
+ * services (bug real detectado en producción: hero.image y hero.banner
+ * publicados como "blob:https://...", rotos apenas se cierra esa pestaña).
+ * Mejor abortar la publicación con un error claro que corromper el dato
+ * publicado en silencio.
  */
 async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Promise<string> {
   const file = blobRegistry.get(url)
   if (!file) {
-    console.warn(`[handlePublish] No se encontró el File para blob URL: ${url}`)
-    return url
+    throw new Error(
+      "No se encontró el archivo de una imagen o audio recién agregado. Volvé a subirlo e intentá publicar de nuevo."
+    )
   }
   // `file.type` no es confiable para decidir la carpeta: algunos navegadores
   // reportan ciertos .mp3 como "video/mpeg" (el mismo problema documentado
@@ -396,12 +404,18 @@ function ProfileEditorInner() {
 
           if (error) throw error
 
+          // Lo publicado NUNCA debería tener blob URLs (se resuelven a permanentes
+          // antes de insertar en profile_blocks) pero se limpian igual por las
+          // dudas: si alguna llegó a quedar guardada por un bug de publicación
+          // ya corregido, mostrar "Subir imagen" es mejor que un thumbnail roto
+          // para siempre apuntando a un blob: muerto de otra sesión.
           const loadedBlocks =
             dbBlocks && dbBlocks.length > 0
               ? mergePublicacionesEmbeds(
                   dbBlocks
                     .filter((b) => isKnownBlockType(b.block_type))
                     .map((b) => dbBlockToBlock(b, { isBand }))
+                    .map((b) => ({ ...b, data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"] }))
                 )
               : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
           setBlocks(loadedBlocks)

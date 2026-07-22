@@ -14,10 +14,10 @@ import {
   Feather,
   FileMusic,
   Gem,
-  Guitar,
   Music4,
   Sparkles,
   SlidersHorizontal,
+  User,
   Users,
   Wand2,
   Disc3,
@@ -37,7 +37,7 @@ const ROLE_ICONS: Record<MusicianRole, ComponentType<{ className?: string }>> = 
   productores: Disc3,
   mezclas: SlidersHorizontal,
   masters: Gem,
-  musicos: Guitar,
+  musicos: User,
 }
 
 export function FeedSidebar({

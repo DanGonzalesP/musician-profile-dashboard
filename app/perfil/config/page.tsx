@@ -22,10 +22,10 @@ import {
   Feather,
   FileMusic,
   Gem,
-  Guitar,
   Loader2,
   Music4,
   SlidersHorizontal,
+  User,
   Wand2,
 } from "lucide-react";
 import {
@@ -42,7 +42,7 @@ const ROLE_ICONS: Record<MusicianRole, ComponentType<{ className?: string }>> = 
   productores: Disc3,
   mezclas: SlidersHorizontal,
   masters: Gem,
-  musicos: Guitar,
+  musicos: User,
 };
 
 export default function ConfigPerfilPage() {
