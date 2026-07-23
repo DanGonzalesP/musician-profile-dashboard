@@ -9,6 +9,7 @@ import { ProfileSwitcher } from "@/components/profile-switcher"
 import { Logo } from "@/components/logo"
 import { supabase } from "@/lib/supabase"
 import type { BandRole } from "@/lib/bands"
+import { PerfilPreviewContent } from "@/components/perfil-preview-content"
 
 export function EditorHeader({
   blockCount,
@@ -25,10 +26,14 @@ export function EditorHeader({
   activeRole?: BandRole
 }) {
   // "Vista previa" muestra el BORRADOR (draft_content) tal como quedaría el
-  // perfil con los cambios sin publicar todavía, embebido en un modal dentro
-  // del propio editor (no navega a otra página) — ver `previewOpen` abajo.
-  // "Ver mi perfil" en cambio sí sale a la página pública YA publicada.
-  const previewHref = "/perfil/preview?embed=1"
+  // perfil con los cambios sin publicar todavía, en un modal dentro del
+  // propio editor (no navega a otra página) — ver `previewOpen` abajo. Se
+  // renderiza el componente DIRECTAMENTE (no en un <iframe>): un iframe
+  // apuntando a la misma app queda bloqueado por el navegador ("Este
+  // contenido está bloqueado") en cuanto la propia app ya está embebida en
+  // otro iframe externo, porque frame-ancestors/X-Frame-Options evalúan toda
+  // la cadena de ancestros. "Ver mi perfil" en cambio sí sale a la página
+  // pública YA publicada.
   const [previewOpen, setPreviewOpen] = useState(false)
 
   // "Grupos" solo se muestra si el artista ya creó más de un grupo musical
@@ -206,7 +211,9 @@ export function EditorHeader({
               Cerrar
             </button>
           </div>
-          <iframe src={previewHref} title="Vista previa del perfil" className="w-full flex-1 border-0 bg-background" />
+          <div className="w-full flex-1 overflow-y-auto bg-background">
+            <PerfilPreviewContent embedded />
+          </div>
         </div>
       )}
     </header>

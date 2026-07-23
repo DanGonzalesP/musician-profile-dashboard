@@ -1,0 +1,151 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { type Block, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID } from "@/lib/blocks";
+import { type CatalogProduct, type CatalogService, fetchCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog";
+import { BlockRenderer } from "@/components/blocks/block-renderer";
+import { ProfileSkeleton } from "@/components/blocks/skeletons";
+import { ArrowLeft } from "lucide-react";
+
+type LoadingState = "loading" | "error" | "success";
+
+// Contenido de la vista previa del borrador — se usa tanto en la página
+// standalone (/perfil/preview) como embebido DIRECTAMENTE (sin iframe) en el
+// modal "Vista previa" del editor (ver editor-header.tsx). Antes el modal
+// usaba un <iframe>, pero eso quedaba bloqueado por el navegador ("Este
+// contenido está bloqueado") en cualquier contexto donde la propia app ya
+// esté dentro de otro iframe (frame-ancestors/X-Frame-Options revisan TODA
+// la cadena de ancestros, no solo el padre inmediato) — renderizar el mismo
+// componente en el propio documento evita el problema de raíz.
+export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean }) {
+  const router = useRouter();
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [services, setServices] = useState<CatalogService[]>([]);
+  const [state, setState] = useState<LoadingState>("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function cargarBorrador() {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          router.push("/login");
+          return;
+        }
+
+        // Misma resolución que el editor: perfil real del usuario, con
+        // PROFILE_ID como respaldo si todavía no tiene fila propia.
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", user.id ?? PROFILE_ID)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        const profileId = profile?.id ?? PROFILE_ID;
+
+        let draft: { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] } | null = null;
+        if (profile) {
+          const { data: draftRow, error: draftError } = await supabase
+            .from("profiles")
+            .select("draft_content")
+            .eq("id", profileId)
+            .maybeSingle();
+          if (!draftError) draft = draftRow?.draft_content ?? null;
+        }
+
+        if (draft) {
+          setBlocks(mergePublicacionesEmbeds((draft.blocks ?? []).filter((b) => isKnownBlockType(b.type))));
+          setProducts((draft.products ?? []).map(normalizeDraftProduct));
+          setServices((draft.services ?? []).map(normalizeDraftService));
+        } else {
+          const { data: dbBlocks, error: blocksError } = await supabase
+            .from("profile_blocks")
+            .select("id, block_type, content, position_index")
+            .eq("profile_id", profileId)
+            .order("position_index", { ascending: true });
+
+          if (blocksError) throw blocksError;
+
+          const validDbBlocks = (dbBlocks ?? []).filter((b) => isKnownBlockType(b.block_type));
+          setBlocks(
+            validDbBlocks.length > 0
+              ? mergePublicacionesEmbeds(validDbBlocks.map((b) => dbBlockToBlock(b)))
+              : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
+          );
+
+          const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId);
+          setProducts(catalogProducts);
+          setServices(catalogServices);
+        }
+
+        setState("success");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Error desconocido al cargar la vista previa";
+        setErrorMessage(message);
+        setState("error");
+      }
+    }
+    cargarBorrador();
+  }, [router]);
+
+  if (state === "loading") {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        {!embedded && (
+          <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-amber-500/10 px-4 py-2 backdrop-blur">
+            <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300">
+              <ArrowLeft className="size-3.5" /> Volver al editor
+            </Link>
+            <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
+          </div>
+        )}
+        <main className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
+          <ProfileSkeleton />
+        </main>
+      </div>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <p className="text-sm font-semibold text-destructive">{errorMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {!embedded && (
+        <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-amber-500/10 px-4 py-2 backdrop-blur">
+          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300">
+            <ArrowLeft className="size-3.5" /> Volver al editor
+          </Link>
+          <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
+        </div>
+      )}
+      <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8 animate-fade-in">
+        {blocks.map((block) => {
+          const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
+          const creditsData = blocks.find((b) => b.type === "credits")?.data as CreditsData | undefined;
+          return (
+            <BlockRenderer
+              key={block.id}
+              block={block}
+              products={products}
+              services={services}
+              albumCovers={tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? []}
+              creditsCount={creditsData?.credits.length ?? 0}
+            />
+          );
+        })}
+      </main>
+    </div>
+  );
+}

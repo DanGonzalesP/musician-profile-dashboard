@@ -12,7 +12,7 @@ import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, ArrowLeft, ArrowUpRight, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
+import { Store, ArrowLeft, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
 type TabKey = "main" | "legado" | "publicaciones";
@@ -318,15 +318,22 @@ function PerfilPublicoContent() {
           </div>
         )}
 
-        {hasStore && (
+        {/* Botón a Merch y servicios: antes era un chip grande en color de
+            acento, flotando solo entre el hero y las pestañas — competía
+            visualmente con Legado/Trayectoria/Publicaciones. Ahora es
+            discreto (bordes/texto neutros, sin relleno de acento) y no ocupa
+            una fila propia: si hay barra de pestañas se integra como un
+            ítem más al final de esa misma barra; si no la hay (perfil
+            unificado o una sola pestaña), flota como una esquina fija junto
+            al botón de "Volver", fuera del flujo del contenido. */}
+        {hasStore && !showTabBar && (
           <Link
             href={`/${username}/tienda`}
             title={t("profile_store_cta_subtitle")}
-            className="group inline-flex w-fit shrink-0 items-center gap-2 self-start rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:border-primary/60 hover:bg-primary/10 sm:text-sm"
+            className="fixed right-4 top-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur transition-colors hover:border-primary/40 hover:text-foreground"
           >
             <Store className="size-3.5" />
             {t("profile_store_cta_title")}
-            <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
         )}
 
@@ -341,25 +348,38 @@ function PerfilPublicoContent() {
           : (
             <>
               {showTabBar && (
-                <div className="sticky top-2 z-20 flex w-full overflow-x-auto rounded-xl border border-border bg-card/95 px-2 shadow-lg backdrop-blur [&::-webkit-scrollbar]:hidden">
-                  {tabs.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`flex flex-1 min-w-fit items-center justify-center gap-1 whitespace-nowrap border-b-2 px-2 py-2.5 text-xs font-medium transition-colors sm:gap-1.5 sm:px-3 sm:py-3 sm:text-sm ${
-                          activeTab === tab.key
-                            ? "border-primary text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <Icon className="hidden size-4 sm:block" />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
+                <div className="sticky top-2 z-20 flex w-full items-center gap-2">
+                  <div className="flex flex-1 overflow-x-auto rounded-xl border border-border bg-card/95 px-2 shadow-lg backdrop-blur [&::-webkit-scrollbar]:hidden">
+                    {tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setActiveTab(tab.key)}
+                          className={`flex flex-1 min-w-fit items-center justify-center gap-1 whitespace-nowrap border-b-2 px-2 py-2.5 text-xs font-medium transition-colors sm:gap-1.5 sm:px-3 sm:py-3 sm:text-sm ${
+                            activeTab === tab.key
+                              ? "border-primary text-foreground"
+                              : "border-transparent text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Icon className="hidden size-4 sm:block" />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {hasStore && (
+                    <Link
+                      href={`/${username}/tienda`}
+                      title={t("profile_store_cta_subtitle")}
+                      aria-label={t("profile_store_cta_title")}
+                      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border bg-card/95 px-3 py-2.5 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur transition-colors hover:border-primary/40 hover:text-foreground sm:px-3.5 sm:py-3 sm:text-sm"
+                    >
+                      <Store className="size-3.5 sm:size-4" />
+                      <span className="hidden sm:inline">{t("profile_store_cta_title")}</span>
+                    </Link>
+                  )}
                 </div>
               )}
               {activeBlocks.map(renderBlock)}
