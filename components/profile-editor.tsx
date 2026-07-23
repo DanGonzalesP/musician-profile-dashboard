@@ -166,17 +166,22 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
 }
 
 /**
- * Sube el File registrado para una blob URL y libera el registro.
+ * Sube el File registrado para una blob URL. Si por alguna razón el File ya
+ * no está en el registro (ej. el editor se remontó a mitad de camino),
+ * aborta la publicación con un error claro en vez de guardar un link muerto
+ * ("blob:https://...", roto apenas se cierra esa pestaña) en
+ * profile_blocks/products/services.
  *
- * Si por alguna razón el File ya no está en el registro (ej. el editor se
- * remontó a mitad de camino), ANTES esta función devolvía la misma blob URL
- * tal cual, confiando en que collectBlobPaths ya la habría filtrado — pero
- * esa blob URL vive solo en la pestaña que la creó, así que "publicar" con
- * ese valor guardaba un link muerto para siempre en profile_blocks/products/
- * services (bug real detectado en producción: hero.image y hero.banner
- * publicados como "blob:https://...", rotos apenas se cierra esa pestaña).
- * Mejor abortar la publicación con un error claro que corromper el dato
- * publicado en silencio.
+ * A propósito NO se borra la entrada del registro ni se revoca la blob URL
+ * acá: un bloque/producto puede tener varias imágenes (ver MultiImageUploader
+ * en legado/merch), y resolveEntityBlobs las sube una por una dentro del
+ * mismo item. Si la primera sube bien pero la segunda falla (red inestable,
+ * R2 caído un instante), antes esta función ya había borrado el registro de
+ * la primera — así que reintentar publicar volvía a fallar con "no se
+ * encontró el archivo" para una imagen que sí se había subido, sin forma de
+ * reintentar salvo volviendo a seleccionarla a mano. La limpieza real del
+ * registro pasa recién al final de handlePublish, cuando TODO el publish
+ * terminó con éxito.
  */
 async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Promise<string> {
   const file = blobRegistry.get(url)
@@ -197,10 +202,7 @@ async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Pro
   // Cualquier audio que no sea ya mp3/aac/m4a (ej. wav, flac, aiff) se
   // transcodifica en el navegador antes de subir — ver lib/audio-transcode.
   const fileToUpload = folder === "audio" ? await ensureCompressedAudio(file) : file
-  const permanentUrl = await uploadFileToStorage(fileToUpload, folder)
-  URL.revokeObjectURL(url)
-  blobRegistry.delete(url)
-  return permanentUrl
+  return uploadFileToStorage(fileToUpload, folder)
 }
 
 /**
@@ -652,6 +654,15 @@ function ProfileEditorInner() {
 
       // 5. Publicar catálogo de productos y servicios
       await publishCatalog(profileId, publishProducts, publishServices)
+
+      // Recién acá es seguro liberar el registro de blobs: todo lo que
+      // apuntaba a blob: ya se subió y el estado ya quedó con las URLs
+      // permanentes (ver los setBlocks/setProducts/setServices de arriba),
+      // así que ninguna blob URL sigue en uso.
+      for (const url of blobRegistryRef.current.keys()) {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url)
+      }
+      blobRegistryRef.current.clear()
 
       // Ya está publicado: se limpia el borrador para no recargarlo la
       // próxima vez que se abra el editor. Si esta llamada falla (ej. una red

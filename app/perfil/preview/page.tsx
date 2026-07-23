@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { type Block, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID } from "@/lib/blocks";
@@ -13,7 +13,20 @@ import { ArrowLeft } from "lucide-react";
 type LoadingState = "loading" | "error" | "success";
 
 export default function PerfilPreviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <PerfilPreviewInner />
+    </Suspense>
+  );
+}
+
+function PerfilPreviewInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // ?embed=1: se está mostrando dentro del iframe del modal "Vista previa"
+  // del editor — la barra superior con "Volver al editor" no aplica ahí (el
+  // modal ya tiene su propio botón "Cerrar").
+  const embedded = searchParams.get("embed") === "1";
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [services, setServices] = useState<CatalogService[]>([]);
@@ -89,12 +102,14 @@ export default function PerfilPreviewPage() {
   if (state === "loading") {
     return (
       <div className="min-h-screen bg-background text-foreground">
-        <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-amber-500/10 px-4 py-2 backdrop-blur">
-          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300">
-            <ArrowLeft className="size-3.5" /> Volver al editor
-          </Link>
-          <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
-        </div>
+        {!embedded && (
+          <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-amber-500/10 px-4 py-2 backdrop-blur">
+            <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300">
+              <ArrowLeft className="size-3.5" /> Volver al editor
+            </Link>
+            <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
+          </div>
+        )}
         <main className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
           <ProfileSkeleton />
         </main>
@@ -112,12 +127,14 @@ export default function PerfilPreviewPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-amber-500/10 px-4 py-2 backdrop-blur">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300">
-          <ArrowLeft className="size-3.5" /> Volver al editor
-        </Link>
-        <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
-      </div>
+      {!embedded && (
+        <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-amber-500/10 px-4 py-2 backdrop-blur">
+          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300">
+            <ArrowLeft className="size-3.5" /> Volver al editor
+          </Link>
+          <span className="text-xs font-semibold text-amber-400">Vista previa — cambios sin publicar</span>
+        </div>
+      )}
       <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8 animate-fade-in">
         {blocks.map((block) => {
           const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;

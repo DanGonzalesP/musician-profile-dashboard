@@ -5,10 +5,12 @@
 // Roles (Para ti + 7 roles + Grupos + Tienda), Servicios (Profesor + rubros) o
 // Productos (Tienda + rubros). Cada ítem tiene su ícono en una loseta con glow;
 // el activo se resalta con un fondo deslizante compartido (layoutId) y una
-// barra de acento a la izquierda. En móvil se colapsa a una fila horizontal
-// deslizable (carrusel lento automático) bajo el header.
+// barra de acento a la izquierda. En móvil se colapsa a una columna vertical
+// de íconos pegada al borde izquierdo, debajo de SectionTabs — antes era una
+// fila horizontal deslizable arriba de la pantalla que tapaba la portada/
+// disco del feed (que queda centrado).
 
-import { useEffect, useRef, useState, type ComponentType } from "react"
+import { type ComponentType } from "react"
 import { motion } from "framer-motion"
 import { AudioWaveform } from "lucide-react"
 
@@ -35,30 +37,6 @@ export function FeedSidebar({
   onSelect: (id: string) => void
   heading?: string
 }) {
-  // ── Carrusel lento en móvil (ver comentario original): avanza solo y se
-  // pausa al tocar.
-  const mobileRowRef = useRef<HTMLDivElement | null>(null)
-  const [autoScrollPaused, setAutoScrollPaused] = useState(false)
-
-  useEffect(() => {
-    if (autoScrollPaused) return
-    const el = mobileRowRef.current
-    if (!el) return
-
-    let raf = 0
-    const SPEED_PX_PER_FRAME = 0.4
-
-    const step = () => {
-      if (el.scrollWidth > el.clientWidth) {
-        const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1
-        el.scrollLeft = atEnd ? 0 : el.scrollLeft + SPEED_PX_PER_FRAME
-      }
-      raf = requestAnimationFrame(step)
-    }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [autoScrollPaused])
-
   return (
     <>
       {/* ── Escritorio: panel vertical desplegado ─────────────────────── */}
@@ -88,16 +66,15 @@ export function FeedSidebar({
         </nav>
       </aside>
 
-      {/* ── Móvil: fila horizontal deslizable (carrusel lento automático) ── */}
-      <div className="pointer-events-none absolute inset-x-0 top-28 z-40 sm:top-32 lg:hidden">
+      {/* ── Móvil: columna vertical de íconos pegada a la izquierda, debajo
+          de SectionTabs — así deja libre el centro de la pantalla donde
+          queda la portada/disco. Se desliza verticalmente si no entran
+          todos los ítems. ── */}
+      <div className="pointer-events-none fixed left-3 top-48 z-40 sm:top-52 lg:hidden">
         <div
-          ref={mobileRowRef}
           role="tablist"
           aria-label="Filtrar el feed"
-          onPointerDown={() => setAutoScrollPaused(true)}
-          onPointerUp={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
-          onPointerCancel={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
-          className="pointer-events-auto flex items-center gap-2 overflow-x-auto px-4 pb-2 pt-1 scrollbar-none [&::-webkit-scrollbar]:hidden"
+          className="pointer-events-auto flex max-h-[calc(100dvh-13rem)] flex-col gap-1 overflow-y-auto rounded-2xl border border-border bg-card/80 p-1 shadow-xl backdrop-blur-xl scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
           {items.map((item) => (
             <MobileChip
@@ -205,22 +182,21 @@ function MobileChip({
       aria-label={title ?? label}
       title={title ?? label}
       onClick={onClick}
-      className={`relative flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur transition-colors ${
+      className={`relative flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
         selected
-          ? "border-transparent text-primary-foreground"
-          : "border-border/70 bg-card/50 text-foreground/85 hover:border-primary/50"
+          ? "text-primary-foreground"
+          : "text-foreground/85 hover:text-foreground"
       }`}
     >
       {selected && (
         <motion.span
           layoutId="feed-sidebar-active-mobile"
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-          className="absolute inset-0 rounded-full bg-primary shadow-[0_0_20px_-4px_var(--primary)]"
+          className="absolute inset-0 rounded-xl bg-primary shadow-[0_0_20px_-4px_var(--primary)]"
           aria-hidden="true"
         />
       )}
-      <Icon className="relative z-10 size-3.5" />
-      <span className="relative z-10">{label}</span>
+      <Icon className="relative z-10 size-4" />
     </button>
   )
 }

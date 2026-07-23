@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, MoreHorizontal, Users } from "lucide-react"
+import { ArrowLeft, ExternalLink, MoreHorizontal, Users, X } from "lucide-react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ProfileSwitcher } from "@/components/profile-switcher"
@@ -14,20 +14,22 @@ export function EditorHeader({
   blockCount,
   onPublish,
   isPublishing,
+  publicSlug,
   activeRole = "owner",
 }: {
   blockCount: number
   onPublish: () => void
   isPublishing: boolean
-  /** Se mantiene por compatibilidad con el editor; ya no afecta la vista previa. */
+  /** Slug de la página pública ya publicada — vacío si el perfil todavía no publicó nunca. */
   publicSlug?: string
   activeRole?: BandRole
 }) {
   // "Vista previa" muestra el BORRADOR (draft_content) tal como quedaría el
-  // perfil con los cambios sin publicar todavía — por eso siempre apunta a
-  // /perfil/preview. El perfil público ya publicado se ve desde el menú de
-  // usuario ("Perfil") o "Ver Portal Público" en el panel admin.
-  const previewHref = "/perfil/preview"
+  // perfil con los cambios sin publicar todavía, embebido en un modal dentro
+  // del propio editor (no navega a otra página) — ver `previewOpen` abajo.
+  // "Ver mi perfil" en cambio sí sale a la página pública YA publicada.
+  const previewHref = "/perfil/preview?embed=1"
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   // "Grupos" solo se muestra si el artista ya creó más de un grupo musical
   // — igual que en el panel (ver LayoutAdmin.tsx).
@@ -89,9 +91,19 @@ export function EditorHeader({
           <Link href="/perfil/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             Panel Admin
           </Link>
-          <Button variant="outline" size="sm" onClick={() => window.open(previewHref, '_blank')}>
+          <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
             Vista previa
           </Button>
+          {publicSlug && (
+            <Link
+              href={`/${publicSlug}`}
+              target="_blank"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+            >
+              <ExternalLink className="size-3.5" />
+              Ver mi perfil
+            </Link>
+          )}
         </div>
 
         {/* Móvil (< xl): las mismas acciones secundarias colapsadas en un
@@ -144,12 +156,23 @@ export function EditorHeader({
                   type="button"
                   onClick={() => {
                     setMobileMenuOpen(false)
-                    window.open(previewHref, "_blank")
+                    setPreviewOpen(true)
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent"
                 >
                   Vista previa
                 </button>
+                {publicSlug && (
+                  <Link
+                    href={`/${publicSlug}`}
+                    target="_blank"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Ver mi perfil
+                  </Link>
+                )}
               </div>
             </>
           )}
@@ -166,6 +189,26 @@ export function EditorHeader({
           {isPublishing ? "Publicando..." : "Publicar"}
         </Button>
       </div>
+
+      {previewOpen && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-background">
+          <div className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-2.5">
+            <span className="text-sm font-semibold text-foreground">
+              Vista previa <span className="font-normal text-muted-foreground">— así se vería tu perfil publicado</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(false)}
+              aria-label="Cerrar vista previa"
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <X className="size-4" />
+              Cerrar
+            </button>
+          </div>
+          <iframe src={previewHref} title="Vista previa del perfil" className="w-full flex-1 border-0 bg-background" />
+        </div>
+      )}
     </header>
   )
 }

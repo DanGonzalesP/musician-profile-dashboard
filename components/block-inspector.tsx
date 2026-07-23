@@ -2155,29 +2155,28 @@ function ServiceFields({
             </Field>
             <div className="flex gap-2">
               <Field label="Precio">
-                <div className="flex gap-1.5">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={service.price || ""}
-                    onChange={(e) => setService(i, { price: e.target.value })}
-                    className={`${inputClass} flex-1`}
-                    placeholder="150.00"
-                    aria-label={`Precio de ${service.title || `servicio ${i + 1}`}`}
-                  />
-                  <select
-                    value={service.currency || "USD"}
-                    onChange={(e) => setService(i, { currency: e.target.value })}
-                    className={`${inputClass} w-20 shrink-0`}
-                    aria-label="Moneda"
-                  >
-                    {CURRENCIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={service.price || ""}
+                  onChange={(e) => setService(i, { price: e.target.value })}
+                  className={inputClass}
+                  placeholder="150.00"
+                  aria-label={`Precio de ${service.title || `servicio ${i + 1}`}`}
+                />
+              </Field>
+              <Field label="Moneda">
+                <select
+                  value={service.currency || "USD"}
+                  onChange={(e) => setService(i, { currency: e.target.value })}
+                  className={inputClass}
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="Cobras...">
                 <select
@@ -2209,30 +2208,32 @@ function ServiceFields({
                 ))}
               </div>
             </Field>
-            <Field label="Duración (opcional)">
-              <div className="flex gap-1.5">
+            <div className="flex gap-2">
+              <Field label="Duración (opcional)">
                 <input
                   type="number"
                   inputMode="numeric"
                   min="0"
                   value={service.duration || ""}
                   onChange={(e) => setService(i, { duration: e.target.value })}
-                  className={`${inputClass} flex-1`}
+                  className={inputClass}
                   placeholder="60"
                   aria-label={`Duración de ${service.title || `servicio ${i + 1}`}`}
                 />
+              </Field>
+              <Field label="Unidad">
                 <select
                   value={service.durationUnit || "min"}
                   onChange={(e) => setService(i, { durationUnit: e.target.value })}
-                  className={`${inputClass} w-28 shrink-0`}
+                  className={inputClass}
                   aria-label="Unidad de duración"
                 >
                   {DURATION_UNITS.map((u) => (
                     <option key={u.id} value={u.id}>{u.label}</option>
                   ))}
                 </select>
-              </div>
-            </Field>
+              </Field>
+            </div>
             {serviceHasDelivery(service.category || "otro") && (
               <Field label="Tiempo de entrega (opcional)">
                 <TextInput
