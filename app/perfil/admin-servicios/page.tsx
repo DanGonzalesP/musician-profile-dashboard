@@ -17,9 +17,13 @@ import { uploadImageNow } from "@/lib/upload";
 import {
   CURRENCIES,
   PRICE_UNITS,
+  DURATION_UNITS,
   SERVICE_CATEGORIES,
   serviceCategoryLabel,
   priceUnitLabel,
+  serviceDurationLabel,
+  serviceHasDelivery,
+  formatMoney,
   type CatalogService,
   fetchCatalog,
   newService,
@@ -46,11 +50,13 @@ function fullUpdatePayload(s: CatalogService) {
   return {
     title: s.title,
     price: Number(s.price) || 0,
+    currency: s.currency || "USD",
     description: s.description || null,
     category: s.category,
     price_unit: s.priceUnit,
     modality: s.modality,
     duration: s.duration || null,
+    duration_unit: s.durationUnit || null,
     delivery_time: s.deliveryTime || null,
     features: s.features,
     booking_url: s.bookingUrl || null,
@@ -281,16 +287,16 @@ export default function AdminServiciosPage() {
                     {s.modality === "online" ? <Globe className="size-3" /> : <MapPin className="size-3" />}
                     {MODALITIES.find((m) => m.id === s.modality)?.label}
                   </span>
-                  {s.duration && (
+                  {serviceDurationLabel(s) && (
                     <span className="inline-flex items-center gap-1">
-                      <Clock className="size-3" /> {s.duration}
+                      <Clock className="size-3" /> {serviceDurationLabel(s)}
                     </span>
                   )}
                 </div>
 
                 <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                   <p className="text-base font-bold tabular-nums text-primary">
-                    ${Number(s.price || 0).toFixed(2)}{" "}
+                    {formatMoney(Number(s.price || 0), s.currency)}{" "}
                     <span className="text-[11px] font-medium text-muted-foreground">{priceUnitLabel(s.priceUnit)}</span>
                   </p>
                   <div className="flex items-center gap-1">
@@ -426,18 +432,31 @@ function ServiceForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Precio *</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={service.price}
-            onChange={(e) => onChange({ ...service, price: e.target.value })}
-            className={inputClass}
-            placeholder="150.00"
-          />
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={service.price}
+              onChange={(e) => onChange({ ...service, price: e.target.value })}
+              className={`${inputClass} flex-1`}
+              placeholder="150.00"
+            />
+            <select
+              value={service.currency}
+              onChange={(e) => onChange({ ...service, currency: e.target.value })}
+              className={`${inputClass} w-24 shrink-0`}
+              aria-label="Moneda"
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Cobras...</label>
@@ -451,6 +470,9 @@ function ServiceForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Modalidad</label>
           <div className="flex gap-1 rounded-lg border border-input bg-background p-0.5">
@@ -468,19 +490,33 @@ function ServiceForm({
             ))}
           </div>
         </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Duración (opcional)</label>
-          <input
-            type="text"
-            value={service.duration}
-            onChange={(e) => onChange({ ...service, duration: e.target.value })}
-            className={inputClass}
-            placeholder="Ej. 60 min por clase / 3 horas de show"
-          />
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              value={service.duration}
+              onChange={(e) => onChange({ ...service, duration: e.target.value })}
+              className={`${inputClass} flex-1`}
+              placeholder="60"
+            />
+            <select
+              value={service.durationUnit}
+              onChange={(e) => onChange({ ...service, durationUnit: e.target.value })}
+              className={`${inputClass} w-32 shrink-0`}
+              aria-label="Unidad de duración"
+            >
+              {DURATION_UNITS.map((u) => (
+                <option key={u.id} value={u.id}>{u.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
+      </div>
+
+      {serviceHasDelivery(service.category) && (
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Tiempo de entrega (opcional)</label>
           <input
@@ -491,7 +527,7 @@ function ServiceForm({
             placeholder="Ej. 5 días hábiles"
           />
         </div>
-      </div>
+      )}
 
       {/* Qué incluye */}
       <div className="space-y-2">

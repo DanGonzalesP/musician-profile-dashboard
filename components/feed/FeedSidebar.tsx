@@ -1,60 +1,42 @@
 "use client"
 
-// Barra lateral izquierda del feed — los 7 roles profesionales + la sección
-// de grupos musicales, siempre desplegados en escritorio (nada de chips
-// arriba). Cada rol tiene su ícono en una loseta con glow; el activo se
-// resalta con un fondo deslizante compartido (layoutId) y una barra de
-// acento en el borde izquierdo. En móvil se colapsa a una fila horizontal
-// deslizable bajo el header, con los mismos ítems.
+// Barra lateral izquierda del feed. Ahora es genérica: recibe una lista de
+// ítems (`items`) y el id activo, y los pinta igual para cualquier sección —
+// Roles (Para ti + 7 roles + Grupos + Tienda), Servicios (Profesor + rubros) o
+// Productos (Tienda + rubros). Cada ítem tiene su ícono en una loseta con glow;
+// el activo se resalta con un fondo deslizante compartido (layoutId) y una
+// barra de acento a la izquierda. En móvil se colapsa a una fila horizontal
+// deslizable (carrusel lento automático) bajo el header.
 
 import { useEffect, useRef, useState, type ComponentType } from "react"
 import { motion } from "framer-motion"
-import {
-  AudioWaveform,
-  Feather,
-  FileMusic,
-  Gem,
-  Music4,
-  Sparkles,
-  SlidersHorizontal,
-  User,
-  Users,
-  Wand2,
-  Disc3,
-} from "lucide-react"
-import {
-  GROUPS_FILTER_ID,
-  MUSICIAN_ROLES,
-  type FeedFilterId,
-  type MusicianRole,
-} from "@/lib/musician-roles"
+import { AudioWaveform } from "lucide-react"
 
-const ROLE_ICONS: Record<MusicianRole, ComponentType<{ className?: string }>> = {
-  autores: Feather,
-  compositores: Music4,
-  arreglistas: FileMusic,
-  directores: Wand2,
-  productores: Disc3,
-  mezclas: SlidersHorizontal,
-  masters: Gem,
-  musicos: User,
+export type FeedNavItem = {
+  id: string
+  icon: ComponentType<{ className?: string }>
+  label: string
+  description: string
+  // Etiqueta corta para las píldoras de móvil (si se omite, usa `label`).
+  shortLabel?: string
+  highlight?: boolean
 }
 
 export function FeedSidebar({
-  active,
+  items,
+  activeId,
   counts,
-  onChange,
+  onSelect,
+  heading = "Explora",
 }: {
-  active: FeedFilterId | null
-  counts: Partial<Record<FeedFilterId | "todos", number>>
-  onChange: (filter: FeedFilterId | null) => void
+  items: FeedNavItem[]
+  activeId: string
+  counts: Partial<Record<string, number>>
+  onSelect: (id: string) => void
+  heading?: string
 }) {
-  const toggle = (id: FeedFilterId | null) =>
-    onChange(active === id ? null : id)
-
-  // ── Carrusel lento en móvil: la fila avanza sola de derecha a izquierda
-  // (scrollLeft creciente) y se pausa apenas el usuario la toca, para no
-  // pelearse con un swipe manual. Al llegar al final vuelve al inicio.
+  // ── Carrusel lento en móvil (ver comentario original): avanza solo y se
+  // pausa al tocar.
   const mobileRowRef = useRef<HTMLDivElement | null>(null)
   const [autoScrollPaused, setAutoScrollPaused] = useState(false)
 
@@ -81,88 +63,51 @@ export function FeedSidebar({
     <>
       {/* ── Escritorio: panel vertical desplegado ─────────────────────── */}
       <aside
-        aria-label="Filtrar el feed por rol"
+        aria-label="Filtrar el feed"
         className="pointer-events-none absolute inset-y-0 left-0 z-40 hidden w-64 items-center pl-5 lg:flex"
       >
         <nav className="pointer-events-auto w-full">
-          {/* Sin subtítulos "Roles"/"Comunidad": todos los ítems (Para ti +
-              roles + Grupos musicales) van en una sola lista continua, más
-              compacta, para que entren completos sin tener que arrastrar la
-              página. El scrollbar queda visible (fino) por si en una
-              pantalla baja igual no entran todos — así el usuario ve que hay
-              más ítems para scrollear DENTRO del panel, sin confundirlo con
-              el scroll de la página. */}
           <div className="gradient-border-static relative max-h-[85dvh] overflow-y-auto rounded-3xl bg-card/55 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl scrollbar-thin">
             <p className="flex items-center gap-1.5 px-3 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
-              <AudioWaveform className="size-3" /> Explora
+              <AudioWaveform className="size-3" /> {heading}
             </p>
 
-            <SidebarItem
-              icon={Sparkles}
-              label="Para ti"
-              description="Todo el feed, sin filtrar"
-              selected={active === null}
-              count={counts.todos}
-              onClick={() => onChange(null)}
-            />
-
-            {MUSICIAN_ROLES.map((role) => (
+            {items.map((item) => (
               <SidebarItem
-                key={role.id}
-                icon={ROLE_ICONS[role.id]}
-                label={role.label}
-                description={role.description}
-                selected={active === role.id}
-                count={counts[role.id]}
-                onClick={() => toggle(role.id)}
+                key={item.id}
+                icon={item.icon}
+                label={item.label}
+                description={item.description}
+                selected={activeId === item.id}
+                count={counts[item.id]}
+                onClick={() => onSelect(item.id)}
+                highlight={item.highlight}
               />
             ))}
-
-            <SidebarItem
-              icon={Users}
-              label="Grupos musicales"
-              description="Páginas de bandas y ensambles"
-              selected={active === GROUPS_FILTER_ID}
-              count={counts[GROUPS_FILTER_ID]}
-              onClick={() => toggle(GROUPS_FILTER_ID)}
-              highlight
-            />
           </div>
         </nav>
       </aside>
 
       {/* ── Móvil: fila horizontal deslizable (carrusel lento automático) ── */}
-      <div className="pointer-events-none absolute inset-x-0 top-16 z-40 sm:top-20 lg:hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-28 z-40 sm:top-32 lg:hidden">
         <div
           ref={mobileRowRef}
           role="tablist"
-          aria-label="Filtrar el feed por rol"
+          aria-label="Filtrar el feed"
           onPointerDown={() => setAutoScrollPaused(true)}
           onPointerUp={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
           onPointerCancel={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
           className="pointer-events-auto flex items-center gap-2 overflow-x-auto px-4 pb-2 pt-1 scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
-          <MobileChip
-            icon={Sparkles}
-            label="Para ti"
-            selected={active === null}
-            onClick={() => onChange(null)}
-          />
-          {MUSICIAN_ROLES.map((role) => (
+          {items.map((item) => (
             <MobileChip
-              key={role.id}
-              icon={ROLE_ICONS[role.id]}
-              label={role.label}
-              selected={active === role.id}
-              onClick={() => toggle(role.id)}
+              key={item.id}
+              icon={item.icon}
+              label={item.shortLabel ?? item.label}
+              selected={activeId === item.id}
+              onClick={() => onSelect(item.id)}
             />
           ))}
-          <MobileChip
-            icon={Users}
-            label="Grupos"
-            selected={active === GROUPS_FILTER_ID}
-            onClick={() => toggle(GROUPS_FILTER_ID)}
-          />
         </div>
       </div>
     </>

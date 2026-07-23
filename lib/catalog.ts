@@ -40,11 +40,16 @@ export type CatalogService = {
   id: string
   title: string
   price: string
+  currency: string
   priceUnit: string
   description: string
   category: string
   modality: "presencial" | "online" | "ambas"
+  // `duration` guarda solo el valor numérico (ej. "60"); `durationUnit` es el
+  // id de la unidad (ver DURATION_UNITS). Borradores viejos pueden traer un
+  // `duration` de texto libre — serviceDurationLabel lo muestra tal cual.
   duration: string
+  durationUnit: string
   deliveryTime: string
   features: string[]
   bookingUrl: string
@@ -86,6 +91,22 @@ export const PRICE_UNITS = [
 
 export const CURRENCIES = ["USD", "PEN", "MXN", "COP", "ARS", "EUR"] as const
 
+// Unidades para el campo "duración" de un servicio: el usuario escribe un
+// número y elige aquí cómo se lee (ej. 60 + "minutos", 1 + "por clase").
+export const DURATION_UNITS = [
+  { id: "min", label: "minutos" },
+  { id: "horas", label: "horas" },
+  { id: "clase", label: "por clase" },
+  { id: "sesion", label: "por sesión" },
+  { id: "dias", label: "días" },
+  { id: "semanas", label: "semanas" },
+] as const
+
+// Categorías de servicio que SÍ tienen un entregable con plazo (producción,
+// mezcla, composición...). Solo en estas se muestra el campo "tiempo de
+// entrega"; en clases, shows en vivo o alquiler no tiene sentido.
+export const DELIVERY_CATEGORIES = ["produccion", "mezcla-master", "composicion", "otro"] as const
+
 export function productCategoryLabel(id: string): string {
   return PRODUCT_CATEGORIES.find((c) => c.id === id)?.label ?? id
 }
@@ -96,6 +117,28 @@ export function serviceCategoryLabel(id: string): string {
 
 export function priceUnitLabel(id: string): string {
   return PRICE_UNITS.find((u) => u.id === id)?.label ?? ""
+}
+
+export function durationUnitLabel(id: string): string {
+  return DURATION_UNITS.find((u) => u.id === id)?.label ?? id
+}
+
+export function serviceHasDelivery(category: string): boolean {
+  return (DELIVERY_CATEGORIES as readonly string[]).includes(category)
+}
+
+// Texto legible de la duración: "60 minutos" / "1 por clase". Si el servicio
+// viene de un borrador viejo con `duration` de texto libre y sin unidad, se
+// muestra ese texto sin tocar.
+export function serviceDurationLabel(s: Pick<CatalogService, "duration" | "durationUnit">): string {
+  const value = (s.duration ?? "").trim()
+  if (!value) return ""
+  return s.durationUnit ? `${value} ${durationUnitLabel(s.durationUnit)}` : value
+}
+
+// Precio con su moneda, igual formato que merch: "USD 150.00".
+export function formatMoney(value: number, currency: string): string {
+  return `${currency || "USD"} ${value.toFixed(2)}`
 }
 
 function toPriceNumber(price: string): number {
@@ -143,11 +186,13 @@ export function newService(): CatalogService {
     id: crypto.randomUUID(),
     title: "Nuevo Servicio",
     price: "0.00",
+    currency: "USD",
     priceUnit: "proyecto",
     description: "",
     category: "otro",
     modality: "ambas",
     duration: "",
+    durationUnit: "min",
     deliveryTime: "",
     features: [],
     bookingUrl: "",
@@ -194,11 +239,13 @@ export function normalizeDraftService(raw: unknown): CatalogService {
     id: String(s.id ?? crypto.randomUUID()),
     title: String(s.title ?? ""),
     price: s.price != null ? String(s.price) : "0.00",
+    currency: typeof s.currency === "string" && s.currency ? s.currency : "USD",
     priceUnit: typeof s.priceUnit === "string" && s.priceUnit ? s.priceUnit : "proyecto",
     description: typeof s.description === "string" ? s.description : "",
     category: typeof s.category === "string" && s.category ? s.category : "otro",
     modality: s.modality === "presencial" || s.modality === "online" ? s.modality : "ambas",
     duration: typeof s.duration === "string" ? s.duration : "",
+    durationUnit: typeof s.durationUnit === "string" ? s.durationUnit : "",
     deliveryTime: typeof s.deliveryTime === "string" ? s.deliveryTime : "",
     features: normalizeFeatures(s.features),
     bookingUrl: typeof s.bookingUrl === "string" ? s.bookingUrl : "",
@@ -235,11 +282,13 @@ function rowToService(s: Row): CatalogService {
     id: String(s.id),
     title: String(s.title ?? ""),
     price: s.price != null ? String(s.price) : "",
+    currency: typeof s.currency === "string" && s.currency ? s.currency : "USD",
     priceUnit: typeof s.price_unit === "string" && s.price_unit ? s.price_unit : "proyecto",
     description: typeof s.description === "string" ? s.description : "",
     category: typeof s.category === "string" && s.category ? s.category : "otro",
     modality: s.modality === "presencial" || s.modality === "online" ? s.modality : "ambas",
     duration: typeof s.duration === "string" ? s.duration : "",
+    durationUnit: typeof s.duration_unit === "string" ? s.duration_unit : "",
     deliveryTime: typeof s.delivery_time === "string" ? s.delivery_time : "",
     features: normalizeFeatures(s.features),
     bookingUrl: typeof s.booking_url === "string" ? s.booking_url : "",
@@ -324,12 +373,14 @@ function serviceFullPayload(s: CatalogService, profileId: string, i: number) {
     profile_id: profileId,
     title: s.title,
     price: toPriceNumber(s.price),
+    currency: s.currency || "USD",
     description: s.description || null,
     position_index: i,
     category: s.category || "otro",
     price_unit: s.priceUnit,
     modality: s.modality,
     duration: s.duration || null,
+    duration_unit: s.durationUnit || null,
     delivery_time: s.deliveryTime || null,
     features: s.features,
     booking_url: s.bookingUrl || null,

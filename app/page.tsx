@@ -1,5 +1,6 @@
 import { fetchAllPublicFeed } from "@/lib/musicFeed";
 import { buildMixedFeed, fetchPublicPosts, type FeedItem } from "@/lib/feed/publicPosts";
+import { fetchProductSellers, fetchServiceProviders } from "@/lib/feed/discovery";
 import { SAMPLE_FEED_TRACKS } from "@/lib/feed/sampleTracks";
 import FeedExperience from "@/components/feed/FeedExperience";
 import FeedHeader from "@/components/feed/FeedHeader";
@@ -14,9 +15,11 @@ import { AudioReactiveBackground } from "@/components/audio-reactive-background"
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [realTracks, posts] = await Promise.all([
+  const [realTracks, posts, serviceProviders, productSellers] = await Promise.all([
     fetchAllPublicFeed(),
     fetchPublicPosts(),
+    fetchServiceProviders(),
+    fetchProductSellers(),
   ]);
 
   const isSampleFeed = realTracks.length === 0 && posts.length === 0;
@@ -28,7 +31,12 @@ export default async function HomePage() {
     <main className="relative h-dvh w-full text-foreground">
       <AudioReactiveBackground />
       <FeedHeader />
-      <FeedExperience items={items} isSampleFeed={isSampleFeed} />
+      <FeedExperience
+        items={items}
+        isSampleFeed={isSampleFeed}
+        serviceProviders={serviceProviders}
+        productSellers={productSellers}
+      />
     </main>
   );
 }

@@ -12,20 +12,24 @@ import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { useLocale } from "@/components/locale-provider";
-import { Store, ArrowLeft, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
+import { Store, ArrowLeft, ArrowUpRight, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
 
 type LoadingState = "idle" | "loading" | "error" | "empty" | "success";
-type TabKey = "main" | "legado" | "publicaciones" | "store";
+type TabKey = "main" | "legado" | "publicaciones";
 
 // Perfil "separado" (default): Hero, Single Destacado, Meta de Producción,
 // Track List y Donaciones viven en la pestaña "Legado" (el catálogo de
 // canciones). Trayectoria (historia/carrera), Publicaciones y Embeds son
 // pestañas propias — cada una solo aparece si el artista tiene al menos un
-// bloque de ese tipo. Merch y Servicios quedan en "Tienda", al final. Si el
-// artista activa "Unificar perfil" (profiles.unified_profile), se muestran
-// todos los bloques juntos en position_index, sin pestañas.
+// bloque de ese tipo. Merch y Servicios YA NO viven en el perfil: se muestran
+// en una página aparte (/[username]/tienda), a la que se llega con el botón
+// "Tienda y servicios". Si el artista activa "Unificar perfil"
+// (profiles.unified_profile), se muestran todos los bloques juntos en
+// position_index, sin pestañas (merch/servicio siguen fuera).
 const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "credits"];
 const EXTRA_TAB_TYPES: BlockType[] = ["legado", "publicaciones", "embeds"];
+// Bloques que ya no se renderizan en el perfil (viven en /tienda).
+const STORE_BLOCK_TYPES: BlockType[] = ["merch", "service"];
 
 export default function PerfilPublicoPage() {
   return <PerfilPublicoContent />;
@@ -238,19 +242,19 @@ function PerfilPublicoContent() {
   const mainBlocks = blocks.filter((b) => MAIN_BLOCK_TYPES.includes(b.type) && b.type !== "hero");
   const legadoBlocks = blocks.filter((b) => b.type === "legado");
   const publicacionesBlocks = blocks.filter((b) => b.type === "publicaciones");
-  const storeBlocks = blocks.filter(
-    (b) => !MAIN_BLOCK_TYPES.includes(b.type) && !EXTRA_TAB_TYPES.includes(b.type)
-  );
 
-  // Cada pestaña extra (Legado/Publicaciones/Embeds/Tienda) solo existe si
-  // el artista tiene contenido de ese tipo — "Inicio" siempre está presente.
+  // Merch y Servicios ya no son una pestaña del perfil: si el artista tiene
+  // productos o servicios activos, se ofrece un botón a su página /tienda.
+  const hasStore = products.length > 0 || services.length > 0;
+
+  // Cada pestaña extra (Legado/Publicaciones/Embeds) solo existe si el artista
+  // tiene contenido de ese tipo — "Inicio" siempre está presente.
   const tabs: { key: TabKey; label: string; icon: LucideIcon; blocks: Block[] }[] = [
     { key: "main", label: t("tab_home"), icon: Sparkles, blocks: mainBlocks },
     ...(legadoBlocks.length > 0 ? [{ key: "legado" as const, label: t("tab_legado"), icon: Milestone, blocks: legadoBlocks }] : []),
     ...(publicacionesBlocks.length > 0
       ? [{ key: "publicaciones" as const, label: t("tab_publicaciones"), icon: GalleryHorizontalEnd, blocks: publicacionesBlocks }]
       : []),
-    ...(storeBlocks.length > 0 ? [{ key: "store" as const, label: t("tab_store"), icon: Store, blocks: storeBlocks }] : []),
   ];
   const showTabBar = !unifiedProfile && tabs.length > 1;
   const activeBlocks = tabs.find((tab) => tab.key === activeTab)?.blocks ?? mainBlocks;
@@ -314,10 +318,37 @@ function PerfilPublicoContent() {
           </div>
         )}
 
+        {hasStore && (
+          <Link
+            href={`/${username}/tienda`}
+            className="group flex items-center justify-between gap-4 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-4 transition-colors hover:border-primary/60 hover:bg-primary/10"
+          >
+            <span className="flex items-center gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <Store className="size-5" />
+              </span>
+              <span className="flex flex-col">
+                <span className="text-sm font-semibold text-foreground sm:text-base">
+                  {t("profile_store_cta_title")}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {t("profile_store_cta_subtitle")}
+                </span>
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground transition-transform group-hover:translate-x-0.5">
+              {t("profile_store_cta_button")}
+              <ArrowUpRight className="size-3.5" />
+            </span>
+          </Link>
+        )}
+
         {unifiedProfile
           ? (
             <>
-              {blocks.filter((b) => b.type !== "hero").map(renderBlock)}
+              {blocks
+                .filter((b) => b.type !== "hero" && !STORE_BLOCK_TYPES.includes(b.type))
+                .map(renderBlock)}
             </>
           )
           : (

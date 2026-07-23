@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ExternalLink, LayoutDashboard, Loader2, LogOut, Settings, Sparkles, Upload, Users } from "lucide-react";
+import { ChevronDown, LayoutDashboard, Loader2, LogOut, Pencil, Settings, Sparkles, Upload, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import { supabase } from "@/lib/supabase";
 import { setActiveBandId, type MyProfileOption } from "@/lib/bands";
@@ -66,9 +66,9 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
   return (
     <div ref={containerRef} className="relative flex items-center rounded-full border border-border bg-card/70 py-1 pl-1 pr-3 backdrop-blur transition-colors hover:bg-accent/40">
       <Link
-        href="/perfil/dashboard"
-        title={t("feed_menu_admin_panel")}
-        aria-label={t("feed_menu_admin_panel")}
+        href="/dashboard"
+        title={t("feed_menu_edit_profile")}
+        aria-label={t("feed_menu_edit_profile")}
         className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
       >
         {initial}
@@ -98,7 +98,7 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
 
           <div className="flex flex-col gap-1">
             <Link
-              href="/dashboard"
+              href={`/${personalSlug}`}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-accent/40"
             >
@@ -106,12 +106,12 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
               {t("feed_menu_artist_panel")}
             </Link>
             <Link
-              href={`/${personalSlug}`}
+              href="/dashboard"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-accent/40"
             >
-              <ExternalLink className="size-4 text-muted-foreground" />
-              {t("feed_menu_public_profile")}
+              <Pencil className="size-4 text-muted-foreground" />
+              {t("feed_menu_edit_profile")}
             </Link>
             <Link
               href="/perfil/dashboard"

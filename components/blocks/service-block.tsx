@@ -17,7 +17,7 @@ import {
   Timer,
 } from "lucide-react"
 import type { ServiceData } from "@/lib/blocks"
-import { priceUnitLabel, serviceCategoryLabel, type CatalogService } from "@/lib/catalog"
+import { priceUnitLabel, serviceCategoryLabel, serviceDurationLabel, formatMoney, type CatalogService } from "@/lib/catalog"
 import { useLocale } from "@/components/locale-provider"
 
 function modalityLabel(m: CatalogService["modality"]): string {
@@ -31,7 +31,7 @@ function ServicePrice({ service }: { service: CatalogService }) {
   const hasPrice = service.price !== "" && !Number.isNaN(value) && value > 0
   return (
     <p className="text-xl font-bold tabular-nums text-primary">
-      {hasPrice ? `$${value.toFixed(2)}` : "A convenir"}
+      {hasPrice ? formatMoney(value, service.currency) : "A convenir"}
       {hasPrice && (
         <span className="ml-1 text-xs font-medium text-muted-foreground">{priceUnitLabel(service.priceUnit)}</span>
       )}
@@ -171,9 +171,9 @@ export function ServiceBlock({ data, services }: { data: ServiceData; services: 
                 {service.modality === "online" ? <Globe className="size-3" /> : <MapPin className="size-3" />}
                 {modalityLabel(service.modality)}
               </span>
-              {service.duration && (
+              {serviceDurationLabel(service) && (
                 <span className="inline-flex items-center gap-1">
-                  <Clock className="size-3" /> {service.duration}
+                  <Clock className="size-3" /> {serviceDurationLabel(service)}
                 </span>
               )}
               {service.deliveryTime && (

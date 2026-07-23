@@ -14,19 +14,20 @@ export function EditorHeader({
   blockCount,
   onPublish,
   isPublishing,
-  publicSlug,
   activeRole = "owner",
 }: {
   blockCount: number
   onPublish: () => void
   isPublishing: boolean
+  /** Se mantiene por compatibilidad con el editor; ya no afecta la vista previa. */
   publicSlug?: string
   activeRole?: BandRole
 }) {
-  // Mismo destino que "Ver Portal Público" en el panel admin: la página
-  // pública real una vez publicada. Si todavía no hay slug (nunca se
-  // publicó), cae de respaldo al draft de /perfil/preview.
-  const previewHref = publicSlug ? `/${publicSlug}` : "/perfil/preview"
+  // "Vista previa" muestra el BORRADOR (draft_content) tal como quedaría el
+  // perfil con los cambios sin publicar todavía — por eso siempre apunta a
+  // /perfil/preview. El perfil público ya publicado se ve desde el menú de
+  // usuario ("Perfil") o "Ver Portal Público" en el panel admin.
+  const previewHref = "/perfil/preview"
 
   // "Grupos" solo se muestra si el artista ya creó más de un grupo musical
   // — igual que en el panel (ver LayoutAdmin.tsx).
