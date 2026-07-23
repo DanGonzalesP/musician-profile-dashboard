@@ -3,17 +3,20 @@
 // Conmutador de secciones del feed principal: Categorías (el feed vertical de
 // siempre, filtrable por rol), Servicios y Productos (cuadrículas de
 // descubrimiento). En escritorio va centrado bajo el header, flotando sobre
-// el contenido. En móvil se vuelve una columna vertical pegada al borde
-// izquierdo — antes era una fila horizontal arriba que tapaba la portada/
-// disco del feed, que también queda centrado en pantalla.
+// el contenido, con ícono + etiqueta. En móvil se vuelve una columna vertical
+// de solo íconos pegada al borde izquierdo (el filtro de roles/rubros de
+// FeedSidebar sigue siendo el carrusel horizontal de siempre, arriba) — así
+// no compite por el mismo espacio horizontal en pantallas angostas.
 
 import { motion } from "framer-motion"
-import { Disc3, Briefcase, ShoppingBag, type LucideIcon } from "lucide-react"
+import { LayoutGrid, Briefcase, ShoppingBag, type LucideIcon } from "lucide-react"
 
 export type FeedSection = "roles" | "servicios" | "productos"
 
 const SECTIONS: { id: FeedSection; label: string; icon: LucideIcon }[] = [
-  { id: "roles", label: "Categorías", icon: Disc3 },
+  // LayoutGrid (no Disc3): Disc3 ya lo usa el rol "Master" en el panel de
+  // Categorías — repetir el mismo ícono ahí confundía cuál era cuál.
+  { id: "roles", label: "Categorías", icon: LayoutGrid },
   { id: "servicios", label: "Servicios", icon: Briefcase },
   { id: "productos", label: "Productos", icon: ShoppingBag },
 ]
@@ -23,32 +26,40 @@ function SectionButton({
   selected,
   onClick,
   layoutId,
+  iconOnly = false,
 }: {
   section: (typeof SECTIONS)[number]
   selected: boolean
   onClick: () => void
   layoutId: string
+  iconOnly?: boolean
 }) {
   const Icon = section.icon
   return (
     <button
       type="button"
       aria-pressed={selected}
+      aria-label={section.label}
+      title={iconOnly ? section.label : undefined}
       onClick={onClick}
-      className={`relative flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
-        selected ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-      }`}
+      className={`relative flex items-center transition-colors ${
+        iconOnly
+          ? "size-10 justify-center rounded-xl"
+          : "gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold sm:px-4 sm:text-sm"
+      } ${selected ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
     >
       {selected && (
         <motion.span
           layoutId={layoutId}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-          className="absolute inset-0 rounded-full bg-primary shadow-[0_0_20px_-4px_var(--primary)]"
+          className={`absolute inset-0 bg-primary shadow-[0_0_20px_-4px_var(--primary)] ${
+            iconOnly ? "rounded-xl" : "rounded-full"
+          }`}
           aria-hidden="true"
         />
       )}
-      <Icon className="relative z-10 size-3.5 sm:size-4" />
-      <span className="relative z-10">{section.label}</span>
+      <Icon className={`relative z-10 ${iconOnly ? "size-4" : "size-3.5 sm:size-4"}`} />
+      {!iconOnly && <span className="relative z-10">{section.label}</span>}
     </button>
   )
 }
@@ -62,7 +73,7 @@ export function SectionTabs({
 }) {
   return (
     <>
-      {/* ── Escritorio: píldora horizontal centrada arriba ────────────── */}
+      {/* ── Escritorio: píldora horizontal centrada arriba, con etiqueta ── */}
       <div className="pointer-events-none absolute inset-x-0 top-4 z-50 hidden justify-center lg:flex">
         <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-card/80 p-1 shadow-xl backdrop-blur-xl">
           {SECTIONS.map((s) => (
@@ -77,7 +88,7 @@ export function SectionTabs({
         </div>
       </div>
 
-      {/* ── Móvil: columna vertical pegada a la izquierda ─────────────── */}
+      {/* ── Móvil: columna vertical de solo íconos, pegada a la izquierda ── */}
       <div className="pointer-events-none fixed left-3 top-20 z-50 flex flex-col sm:top-24 lg:hidden">
         <div className="pointer-events-auto flex flex-col gap-1 rounded-2xl border border-border bg-card/80 p-1 shadow-xl backdrop-blur-xl">
           {SECTIONS.map((s) => (
@@ -87,6 +98,7 @@ export function SectionTabs({
               selected={active === s.id}
               onClick={() => onChange(s.id)}
               layoutId="feed-section-active-mobile"
+              iconOnly
             />
           ))}
         </div>

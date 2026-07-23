@@ -321,25 +321,12 @@ function PerfilPublicoContent() {
         {hasStore && (
           <Link
             href={`/${username}/tienda`}
-            className="group flex items-center justify-between gap-4 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-4 transition-colors hover:border-primary/60 hover:bg-primary/10"
+            title={t("profile_store_cta_subtitle")}
+            className="group inline-flex w-fit shrink-0 items-center gap-2 self-start rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:border-primary/60 hover:bg-primary/10 sm:text-sm"
           >
-            <span className="flex items-center gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <Store className="size-5" />
-              </span>
-              <span className="flex flex-col">
-                <span className="text-sm font-semibold text-foreground sm:text-base">
-                  {t("profile_store_cta_title")}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {t("profile_store_cta_subtitle")}
-                </span>
-              </span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground transition-transform group-hover:translate-x-0.5">
-              {t("profile_store_cta_button")}
-              <ArrowUpRight className="size-3.5" />
-            </span>
+            <Store className="size-3.5" />
+            {t("profile_store_cta_title")}
+            <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
         )}
 

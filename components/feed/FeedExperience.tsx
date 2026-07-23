@@ -219,7 +219,7 @@ export default function FeedExperience({
           </div>
         )
       ) : (
-        <div className="min-h-dvh overflow-y-auto pl-16 pt-24 lg:pl-72 lg:pt-20">
+        <div className="min-h-dvh overflow-y-auto pt-40 lg:pl-72 lg:pt-20">
           {section === "servicios" ? (
             <DiscoveryGrid
               profiles={filteredServices}
@@ -245,7 +245,7 @@ function EmptyFeed({ activeId, onReset }: { activeId: string; onReset: () => voi
       ? { label: "Grupos musicales" }
       : (MUSICIAN_ROLES.find((r) => r.id === activeId) ?? null)
   return (
-    <div className="flex h-dvh w-full items-center justify-center pl-16 pr-6 lg:pl-72 lg:pr-6">
+    <div className="flex h-dvh w-full items-center justify-center px-6 lg:pl-72">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}

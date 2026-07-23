@@ -16,9 +16,8 @@ export const dictionaries: Record<Locale, Dict> = {
     tab_publicaciones: "Publicaciones",
     tab_embeds: "Embeds",
     tab_store: "Merch y Servicios",
-    profile_store_cta_title: "Tienda y servicios",
+    profile_store_cta_title: "Merch y servicios",
     profile_store_cta_subtitle: "Productos a la venta y servicios profesionales",
-    profile_store_cta_button: "Ver tienda",
     profile_band_badge: "Grupo musical",
     common_close: "Cerrar",
 
@@ -187,9 +186,8 @@ export const dictionaries: Record<Locale, Dict> = {
     tab_publicaciones: "Posts",
     tab_embeds: "Embeds",
     tab_store: "Merch & Services",
-    profile_store_cta_title: "Store & services",
+    profile_store_cta_title: "Merch & services",
     profile_store_cta_subtitle: "Products for sale and professional services",
-    profile_store_cta_button: "View store",
     profile_band_badge: "Music group",
     common_close: "Close",
 

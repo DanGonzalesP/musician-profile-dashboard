@@ -27,7 +27,7 @@ export function ImageAdjustModal({
   /** ancho/alto del marco de recorte. 1 = cuadrado, 16/9 apaisado, 3/4 vertical. */
   aspect?: number
   onCancel: () => void
-  onConfirm: (blobUrl: string) => void
+  onConfirm: (blobUrl: string, file: File) => void
 }) {
   const frameW = FRAME_WIDTH
   const frameH = Math.round(FRAME_WIDTH / aspect)
@@ -132,7 +132,13 @@ export function ImageAdjustModal({
         canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92)
       )
       if (!blob) throw new Error("no se pudo exportar la imagen")
-      onConfirm(URL.createObjectURL(blob))
+      // Se pasa el File directo (ya lo tenemos en memoria acá) en vez de que
+      // el que llama haga fetch(blobUrl) para reconstruirlo — ese round-trip
+      // era innecesario y, si fallaba por lo que sea, dejaba el registro de
+      // blobs desincronizado del estado (bug real: "no se encontró el
+      // archivo" al publicar justo después de recortar una imagen).
+      const file = new File([blob], "recorte.jpg", { type: blob.type || "image/jpeg" })
+      onConfirm(URL.createObjectURL(blob), file)
     } catch (err) {
       console.error("[ImageAdjustModal] Error al recortar:", err)
       // Fallback: sin recorte, se conserva la imagen original.

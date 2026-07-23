@@ -271,18 +271,14 @@ export function ImageUploader({
     e.target.value = ""
   }
 
-  // Al confirmar un recorte, el modal devuelve un blob URL nuevo; lo
-  // convertimos a File para registrarlo (así se sube al publicar) y lo usamos
-  // como nueva imagen.
-  async function handleAdjustConfirm(blobUrl: string) {
+  // Al confirmar un recorte, el modal devuelve el blob URL nuevo junto con su
+  // File ya armado — se registra directo, sin el round-trip fetch(blobUrl)
+  // que había antes (si ese fetch fallaba, el registro quedaba sin la
+  // entrada pero la imagen recortada igual quedaba puesta en el bloque, y
+  // publicar tiraba "no se encontró el archivo" para algo recién recortado).
+  function handleAdjustConfirm(blobUrl: string, file: File) {
     setAdjusting(false)
-    try {
-      const blob = await (await fetch(blobUrl)).blob()
-      const file = new File([blob], "recorte.jpg", { type: blob.type || "image/jpeg" })
-      blobRegistry.current.set(blobUrl, file)
-    } catch (err) {
-      console.error("[ImageUploader] No se pudo registrar el recorte:", err)
-    }
+    blobRegistry.current.set(blobUrl, file)
     if (localPreview && localPreview.startsWith("blob:")) {
       URL.revokeObjectURL(localPreview)
     }

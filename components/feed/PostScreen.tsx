@@ -40,7 +40,7 @@ const PostScreen = forwardRef<HTMLDivElement, PostScreenProps>(function PostScre
   return (
     <section
       ref={ref}
-      className="relative flex h-dvh w-full snap-start snap-always justify-center overflow-hidden pb-24 pl-20 pr-6 pt-48 [align-items:safe_center] lg:px-6 lg:pt-24"
+      className="relative flex h-dvh w-full snap-start snap-always items-center justify-center overflow-hidden px-6 pb-24 pt-24"
     >
       {/* Fondo difuminado con el propio medio */}
       <div
