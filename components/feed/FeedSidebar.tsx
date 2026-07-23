@@ -88,8 +88,12 @@ export function FeedSidebar({
         </nav>
       </aside>
 
-      {/* ── Móvil: fila horizontal deslizable (carrusel lento automático) ── */}
-      <div className="pointer-events-none absolute inset-x-0 top-28 z-40 sm:top-32 lg:hidden">
+      {/* ── Móvil: fila horizontal deslizable (carrusel lento automático) ──
+          Va pegada bajo el header y por encima del disco (que arranca en
+          pt-36 en TrackScreen); el riel de secciones ya no compite por este
+          espacio porque ahora vive a la altura de las flechitas, ver
+          SectionTabs. ── */}
+      <div className="pointer-events-none absolute inset-x-0 top-20 z-40 sm:top-24 lg:hidden">
         <div
           ref={mobileRowRef}
           role="tablist"
@@ -97,7 +101,7 @@ export function FeedSidebar({
           onPointerDown={() => setAutoScrollPaused(true)}
           onPointerUp={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
           onPointerCancel={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
-          className="pointer-events-auto flex items-center gap-2 overflow-x-auto py-1 pb-2 pl-16 pr-4 scrollbar-none [&::-webkit-scrollbar]:hidden"
+          className="pointer-events-auto flex items-center gap-2 overflow-x-auto py-1 pb-2 px-4 scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
           {items.map((item) => (
             <MobileChip

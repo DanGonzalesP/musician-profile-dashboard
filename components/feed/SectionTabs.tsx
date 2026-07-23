@@ -6,7 +6,9 @@
 // el contenido, con ícono + etiqueta. En móvil se vuelve una columna vertical
 // de solo íconos pegada al borde izquierdo (el filtro de roles/rubros de
 // FeedSidebar sigue siendo el carrusel horizontal de siempre, arriba) — así
-// no compite por el mismo espacio horizontal en pantallas angostas.
+// no compite por el mismo espacio horizontal en pantallas angostas. En móvil
+// se ubica a la altura de las flechitas de FeedScrollNav (centrado
+// verticalmente), al costado opuesto de la pantalla.
 
 import { motion } from "framer-motion"
 import { LayoutGrid, Briefcase, ShoppingBag, type LucideIcon } from "lucide-react"
@@ -44,7 +46,7 @@ function SectionButton({
       onClick={onClick}
       className={`relative flex items-center transition-colors ${
         iconOnly
-          ? "size-10 justify-center rounded-xl"
+          ? "size-8 justify-center rounded-lg"
           : "gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold sm:px-4 sm:text-sm"
       } ${selected ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
     >
@@ -53,12 +55,12 @@ function SectionButton({
           layoutId={layoutId}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
           className={`absolute inset-0 bg-primary shadow-[0_0_20px_-4px_var(--primary)] ${
-            iconOnly ? "rounded-xl" : "rounded-full"
+            iconOnly ? "rounded-lg" : "rounded-full"
           }`}
           aria-hidden="true"
         />
       )}
-      <Icon className={`relative z-10 ${iconOnly ? "size-4" : "size-3.5 sm:size-4"}`} />
+      <Icon className={`relative z-10 ${iconOnly ? "size-3.5" : "size-3.5 sm:size-4"}`} />
       {!iconOnly && <span className="relative z-10">{section.label}</span>}
     </button>
   )
@@ -88,9 +90,10 @@ export function SectionTabs({
         </div>
       </div>
 
-      {/* ── Móvil: columna vertical de solo íconos, pegada a la izquierda ── */}
-      <div className="pointer-events-none fixed left-3 top-20 z-50 flex flex-col sm:top-24 lg:hidden">
-        <div className="pointer-events-auto flex flex-col gap-1 rounded-2xl border border-border bg-card/80 p-1 shadow-xl backdrop-blur-xl">
+      {/* ── Móvil: columna vertical de solo íconos, a la altura de las
+          flechitas de subir/bajar (FeedScrollNav) pero del lado izquierdo ── */}
+      <div className="pointer-events-none fixed left-2 top-1/2 z-50 flex -translate-y-1/2 flex-col lg:hidden">
+        <div className="pointer-events-auto flex flex-col gap-0.5 rounded-xl border border-border bg-card/80 p-0.5 shadow-xl backdrop-blur-xl">
           {SECTIONS.map((s) => (
             <SectionButton
               key={s.id}
