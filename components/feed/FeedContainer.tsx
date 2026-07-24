@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeedItem } from "@/lib/feed/publicPosts";
 import type { FeedTrack } from "@/lib/musicFeed";
+import * as audioEngine from "@/lib/audio-engine";
 import { fetchCommentCounts } from "@/lib/track-comments";
 import { fetchPostCommentCounts } from "@/lib/post-comments";
 import TrackScreen from "./TrackScreen";
@@ -20,12 +21,12 @@ interface FeedContainerProps {
 export default function FeedContainer({ items, isSampleFeed }: FeedContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  // Reproducción centralizada en el motor global (lib/audio-engine): un único
+  // <audio> para toda la app, sin colisiones con la discografía del perfil.
+  const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState);
+  useEffect(() => audioEngine.subscribe(setEngine), []);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   // En escritorio el panel de comentarios está siempre abierto y sigue a la
@@ -72,77 +73,42 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
     return () => observer.disconnect();
   }, [items.length]);
 
+  // Al cambiar la pista activa (por scroll), el motor la reproduce desde 0 y,
+  // al terminar, avanza al siguiente ítem del feed. Una publicación no tiene
+  // audio propio: se pausa el motor (el video, si lo hay, lo maneja PostScreen).
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    // Una publicación no tiene audio propio: se silencia el reproductor y el
-    // video (si lo hay) se maneja dentro de PostScreen.
     if (!activeTrack) {
-      audio.pause();
-      audio.removeAttribute("src");
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setDuration(0);
+      audioEngine.pause();
       return;
     }
-    audio.src = activeTrack.audioUrl;
-    audio.currentTime = 0;
-    setCurrentTime(0);
-    setDuration(0);
-    audio
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-      })
-      .catch(() => {
-        setIsPlaying(false);
-      });
+    audioEngine.play(activeTrack.audioUrl, {
+      onEnded: () => {
+        const next = sectionRefs.current[activeIndex + 1];
+        if (next) next.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, activeTrack?.audioUrl]);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onLoadedMetadata = () => setDuration(audio.duration || 0);
-    const onEnded = () => {
-      const next = sectionRefs.current[activeIndex + 1];
-      if (next) {
-        next.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else {
-        setIsPlaying(false);
-      }
-    };
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("loadedmetadata", onLoadedMetadata);
-    audio.addEventListener("ended", onEnded);
-    return () => {
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
-      audio.removeEventListener("ended", onEnded);
-    };
-  }, [activeIndex]);
+  // Al desmontar el feed (cambio de ruta), se detiene la reproducción para no
+  // dejar audio huérfano sonando sin controles.
+  useEffect(() => () => audioEngine.stop(), []);
+
+  const isPlaying = activeTrack != null && engine.url === activeTrack.audioUrl && engine.playing;
+  const isActiveLoaded = activeTrack != null && engine.url === activeTrack.audioUrl;
+  const currentTime = isActiveLoaded ? engine.currentTime : 0;
+  const duration = isActiveLoaded ? engine.duration : 0;
 
   const togglePlay = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.paused) {
-      audio
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
-    } else {
-      audio.pause();
-      setIsPlaying(false);
-    }
-  }, []);
+    if (activeTrack) audioEngine.toggle(activeTrack.audioUrl);
+  }, [activeTrack]);
 
-  const seek = useCallback((time: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = time;
-    setCurrentTime(time);
-  }, []);
+  const seek = useCallback(
+    (time: number) => {
+      if (activeTrack && audioEngine.isCurrent(activeTrack.audioUrl)) audioEngine.seek(time);
+    },
+    [activeTrack]
+  );
 
   const toggleLike = useCallback((id: string) => {
     setLikedIds((prev) => {
@@ -190,7 +156,6 @@ export default function FeedContainer({ items, isSampleFeed }: FeedContainerProp
           ref={containerRef}
           className="h-dvh w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scroll-smooth scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
-          <audio ref={audioRef} preload="auto" />
           {items.map((item, index) =>
             item.kind === "track" ? (
               <TrackScreen

@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Play, Pause, Music } from "lucide-react"
 import type { TracksData, Album } from "@/lib/blocks"
-import { setActiveAudio } from "@/lib/audio-bus"
-import { claimNowPlaying, releaseNowPlaying } from "@/lib/now-playing"
+import * as audioEngine from "@/lib/audio-engine"
 import { useLocale } from "@/components/locale-provider"
 
 function AlbumCover({
@@ -134,39 +133,33 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   // descripción y la barra de progreso no desaparezcan. isPlaying es lo
   // único que refleja si el audio está sonando de verdad en este momento.
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
   const [carouselPaused, setCarouselPaused] = useState(false)
   const [isClosingPanel, setIsClosingPanel] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  // Guarda qué audioUrl quedó realmente cargado en audioRef — no solo el
-  // índice de la pista. Si el artista sube un archivo nuevo para la misma
-  // posición mientras el panel sigue abierto, el índice no cambia, así que
-  // sin esta referencia el siguiente clic en Play creía que "ya estaba
-  // sonando esa pista" y solo la detenía en vez de cargar el archivo nuevo.
+  // Estado de reproducción desde el motor de audio global (lib/audio-engine):
+  // un único <audio> compartido por toda la app, así nunca suenan dos a la vez
+  // y cambiar de pista rápido no cuelga.
+  const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState)
+  useEffect(() => audioEngine.subscribe(setEngine), [])
+  // Guarda qué audioUrl le pidió ESTE bloque al motor. Si el artista sube un
+  // archivo nuevo para la misma posición mientras el panel sigue abierto, el
+  // índice no cambia, así que sin esta referencia el siguiente clic en Play
+  // creía que "ya estaba sonando esa pista" y solo la detenía en vez de cargar
+  // el archivo nuevo. También sirve para saber si el motor está sonando algo
+  // de este bloque al cerrar/cambiar de álbum.
   const loadedUrlRef = useRef<string | null>(null)
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const switchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const slideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Descarta el elemento de audio actual por completo — solo para cuando se
-  // cambia de pista, de álbum, o se cierra el panel. Una pausa normal NO
-  // pasa por aquí: ver handleTrackClick, que solo llama a audio.pause() y
-  // conserva todo para poder reanudar exactamente donde se quedó.
+  // Detiene el motor solo si lo que suena ahora mismo pertenece a este bloque
+  // — nunca corta la reproducción de otra superficie (feed, otro bloque).
+  // Una pausa normal NO pasa por aquí: ver handleTrackClick, que solo pausa el
+  // motor y conserva la posición para poder reanudar donde se quedó.
   function teardownAudio() {
-    const audio = audioRef.current
-    if (audio) {
-      audio.pause()
-      audio.onended = null
-      audio.onerror = null
-      audio.ontimeupdate = null
-      audio.onloadedmetadata = null
+    if (loadedUrlRef.current && audioEngine.getState().url === loadedUrlRef.current) {
+      audioEngine.stop()
     }
-    audioRef.current = null
     loadedUrlRef.current = null
-    setActiveAudio(null)
-    releaseNowPlaying("tracks-block")
   }
 
   // Reinicio completo del reproductor: cierra el panel del álbum o cambia a
@@ -174,10 +167,7 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   // progreso, porque ya no hay ningún disco puesto.
   function resetPlayback() {
     teardownAudio()
-    setIsPlaying(false)
     setCurrentTrackIndex(null)
-    setCurrentTime(0)
-    setDuration(0)
   }
 
   // El carrusel se pausa mientras el usuario interactúa y se reanuda solo
@@ -188,78 +178,25 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     resumeTimeoutRef.current = setTimeout(() => setCarouselPaused(false), 2500)
   }
 
+  // Al terminar una pista, encadena la siguiente reproducible del álbum. Si no
+  // hay más, el motor ya quedó rebobinado a 0 y en pausa; el panel, la
+  // descripción y la barra de progreso se mantienen tal cual — solo desaparecen
+  // si se cierra el disco o se cambia de álbum, nunca porque la canción terminó.
+  function handleTrackEnded(albumIndex: number, trackIndex: number) {
+    const tracks = albums[albumIndex]?.tracks || []
+    const nextIndex = tracks.findIndex((t, idx) => idx > trackIndex && Boolean(t.audioUrl))
+    if (nextIndex >= 0) loadAndPlay(albumIndex, nextIndex)
+  }
+
   function loadAndPlay(albumIndex: number, trackIndex: number) {
     const track = albums[albumIndex]?.tracks[trackIndex]
     if (!track?.audioUrl) return
 
-    teardownAudio()
     setCurrentTrackIndex(trackIndex)
-    setCurrentTime(0)
-    setDuration(0)
-    let fallbackTried = false
-
-    // Se intenta primero con crossOrigin habilitado (necesario para que el
-    // fondo audio-reactivo pueda leer las frecuencias). Si el host del audio
-    // no soporta CORS, la carga falla por completo (no solo el análisis) —
-    // en ese caso se reintenta UNA vez sin crossOrigin para no romper la
-    // reproducción; esa pista simplemente no alimentará el fondo reactivo.
-    function createAndPlay(withCors: boolean) {
-      const audio = new Audio()
-      if (withCors) audio.crossOrigin = "anonymous"
-      audio.src = track!.audioUrl!
-      audioRef.current = audio
-      loadedUrlRef.current = track!.audioUrl!
-      if (withCors) setActiveAudio(audio)
-
-      function giveUp() {
-        if (audioRef.current === audio) {
-          audioRef.current = null
-          loadedUrlRef.current = null
-          setIsPlaying(false)
-          setActiveAudio(null)
-        }
-      }
-
-      function retryOrGiveUp() {
-        if (withCors && !fallbackTried) {
-          fallbackTried = true
-          createAndPlay(false)
-          return
-        }
-        giveUp()
-      }
-
-      audio.ontimeupdate = () => setCurrentTime(audio.currentTime)
-      audio.onloadedmetadata = () => setDuration(audio.duration || 0)
-      audio.onended = () => {
-        const tracks = albums[albumIndex]?.tracks || []
-        const nextIndex = tracks.findIndex((t, idx) => idx > trackIndex && Boolean(t.audioUrl))
-        if (nextIndex >= 0) {
-          loadAndPlay(albumIndex, nextIndex)
-        } else {
-          // Termina la última pista reproducible del álbum: se detiene, pero
-          // el panel, la descripción y la barra de progreso se quedan tal
-          // cual — solo desaparecen si se cierra el disco o se cambia de
-          // álbum, nunca solo porque la canción terminó de sonar.
-          audio.currentTime = 0
-          setCurrentTime(0)
-          setIsPlaying(false)
-        }
-      }
-      audio.onerror = retryOrGiveUp
-      audio
-        .play()
-        .then(() => {
-          claimNowPlaying("tracks-block", () => {
-            audio.pause()
-            setIsPlaying(false)
-          })
-          setIsPlaying(true)
-        })
-        .catch(retryOrGiveUp)
-    }
-
-    createAndPlay(true)
+    loadedUrlRef.current = track.audioUrl
+    audioEngine.play(track.audioUrl, {
+      onEnded: () => handleTrackEnded(albumIndex, trackIndex),
+    })
   }
 
   function dropVinylFor(index: number) {
@@ -325,27 +262,14 @@ export function TrackListBlock({ data }: { data: TracksData }) {
     const isSameLoadedTrack =
       panelAlbumIndex === albumIndex &&
       currentTrackIndex === trackIndex &&
-      loadedUrlRef.current === track.audioUrl
+      audioEngine.getState().url === track.audioUrl
     if (isSameLoadedTrack) {
-      // Pausa/reanuda en el mismo lugar — no se descarta el audio, así que
-      // la posición, la descripción y la barra de progreso se conservan.
-      const audio = audioRef.current
-      if (!audio) return
-      if (isPlaying) {
-        audio.pause()
-        setIsPlaying(false)
-        releaseNowPlaying("tracks-block")
+      // Pausa/reanuda en el mismo lugar — el motor conserva la posición, así
+      // que la descripción y la barra de progreso se mantienen.
+      if (audioEngine.getState().playing) {
+        audioEngine.pause()
       } else {
-        audio
-          .play()
-          .then(() => {
-            claimNowPlaying("tracks-block", () => {
-              audio.pause()
-              setIsPlaying(false)
-            })
-            setIsPlaying(true)
-          })
-          .catch(() => setIsPlaying(false))
+        audioEngine.resume({ onEnded: () => handleTrackEnded(albumIndex, trackIndex) })
       }
       return
     }
@@ -353,10 +277,9 @@ export function TrackListBlock({ data }: { data: TracksData }) {
   }
 
   function handleSeek(value: number) {
-    const audio = audioRef.current
-    if (!audio) return
-    audio.currentTime = value
-    setCurrentTime(value)
+    if (loadedUrlRef.current && audioEngine.isCurrent(loadedUrlRef.current)) {
+      audioEngine.seek(value)
+    }
   }
 
   useEffect(
@@ -371,6 +294,14 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
   const activeAlbum = panelAlbumIndex !== null ? albums[panelAlbumIndex] : null
   const activeTrack = activeAlbum && currentTrackIndex !== null ? activeAlbum.tracks[currentTrackIndex] : null
+
+  // Estado de la pista activa derivado del motor global: solo se considera
+  // "sonando" si el motor está reproduciendo justo la URL de esta pista.
+  const activeUrl = activeTrack?.audioUrl ?? null
+  const isActiveLoaded = activeUrl != null && engine.url === activeUrl
+  const isPlaying = isActiveLoaded && engine.playing
+  const currentTime = isActiveLoaded ? engine.currentTime : 0
+  const duration = isActiveLoaded ? engine.duration : 0
 
   if (albums.length === 0) {
     return (

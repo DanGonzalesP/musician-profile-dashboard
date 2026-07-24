@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Disc3, Pause, Play } from "lucide-react";
 import type { SingleData } from "@/lib/blocks";
-import { setActiveAudio } from "@/lib/audio-bus";
-import { claimNowPlaying, releaseNowPlaying } from "@/lib/now-playing";
+import * as audioEngine from "@/lib/audio-engine";
 import { useLocale } from "@/components/locale-provider";
 
 function formatTime(seconds: number) {
@@ -16,122 +15,26 @@ function formatTime(seconds: number) {
 
 export function FeaturedSingleBlock({ data }: { data: SingleData }) {
   const { t } = useLocale();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const loadedUrlRef = useRef<string | null>(null);
+  const url = data.audioUrl ?? null;
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  // Todo el estado de reproducción vive en el motor global (lib/audio-engine):
+  // un único <audio> para toda la plataforma, así nunca suenan dos a la vez.
+  const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState);
+  useEffect(() => audioEngine.subscribe(setEngine), []);
 
-  const hasAudio = Boolean(data.audioUrl);
-
-  const loadAndPlay = (skipCors = false) => {
-    if (!data.audioUrl) return;
-    const url = data.audioUrl;
-
-    const audio = new Audio();
-    audioRef.current = audio;
-    loadedUrlRef.current = url;
-
-    audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
-    audio.onloadedmetadata = () => setDuration(audio.duration || 0);
-    audio.onended = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      audio.currentTime = 0;
-    };
-    audio.onerror = () => {
-      if (!skipCors) {
-        loadAndPlay(true);
-        return;
-      }
-      // Fallaron ambos intentos (con y sin CORS): se limpian las referencias
-      // para que el próximo click en Play cargue el archivo desde cero en
-      // vez de reintentar sobre este mismo audio ya roto (si no, el botón
-      // queda atascado para siempre).
-      if (audioRef.current === audio) {
-        audioRef.current = null;
-        loadedUrlRef.current = null;
-      }
-      setIsPlaying(false);
-      setActiveAudio(null);
-    };
-
-    if (!skipCors) {
-      audio.crossOrigin = "anonymous";
-      setActiveAudio(audio);
-    }
-
-    audio.src = url;
-    audio
-      .play()
-      .then(() => {
-        claimNowPlaying("featured-single", () => {
-          audio.pause();
-          setIsPlaying(false);
-        });
-        setIsPlaying(true);
-      })
-      .catch(() => setIsPlaying(false));
-  };
+  const hasAudio = Boolean(url);
+  const isCurrent = url != null && engine.url === url;
+  const isPlaying = isCurrent && engine.playing;
+  const currentTime = isCurrent ? engine.currentTime : 0;
+  const duration = isCurrent ? engine.duration : 0;
 
   const togglePlay = () => {
-    if (!data.audioUrl) return;
-    const audio = audioRef.current;
-
-    if (audio && loadedUrlRef.current === data.audioUrl) {
-      if (audio.paused) {
-        audio
-          .play()
-          .then(() => {
-            claimNowPlaying("featured-single", () => {
-              audio.pause();
-              setIsPlaying(false);
-            });
-            setIsPlaying(true);
-          })
-          .catch(() => setIsPlaying(false));
-      } else {
-        audio.pause();
-        setIsPlaying(false);
-        releaseNowPlaying("featured-single");
-      }
-      return;
-    }
-
-    if (audio) {
-      audio.pause();
-      audio.onended = null;
-      audio.onerror = null;
-      audio.ontimeupdate = null;
-      audio.onloadedmetadata = null;
-    }
-    setCurrentTime(0);
-    setDuration(0);
-    loadAndPlay();
+    if (url) audioEngine.toggle(url);
   };
 
   const seek = (value: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = value;
-    setCurrentTime(value);
+    if (isCurrent) audioEngine.seek(value);
   };
-
-  useEffect(() => {
-    return () => {
-      const audio = audioRef.current;
-      if (audio) {
-        audio.pause();
-        audio.onended = null;
-        audio.onerror = null;
-        audio.ontimeupdate = null;
-        audio.onloadedmetadata = null;
-      }
-      releaseNowPlaying("featured-single");
-      setActiveAudio(null);
-    };
-  }, []);
 
   if (!hasAudio) {
     return (

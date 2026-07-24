@@ -11,10 +11,14 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg"
 import { fetchFile, toBlobURL } from "@ffmpeg/util"
 
-// "mpeg"/"mp2" cubren archivos como "cancion.mp3.mpeg" — el navegador a
-// veces les asigna esa extensión al descargarlos/re-guardarlos, pero el
-// contenido sigue siendo mp3 comprimido: no hay que retranscodificarlos.
-export const COMPRESSED_AUDIO_EXTS = new Set(["mp3", "aac", "m4a", "mpeg", "mp2"])
+// Formatos que ya vienen en un contenedor mp3/aac/m4a válido y reproducible en
+// cualquier navegador — no hace falta re-procesarlos.
+//
+// A propósito NO se incluyen "mpeg"/"mp2": aunque a veces son un mp3 mal
+// nombrado, otras veces son un contenedor MPEG real que <audio> no reproduce.
+// Para que TODO lo que se publica sea mp3 de verdad (y suene en cualquier
+// lado), esas extensiones sí pasan por ffmpeg y salen como .mp3.
+export const COMPRESSED_AUDIO_EXTS = new Set(["mp3", "aac", "m4a"])
 
 let ffmpegSingleton: FFmpeg | null = null
 let loadPromise: Promise<FFmpeg> | null = null

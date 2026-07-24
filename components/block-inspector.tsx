@@ -17,6 +17,7 @@ import {
   CURRENCIES,
   serviceHasDelivery,
 } from "@/lib/catalog"
+import * as audioEngine from "@/lib/audio-engine"
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
@@ -365,7 +366,7 @@ function AudioUploader({
     // navegador reporta un MIME de audio compatible, aunque el nombre no sea claro.
     const rawName = file.name.trim()
     const ext = rawName.includes(".") ? rawName.split(".").pop()?.toLowerCase().trim() : ""
-    const ACCEPTED_EXTS = new Set(["mp3", "aac", "m4a", "wav", "flac", "aiff", "aif", "ogg"])
+    const ACCEPTED_EXTS = new Set(["mp3", "mpeg", "mpg", "mp2", "aac", "m4a", "wav", "flac", "aiff", "aif", "ogg"])
     const mimeIsAccepted = /mpeg|mp3|aac|mp4|wav|wave|flac|aiff|ogg/i.test(file.type)
     if (!ACCEPTED_EXTS.has(ext ?? "") && !mimeIsAccepted) {
       setError("Formato no reconocido. Subí un archivo de audio (.mp3, .wav, .flac, .aiff, .aac, .ogg).")
@@ -707,8 +708,11 @@ function SingleFields({
   onChange: (d: SingleData) => void
   blobRegistry: BlobRegistry
 }) {
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
-  const [isPreviewing, setIsPreviewing] = useState(false)
+  // La preescucha usa el motor de audio global (un solo <audio> para toda la
+  // app), así nunca choca con otra preescucha ni con el perfil.
+  const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState)
+  useEffect(() => audioEngine.subscribe(setEngine), [])
+  const isPreviewing = Boolean(data.audioUrl) && engine.url === data.audioUrl && engine.playing
 
   const handleAudioUploaded = async (url: string) => {
     // Igual que en TracksFields: audioUrl y duration se guardan juntos en una
@@ -723,20 +727,7 @@ function SingleFields({
   }
 
   const togglePreview = () => {
-    if (!data.audioUrl) return
-    if (isPreviewing && previewAudioRef.current?.src === data.audioUrl) {
-      previewAudioRef.current?.pause()
-      previewAudioRef.current = null
-      setIsPreviewing(false)
-      return
-    }
-    previewAudioRef.current?.pause()
-    const audio = new Audio(data.audioUrl)
-    previewAudioRef.current = audio
-    setIsPreviewing(true)
-    audio.onended = () => setIsPreviewing(false)
-    audio.onerror = () => setIsPreviewing(false)
-    audio.play().catch(() => setIsPreviewing(false))
+    if (data.audioUrl) audioEngine.toggle(data.audioUrl)
   }
 
   return (
@@ -911,8 +902,9 @@ function TracksFields({
   blobRegistry: BlobRegistry
 }) {
   const albums = data.albums || []
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
-  const [previewingKey, setPreviewingKey] = useState<string | null>(null)
+  // Preescucha vía motor de audio global — una sola pista suena a la vez.
+  const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState)
+  useEffect(() => audioEngine.subscribe(setEngine), [])
   // Solo un álbum se edita a la vez — evita el scroll largo de mostrarlos todos juntos.
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(albums[0]?.id ?? null)
 
@@ -1042,26 +1034,8 @@ function TracksFields({
     updateAlbums(updated.filter((a) => a.id === targetId || !a.isExample))
   }
 
-  const togglePreview = (key: string, url?: string) => {
-    if (!url) return
-    // Comparar también el src real cargado, no solo la key de posición: si
-    // el artista subió un audio nuevo para esta misma pista, previewingKey
-    // sigue apuntando a esta posición pero el archivo cargado ya es el
-    // viejo — en ese caso el clic debe cargar y sonar el archivo nuevo, no
-    // limitarse a pausar el anterior.
-    if (previewingKey === key && previewAudioRef.current?.src === url) {
-      previewAudioRef.current?.pause()
-      previewAudioRef.current = null
-      setPreviewingKey(null)
-      return
-    }
-    previewAudioRef.current?.pause()
-    const audio = new Audio(url)
-    previewAudioRef.current = audio
-    setPreviewingKey(key)
-    audio.onended = () => setPreviewingKey(null)
-    audio.onerror = () => setPreviewingKey(null)
-    audio.play().catch(() => setPreviewingKey(null))
+  const togglePreview = (url?: string) => {
+    if (url) audioEngine.toggle(url)
   }
 
   const activeAlbumIndex = Math.max(
@@ -1176,8 +1150,7 @@ function TracksFields({
 
             <div className="space-y-2">
               {activeAlbum.tracks.map((track, trackIndex) => {
-                const key = `${activeAlbumIndex}-${trackIndex}`
-                const isPreviewing = previewingKey === key
+                const isPreviewing = Boolean(track.audioUrl) && engine.url === track.audioUrl && engine.playing
                 return (
                   <div key={trackIndex} className="space-y-2 rounded-lg border border-sidebar-border p-2.5 bg-sidebar/40">
                     <div className="flex items-center justify-between">
@@ -1214,7 +1187,7 @@ function TracksFields({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => togglePreview(key, track.audioUrl)}
+                        onClick={() => togglePreview(track.audioUrl)}
                         disabled={!track.audioUrl}
                         title={track.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
                         aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}

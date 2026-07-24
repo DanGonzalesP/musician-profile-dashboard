@@ -88,11 +88,14 @@ const AUDIO_MIME_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
   mpeg: "audio/mpeg",
   mpg: "audio/mpeg",
+  mp2: "audio/mpeg",
   wav: "audio/wav",
   ogg: "audio/ogg",
   m4a: "audio/mp4",
   aac: "audio/aac",
   flac: "audio/flac",
+  aiff: "audio/aiff",
+  aif: "audio/aiff",
 }
 
 const IMAGE_MIME_TYPES: Record<string, string> = {
