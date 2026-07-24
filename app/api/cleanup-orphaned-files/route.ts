@@ -17,11 +17,6 @@ function publicSupabase() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getAuthenticatedUser(request)
-    if (!user) {
-      return NextResponse.json({ error: "Inicia sesión." }, { status: 401 })
-    }
-
     const { folder = "audio" } = await request.json()
 
     // Listar todos los archivos en la carpeta (ej. "audio/").
