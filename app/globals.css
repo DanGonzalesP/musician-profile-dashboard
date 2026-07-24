@@ -423,13 +423,16 @@
   opacity: 1;
 }
 
-/* Scroll del panel de edición: barra fina y, sobre todo, GUTTER ESTABLE.
+/* Scroll del panel de edición: barra fina y, sobre todo, ANCHO ESTABLE.
    Sin esto, al escribir una descripción larga aparecía la barra de scroll,
    el ancho del contenido se encogía de golpe y quedaba un hueco a la derecha
-   (todo se re-acomodaba más angosto). Con scrollbar-gutter reservado el ancho
-   ya no salta: el borde derecho queda pegado siempre, haya o no scroll. */
+   (todo se re-acomodaba más angosto). `overflow-y: scroll` (en vez de auto)
+   reserva SIEMPRE los mismos 6px de esta barra fina — no salta al aparecer/
+   desaparecer. (`scrollbar-gutter: stable` no sirve acá: reserva el ancho de
+   la barra NATIVA del sistema, ~17px, más ancha que nuestra barra de 6px, y
+   eso deja un hueco sin pintar entre la barra y el borde real de la ventana.) */
 .thin-scroll {
-  scrollbar-gutter: stable;
+  overflow-y: scroll;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
 }

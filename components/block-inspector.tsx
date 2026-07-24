@@ -134,7 +134,7 @@ export function BlockInspector({
         <p className="text-sm font-semibold text-foreground">{def?.label}</p>
       </div>
 
-      <div className="thin-scroll flex-1 space-y-6 overflow-y-auto bg-sidebar/40 p-4">
+      <div className="thin-scroll flex-1 space-y-6 bg-sidebar/40 p-4">
         {block.type === "hero" && (
           <HeroFields data={block.data as HeroData} onChange={update} blobRegistry={blobRegistry} />
         )}
@@ -392,7 +392,7 @@ export function ImageUploader({
   //   · Badge "Acomodar"   → abre el editor de encuadre (solo si ya hay imagen).
   // El tamaño lo define tileClassName (si se pasa) o, por defecto, el alto
   // heightClass con el ancho saliendo del aspecto.
-  const boxSize = compact ? "size-28" : tileClassName ?? heightClass
+  const boxSize = compact ? "size-32" : tileClassName ?? heightClass
   const boxStyle = compact || tileClassName ? undefined : { aspectRatio: String(aspect) }
 
   return (
@@ -615,12 +615,12 @@ function AudioUploader({
           className="hidden"
           aria-label="Subir audio"
         />
-        {/* Columna a la derecha de la imagen, del mismo alto (size-28 = h-28):
+        {/* Columna a la derecha de la imagen, del mismo alto (size-32 = h-32):
             arriba el recuadro para subir/cambiar el audio, abajo el botón de
             reproducir junto a la duración del archivo. Al agrandar la imagen la
             columna se hace más angosta, así el botón ▶ · nombre · duración
             quedan más juntos (antes sobraba espacio entre ellos). */}
-        <div className="flex h-28 flex-col gap-1.5">
+        <div className="flex h-32 flex-col gap-1.5">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
