@@ -497,8 +497,15 @@ function AudioUploader({
   const ACCEPT_ATTR =
     ".mp3,.aac,.m4a,.wav,.flac,.aiff,.aif,.ogg,audio/mpeg,audio/aac,audio/mp4,audio/wav,audio/x-wav,audio/flac,audio/aiff,audio/ogg"
 
-  // Nombre del archivo, progreso del hash y errores — va justo debajo del
-  // disparador (recuadro o barra) en ambos modos.
+  // Progreso del hash y errores — van debajo del disparador en ambos modos.
+  const statusExtras = (
+    <>
+      {hashing && <p className="text-[11px] text-muted-foreground">Calculando huella digital SHA-256...</p>}
+      {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
+    </>
+  )
+
+  // Nombre del archivo (chip) — en modo NO compacto va arriba, como antes.
   const statusBlock = (
     <>
       {displayName && (
@@ -507,8 +514,7 @@ function AudioUploader({
           <span className="truncate">{displayName}</span>
         </p>
       )}
-      {hashing && <p className="text-[11px] text-muted-foreground">Calculando huella digital SHA-256...</p>}
-      {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
+      {statusExtras}
     </>
   )
 
@@ -557,22 +563,36 @@ function AudioUploader({
               {hasAudio ? "Cambiar audio" : "Subir audio"}
             </span>
           </button>
+          {/* Reproducir · nombre del audio · duración — en esa fila, el nombre
+              entre el botón y el tiempo (no debajo). */}
           <div className="flex h-8 shrink-0 items-center gap-2">
             {previewButton}
-            {durationLabel ? (
-              <span
-                title="Calculado automáticamente al subir el audio"
-                aria-label={`Duración: ${durationLabel}`}
-                className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
-              >
-                {durationLabel}
-              </span>
+            {hasAudio ? (
+              <>
+                {displayName && (
+                  <span
+                    title={displayName}
+                    className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary"
+                  >
+                    {displayName}
+                  </span>
+                )}
+                {durationLabel && (
+                  <span
+                    title="Calculado automáticamente al subir el audio"
+                    aria-label={`Duración: ${durationLabel}`}
+                    className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
+                  >
+                    {durationLabel}
+                  </span>
+                )}
+              </>
             ) : (
               <span className="ml-auto text-[10px] text-muted-foreground/70">Sin audio</span>
             )}
           </div>
         </div>
-        {statusBlock}
+        {statusExtras}
         {notesBlock}
       </div>
     )
@@ -1310,13 +1330,15 @@ function TracksFields({
                 </Field>
               </div>
             </div>
-            <Field label="Portada del álbum">
-              <ImageUploader
-                currentImageUrl={activeAlbum.cover}
-                onUploadReady={(url) => setAlbum(activeAlbumIndex, { cover: url })}
-                blobRegistry={blobRegistry}
-              />
-            </Field>
+            {/* Portada (cuadrada, presionable) a la izquierda; a su costado la
+                descripción del álbum con 3 bolitas para cambiar entre los 3
+                textos (opcionales) sin apilarlos todos. */}
+            <AlbumCoverAndDescription
+              album={activeAlbum}
+              blobRegistry={blobRegistry}
+              onCoverChange={(url) => setAlbum(activeAlbumIndex, { cover: url })}
+              onDescriptionsChange={(descriptions) => setAlbum(activeAlbumIndex, { descriptions })}
+            />
 
             <div className="border-t border-sidebar-border pt-2">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pistas</p>
@@ -1389,30 +1411,6 @@ function TracksFields({
               </ItemPager>
             </div>
 
-            <div className="border-t border-sidebar-border pt-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Descripciones del álbum
-              </p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Hasta 3 textos sobre el álbum completo (no una pista puntual). En el perfil rotan en carrusel.
-              </p>
-              <div className="mt-2 space-y-2">
-                {ALBUM_DESCRIPTION_PLACEHOLDERS.map((placeholder, i) => (
-                  <textarea
-                    key={i}
-                    value={activeAlbum.descriptions?.[i] || ""}
-                    onChange={(e) => {
-                      const next = [...(activeAlbum.descriptions || ["", "", ""])]
-                      next[i] = e.target.value
-                      setAlbum(activeAlbumIndex, { descriptions: next })
-                    }}
-                    rows={2}
-                    className={inputClass}
-                    placeholder={placeholder}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
         )}
         {albums.length === 0 && (
@@ -1428,6 +1426,88 @@ const ALBUM_DESCRIPTION_PLACEHOLDERS = [
   "Ej. proceso de creación: dónde y cómo se grabó, con quién se hizo, cuánto tardó...",
   "Ej. a quién va dirigido o qué querés que sienta quien lo escuche completo...",
 ]
+
+// Portada del álbum + su descripción, lado a lado. La descripción es opcional
+// y admite hasta 3 textos que en el perfil rotan en carrusel; acá no se
+// apilan los 3 recuadros: hay 3 bolitas arriba y cada una abre uno distinto,
+// para quien quiera escribir más de uno.
+function AlbumCoverAndDescription({
+  album,
+  blobRegistry,
+  onCoverChange,
+  onDescriptionsChange,
+}: {
+  album: Album
+  blobRegistry: BlobRegistry
+  onCoverChange: (url: string) => void
+  onDescriptionsChange: (descriptions: string[]) => void
+}) {
+  const [descIndex, setDescIndex] = useState(0)
+  const descriptions = album.descriptions || ["", "", ""]
+
+  const setActiveDescription = (value: string) => {
+    const next = [...descriptions]
+    while (next.length < 3) next.push("")
+    next[descIndex] = value
+    onDescriptionsChange(next)
+  }
+
+  return (
+    <div className="flex items-start gap-3">
+      <div className="shrink-0 space-y-1.5">
+        <span className="block text-xs font-medium text-muted-foreground">Portada</span>
+        <ImageUploader
+          currentImageUrl={album.cover}
+          onUploadReady={onCoverChange}
+          blobRegistry={blobRegistry}
+          aspect={1}
+          tileClassName="size-24"
+          placeholderLabel="Portada"
+        />
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="block text-xs font-medium text-muted-foreground">Descripción del álbum</span>
+          {/* Bolitas: cada una es uno de los 3 textos. La activa se resalta;
+              las que ya tienen contenido se ven llenas. */}
+          <div className="flex items-center gap-1.5">
+            {[0, 1, 2].map((i) => {
+              const filled = Boolean((descriptions[i] || "").trim())
+              const active = i === descIndex
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setDescIndex(i)}
+                  aria-label={`Descripción ${i + 1}`}
+                  title={`Descripción ${i + 1}${filled ? " (con texto)" : " (vacía)"}`}
+                  className={`size-2.5 rounded-full transition-all ${
+                    active
+                      ? "scale-110 bg-primary ring-2 ring-primary/30"
+                      : filled
+                        ? "bg-primary/50 hover:bg-primary/70"
+                        : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                  }`}
+                />
+              )
+            })}
+          </div>
+        </div>
+        <textarea
+          value={descriptions[descIndex] || ""}
+          onChange={(e) => setActiveDescription(e.target.value)}
+          rows={3}
+          className={inputClass}
+          placeholder={ALBUM_DESCRIPTION_PLACEHOLDERS[descIndex]}
+        />
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          Opcional. Sobre el álbum completo (no una pista). Usa las bolitas para escribir hasta 3 —
+          en tu perfil rotan en carrusel.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 // ─── CreditsFields — créditos y colaboraciones en canciones de otros artistas
 

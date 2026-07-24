@@ -41,9 +41,21 @@ export function ImageAdjustModal({
   const imgRef = useRef<HTMLImageElement | null>(null)
   const dragState = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null)
 
+  // Las URLs remotas (http/https, ej. una portada ya publicada en R2) se
+  // piden a través de nuestro propio proxy same-origin — así el <canvas>
+  // nunca las ve como cross-origin y no depende de que el bucket de R2 tenga
+  // CORS abierto para el dominio actual (ver app/api/image-proxy). Ese CORS
+  // faltante era justo lo que hacía fallar el recorte ("No se pudo cargar la
+  // imagen para editarla"). Los blob:/data: (foto recién subida, aún sin
+  // publicar) ya son same-origin y se cargan directo.
+  const loadSrc = /^https?:\/\//.test(src)
+    ? `/api/image-proxy?url=${encodeURIComponent(src)}`
+    : src
+
   // Carga la imagen para conocer sus dimensiones naturales. crossOrigin para
-  // poder exportarla del canvas sin "tainted" cuando viene de R2/CDN.
+  // poder exportarla del canvas sin "tainted".
   useEffect(() => {
+    setLoadError(false)
     const img = new Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
@@ -51,8 +63,8 @@ export function ImageAdjustModal({
       setNatural({ w: img.naturalWidth, h: img.naturalHeight })
     }
     img.onerror = () => setLoadError(true)
-    img.src = src
-  }, [src])
+    img.src = loadSrc
+  }, [loadSrc])
 
   // Tamaño "cover" (la imagen justo llena el marco) a zoom 1.
   const cover = natural
@@ -190,7 +202,7 @@ export function ImageAdjustModal({
               >
                 {cover ? (
                   <img
-                    src={src}
+                    src={loadSrc}
                     alt="Ajustar encuadre"
                     draggable={false}
                     className="absolute max-w-none cursor-grab select-none active:cursor-grabbing"
