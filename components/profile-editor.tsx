@@ -80,6 +80,23 @@ function stripDeadBlobUrls<T extends Record<string, unknown>>(data: T): T {
   return result as T
 }
 
+/**
+ * Extrae todas las URLs de R2 (Cloudflare) presentes en cualquier parte de
+ * un valor (bloques, productos, servicios...), sin importar cuán anidada
+ * esté. Se usa en handlePublish para comparar "qué archivos usaba lo ya
+ * publicado" contra "qué archivos usa lo que se acaba de publicar" y borrar
+ * de R2 los que quedaron huérfanos (ej. el usuario reemplazó una pista o
+ * una imagen por otra).
+ */
+function extractR2Urls(value: unknown): Set<string> {
+  const base = process.env.NEXT_PUBLIC_R2_PUBLIC_URL
+  if (!base) return new Set()
+  const json = JSON.stringify(value ?? null)
+  const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const matches = json.match(new RegExp(`${escapedBase}/[^"\\\\]+`, "g")) ?? []
+  return new Set(matches)
+}
+
 // Algunos navegadores detectan mal el MIME type de ciertos archivos de audio
 // (ej. reportan .mp3/.mpeg como "video/mpeg"), lo que el bucket de Supabase
 // rechaza. Para la carpeta "audio" NUNCA confiamos en la detección del
@@ -612,6 +629,26 @@ function ProfileEditorInner() {
         profileId = profile.id
       }
 
+      // 3.5. Antes de sobrescribir lo publicado, guardar qué URLs de R2 usa
+      // TODAVÍA (para poder borrar después las que este publish deja
+      // huérfanas, ej. una pista o imagen reemplazada). Si esta lectura
+      // falla, no debe tumbar la publicación — simplemente no se limpia R2
+      // este ciclo, el archivo viejo queda para el próximo publish exitoso.
+      let oldR2Urls = new Set<string>()
+      try {
+        const [{ data: oldBlocksRows }, { products: oldProducts, services: oldServices }] = await Promise.all([
+          supabase.from("profile_blocks").select("content").eq("profile_id", profileId),
+          fetchCatalog(profileId),
+        ])
+        oldR2Urls = new Set([
+          ...extractR2Urls(oldBlocksRows),
+          ...extractR2Urls(oldProducts),
+          ...extractR2Urls(oldServices),
+        ])
+      } catch (err) {
+        console.error("[handlePublish] No se pudo leer el estado previo para limpiar R2:", err)
+      }
+
       // 4. Eliminar bloques anteriores y reinsertar los actualizados
       const { error: deleteError } = await supabase
         .from("profile_blocks")
@@ -662,6 +699,27 @@ function ProfileEditorInner() {
 
       // 5. Publicar catálogo de productos y servicios
       await publishCatalog(profileId, publishProducts, publishServices)
+
+      // 5.5. Borrar de R2 los archivos que quedaron huérfanos: estaban en lo
+      // publicado anteriormente (oldR2Urls) pero ya nada de este publish los
+      // referencia — típicamente porque el usuario reemplazó una pista o una
+      // imagen por otra. Best-effort y en segundo plano: si falla, el
+      // archivo viejo simplemente queda en R2 hasta que un próximo publish
+      // lo vuelva a detectar como huérfano; nunca debe tumbar la publicación
+      // en sí, que ya terminó con éxito en este punto.
+      const newR2Urls = new Set([
+        ...extractR2Urls(publishBlocks),
+        ...extractR2Urls(publishProducts),
+        ...extractR2Urls(publishServices),
+      ])
+      const orphanedR2Urls = [...oldR2Urls].filter((url) => !newR2Urls.has(url))
+      if (orphanedR2Urls.length > 0) {
+        authedFetch("/api/delete-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls: orphanedR2Urls }),
+        }).catch((err) => console.error("[handlePublish] No se pudieron borrar archivos huérfanos de R2:", err))
+      }
 
       // Recién acá es seguro liberar el registro de blobs: todo lo que
       // apuntaba a blob: ya se subió y el estado ya quedó con las URLs
