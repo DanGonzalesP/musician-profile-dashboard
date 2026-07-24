@@ -20,6 +20,7 @@ export function ItemPager({
   emptyLabel,
   canAdd = true,
   disabledAddHint,
+  hideRemove = false,
   children,
 }: {
   /** Singular del elemento, ej. "Crédito", "Publicación". */
@@ -31,6 +32,9 @@ export function ItemPager({
   emptyLabel: string
   canAdd?: boolean
   disabledAddHint?: string
+  /** Oculta el botón grande "Eliminar" del pie — úsalo cuando el propio
+      contenido ya ofrece un control de borrado (ej. un tacho junto al campo). */
+  hideRemove?: boolean
   /** Renderiza el editor del elemento activo. */
   children: (index: number) => React.ReactNode
 }) {
@@ -123,13 +127,15 @@ export function ItemPager({
       {/* Editor del elemento activo */}
       <div className="space-y-2.5 rounded-lg border border-sidebar-border bg-background/50 p-2.5">
         {children(clamped)}
-        <button
-          type="button"
-          onClick={() => onRemove(clamped)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/10"
-        >
-          <Trash2 className="size-3.5" /> Eliminar {label.toLowerCase()}
-        </button>
+        {!hideRemove && (
+          <button
+            type="button"
+            onClick={() => onRemove(clamped)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <Trash2 className="size-3.5" /> Eliminar {label.toLowerCase()}
+          </button>
+        )}
       </div>
     </div>
   )

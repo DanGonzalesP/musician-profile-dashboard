@@ -23,7 +23,8 @@ import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
 import { MUSICIAN_ROLES } from "@/lib/musician-roles"
-import { X, Trash2, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check } from "lucide-react"
+import { X, Trash2, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check, AlertCircle } from "lucide-react"
+import { resolveContactChannel, CONTACT_CHANNEL_ICONS, CONTACT_CHANNEL_LABELS } from "@/lib/contact-channel"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { LegadoFields } from "@/components/inspector/legado-fields"
 import { PublicacionesFields } from "@/components/inspector/publicaciones-fields"
@@ -92,6 +93,7 @@ export function BlockInspector({
   focusAlbumId,
 }: Props) {
   const [confirmClear, setConfirmClear] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (!block) {
     return (
@@ -210,7 +212,7 @@ export function BlockInspector({
             se queda acá porque no hay "volver" que sirva de confirmación. */}
         <button
           type="button"
-          onClick={() => (block.type === "hero" ? setConfirmClear(true) : onDelete(block.id))}
+          onClick={() => (block.type === "hero" ? setConfirmClear(true) : setConfirmDelete(true))}
           className="hidden w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 xl:flex"
         >
           <Trash2 className="size-4" />
@@ -228,6 +230,19 @@ export function BlockInspector({
             setConfirmClear(false)
           }}
           onCancel={() => setConfirmClear(false)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`¿Eliminar el bloque "${def?.label ?? "este bloque"}"?`}
+          description="Se quitará esta sección de tu página con su contenido. Puedes volver a agregarla después desde la biblioteca de bloques."
+          confirmLabel="Eliminar bloque"
+          onConfirm={() => {
+            onDelete(block.id)
+            setConfirmDelete(false)
+          }}
+          onCancel={() => setConfirmDelete(false)}
         />
       )}
     </div>
@@ -252,6 +267,53 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input type="text" {...props} className={inputClass} />
 }
 
+// Textarea que crece con el texto en vez de mostrar una barra de scroll: al
+// escribir, su alto se ajusta al contenido (sin la barrita ni el tirador de
+// resize). Tiene un límite de caracteres razonable y muestra el contador solo
+// cuando te vas acercando al tope.
+function AutoGrowTextarea({
+  value,
+  onChange,
+  placeholder,
+  minRows = 2,
+  maxLength = 700,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  minRows?: number
+  maxLength?: number
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  // Recalcula el alto cada vez que cambia el texto (y al montar).
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+
+  return (
+    <div className="space-y-1">
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
+        rows={minRows}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        className={`${inputClass} resize-none overflow-hidden`}
+      />
+      {value.length > maxLength * 0.8 && (
+        <p className="text-right text-[10px] tabular-nums text-muted-foreground">
+          {value.length}/{maxLength}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ─── ImageUploader — usa blob URL para preview inmediato ──────────────────
 
 export function ImageUploader({
@@ -263,6 +325,7 @@ export function ImageUploader({
   tileClassName,
   heightClass = "h-28",
   placeholderLabel = "Subir imagen",
+  optional = false,
 }: {
   onUploadReady: (blobUrl: string) => void
   currentImageUrl?: string
@@ -277,6 +340,8 @@ export function ImageUploader({
   heightClass?: string
   /** Texto del recuadro vacío. */
   placeholderLabel?: string
+  /** Muestra "(opcional)" dentro del recuadro vacío (ej. imagen de pista). */
+  optional?: boolean
 }) {
   const [localPreview, setLocalPreview] = useState<string | null>(null)
   const [adjusting, setAdjusting] = useState(false)
@@ -361,6 +426,11 @@ export function ImageUploader({
               >
                 {placeholderLabel}
               </span>
+              {optional && (
+                <span className={`text-muted-foreground/60 ${compact ? "text-[8px]" : "text-[10px]"}`}>
+                  (opcional)
+                </span>
+              )}
             </>
           )}
         </button>
@@ -569,10 +639,11 @@ function AudioUploader({
             {previewButton}
             {hasAudio ? (
               <>
+                {/* Nombre del audio centrado entre el botón y la duración. */}
                 {displayName && (
                   <span
                     title={displayName}
-                    className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary"
+                    className="min-w-0 flex-1 truncate px-1 text-center text-[11px] font-medium text-primary"
                   >
                     {displayName}
                   </span>
@@ -581,7 +652,7 @@ function AudioUploader({
                   <span
                     title="Calculado automáticamente al subir el audio"
                     aria-label={`Duración: ${durationLabel}`}
-                    className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
+                    className="shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
                   >
                     {durationLabel}
                   </span>
@@ -653,23 +724,37 @@ function SocialLinksFields({
         onRemove={removeSocial}
         addLabel="Agregar enlace"
         emptyLabel="Añade tu primera red social."
+        hideRemove
       >
         {(index) => {
           const social = socials[index]
           if (!social) return null
           return (
             <>
-              <select
-                value={social.platform}
-                onChange={(e) => setSocial(index, { platform: e.target.value as SocialPlatform })}
-                className={inputClass}
-              >
-                {SOCIAL_PLATFORMS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+              {/* Selector de red + tacho rojo pequeño para quitarla (antes el
+                  borrado era un botón grande y largo al pie). */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={social.platform}
+                  onChange={(e) => setSocial(index, { platform: e.target.value as SocialPlatform })}
+                  className={`${inputClass} min-w-0 flex-1`}
+                >
+                  {SOCIAL_PLATFORMS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removeSocial(index)}
+                  aria-label="Eliminar red social"
+                  title="Eliminar red social"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-destructive/30 bg-destructive/5 text-destructive transition-colors hover:bg-destructive/15"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
               <TextInput
                 value={social.href}
                 onChange={(e) => setSocial(index, { href: e.target.value })}
@@ -758,6 +843,64 @@ function RoleTagPicker({ value, onChange }: { value: string; onChange: (value: s
   )
 }
 
+// Campo del botón de contacto: solo admite un WhatsApp (número con código de
+// país), un Telegram (@usuario) o un correo — nada de links sueltos. Valida el
+// formato en vivo y avisa si no calza. La verificación REAL de que el dato es
+// tuyo (enviar un código por SMS/correo) necesita un servicio conectado; ver
+// la nota de abajo.
+function ContactField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const trimmed = value.trim()
+  const resolved = trimmed ? resolveContactChannel(trimmed) : null
+  // "other" = un link cualquiera u algo no reconocido → no se acepta.
+  const isValid = resolved !== null && resolved.channel !== "other"
+  const DetectedIcon = isValid && resolved ? CONTACT_CHANNEL_ICONS[resolved.channel] : null
+
+  return (
+    <>
+      <div className="relative">
+        <TextInput
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Ej. +51 987654321, @tuusuario o tu@correo.com"
+          aria-invalid={trimmed.length > 0 && !isValid}
+        />
+        {trimmed.length > 0 && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+            {isValid ? (
+              <Check className="size-4 text-emerald-500" />
+            ) : (
+              <AlertCircle className="size-4 text-destructive" />
+            )}
+          </span>
+        )}
+      </div>
+
+      {trimmed.length > 0 && isValid && resolved && DetectedIcon && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+          <DetectedIcon className="size-3.5" />
+          Se abrirá por {CONTACT_CHANNEL_LABELS[resolved.channel]}.
+        </p>
+      )}
+      {trimmed.length > 0 && !isValid && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-medium text-destructive">
+          <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+          Escribe un número de WhatsApp con código de país (ej. +51 987654321), un usuario de Telegram (@usuario)
+          o un correo válido — no se admiten enlaces sueltos.
+        </p>
+      )}
+
+      <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+        Un número muestra el ícono de WhatsApp, un usuario con "@" el de Telegram, y un correo el de Mail — el
+        botón en tu perfil se ve como un ícono, sin texto.
+      </p>
+      <p className="mt-1 flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+        <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+        Asegúrate de que sea tuyo y esté activo: tus fans te escribirán ahí directamente.
+      </p>
+    </>
+  )
+}
+
 function HeroFields({
   data,
   onChange,
@@ -822,15 +965,10 @@ function HeroFields({
         onChange={(socials) => onChange({ ...data, socials })}
       />
       <Field label="Botón de contacto (opcional)">
-        <TextInput
+        <ContactField
           value={data.contactUrl || ""}
-          onChange={(e) => onChange({ ...data, contactUrl: e.target.value })}
-          placeholder="Ej. 51987654321, @tuusuario o tu@correo.com"
+          onChange={(contactUrl) => onChange({ ...data, contactUrl })}
         />
-        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-          Un número muestra el ícono de WhatsApp, un usuario con "@" el de Telegram, y un correo el de Mail — el
-          botón en tu perfil se ve como un ícono, sin texto.
-        </p>
       </Field>
     </>
   )
@@ -952,6 +1090,7 @@ function SingleFields({
         <div className="flex items-start gap-2">
           <ImageUploader
             compact
+            optional
             currentImageUrl={data.cover}
             onUploadReady={(url) => onChange({ ...data, cover: url })}
             blobRegistry={blobRegistry}
@@ -978,11 +1117,11 @@ function SingleFields({
         </div>
       </Field>
       <Field label="Descripción (opcional)">
-        <textarea
+        <AutoGrowTextarea
           value={data.description || ""}
-          onChange={(e) => onChange({ ...data, description: e.target.value })}
-          rows={3}
-          className={inputClass}
+          onChange={(v) => onChange({ ...data, description: v })}
+          minRows={3}
+          maxLength={800}
           placeholder="Cuenta la historia detrás de esta canción: en qué te inspiraste, dónde la grabaste..."
         />
       </Field>
@@ -1382,6 +1521,7 @@ function TracksFields({
                       <div className="flex items-start gap-2">
                         <ImageUploader
                           compact
+                          optional
                           currentImageUrl={track.image}
                           onUploadReady={(url) => setTrack(activeAlbumIndex, trackIndex, "image", url)}
                           blobRegistry={blobRegistry}
@@ -1395,14 +1535,11 @@ function TracksFields({
                           durationLabel={track.duration}
                         />
                       </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        La imagen es opcional — si no subís una, se usa la portada del álbum.
-                      </p>
-                      <textarea
+                      <AutoGrowTextarea
                         value={track.description || ""}
-                        onChange={(e) => setTrack(activeAlbumIndex, trackIndex, "description", e.target.value)}
-                        rows={2}
-                        className={inputClass}
+                        onChange={(v) => setTrack(activeAlbumIndex, trackIndex, "description", v)}
+                        minRows={2}
+                        maxLength={600}
                         placeholder="Descripción (opcional): en qué te inspiraste, qué significa esta canción..."
                       />
                     </>
@@ -1493,17 +1630,13 @@ function AlbumCoverAndDescription({
             })}
           </div>
         </div>
-        <textarea
+        <AutoGrowTextarea
           value={descriptions[descIndex] || ""}
-          onChange={(e) => setActiveDescription(e.target.value)}
-          rows={3}
-          className={inputClass}
+          onChange={(v) => setActiveDescription(v)}
+          minRows={3}
+          maxLength={700}
           placeholder={ALBUM_DESCRIPTION_PLACEHOLDERS[descIndex]}
         />
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          Opcional. Sobre el álbum completo (no una pista). Usa las bolitas para escribir hasta 3 —
-          en tu perfil rotan en carrusel.
-        </p>
       </div>
     </div>
   )

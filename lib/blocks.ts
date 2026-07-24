@@ -15,7 +15,18 @@ export type BlockType =
   | "publicaciones"
   | "embeds"
 
-export type SocialPlatform = "instagram" | "youtube" | "twitter" | "spotify" | "bandcamp"
+export type SocialPlatform =
+  | "instagram"
+  | "tiktok"
+  | "youtube"
+  | "spotify"
+  | "soundcloud"
+  | "appleMusic"
+  | "facebook"
+  | "twitter"
+  | "twitch"
+  | "bandcamp"
+  | "website"
 
 export type SocialLink = {
   platform: SocialPlatform
@@ -28,10 +39,16 @@ export type SocialLink = {
 // SocialLinksFields en block-inspector.tsx).
 export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   instagram: "Instagram",
+  tiktok: "TikTok",
   youtube: "YouTube",
-  twitter: "Twitter / X",
   spotify: "Spotify",
+  soundcloud: "SoundCloud",
+  appleMusic: "Apple Music",
+  facebook: "Facebook",
+  twitter: "Twitter / X",
+  twitch: "Twitch",
   bandcamp: "Bandcamp",
+  website: "Sitio web",
 }
 
 export type Track = {
@@ -576,7 +593,19 @@ export function normalizeBlockData(
 
 function normalizeSocialLink(raw: unknown): SocialLink {
   const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
-  const validPlatforms: SocialPlatform[] = ["instagram", "youtube", "twitter", "spotify", "bandcamp"]
+  const validPlatforms: SocialPlatform[] = [
+    "instagram",
+    "tiktok",
+    "youtube",
+    "spotify",
+    "soundcloud",
+    "appleMusic",
+    "facebook",
+    "twitter",
+    "twitch",
+    "bandcamp",
+    "website",
+  ]
   const platform = validPlatforms.includes(s.platform as SocialPlatform) ? (s.platform as SocialPlatform) : "instagram"
   return {
     platform,

@@ -1,19 +1,27 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2 } from "lucide-react"
+import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2, Clapperboard, AudioLines, Music, ThumbsUp, Tv, Globe } from "lucide-react"
 import type { HeroData, SocialPlatform } from "@/lib/blocks"
 import { SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
 import { resolveContactChannel, CONTACT_CHANNEL_ICONS, CONTACT_CHANNEL_LABELS } from "@/lib/contact-channel"
 import { ShareProfileDialog } from "./share-profile-dialog"
 import { useLocale } from "@/components/locale-provider"
 
+// lucide quitó los íconos de marca (Instagram, Facebook, Twitch…) por temas de
+// registro, así que cada red usa un ícono genérico que la evoque.
 export const socialIcons: Record<SocialPlatform, typeof Camera> = {
   instagram: Camera,
+  tiktok: Clapperboard,
   youtube: Video,
-  twitter: AtSign,
   spotify: Music2,
+  soundcloud: AudioLines,
+  appleMusic: Music,
+  facebook: ThumbsUp,
+  twitter: AtSign,
+  twitch: Tv,
   bandcamp: Disc3,
+  website: Globe,
 }
 
 // Fila de metadatos secundarios bajo la identidad: ubicación a la izquierda y
