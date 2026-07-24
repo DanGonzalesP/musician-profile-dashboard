@@ -18,12 +18,12 @@ import {
   serviceHasDelivery,
 } from "@/lib/catalog"
 import * as audioEngine from "@/lib/audio-engine"
-import { type AudioBitrate, DEFAULT_AUDIO_BITRATE } from "@/lib/audio-transcode"
+import { type AudioBitrate } from "@/lib/audio-transcode"
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
 import { MUSICIAN_ROLES } from "@/lib/musician-roles"
-import { X, Trash2, Upload, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check } from "lucide-react"
+import { X, Trash2, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check } from "lucide-react"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { LegadoFields } from "@/components/inspector/legado-fields"
 import { PublicacionesFields } from "@/components/inspector/publicaciones-fields"
@@ -31,6 +31,7 @@ import { EmbedsFields } from "@/components/inspector/embeds-fields"
 import { LocationSelect } from "@/components/inspector/location-fields"
 import { ItemPager } from "@/components/inspector/item-pager"
 import { ImageAdjustModal } from "@/components/inspector/image-adjust-modal"
+import { GenreSelect, YearSelect } from "@/components/inspector/genre-year-select"
 
 function BackToPanelLink() {
   return (
@@ -259,14 +260,23 @@ export function ImageUploader({
   blobRegistry,
   aspect = 1,
   compact = false,
+  tileClassName,
+  heightClass = "h-28",
+  placeholderLabel = "Subir imagen",
 }: {
   onUploadReady: (blobUrl: string) => void
   currentImageUrl?: string
   blobRegistry: BlobRegistry
   /** Relación de aspecto del recorte al acomodar la imagen (ancho/alto). */
   aspect?: number
-  /** Recuadro cuadrado con ícono en vez de la fila miniatura + barra larga. */
+  /** Recuadro pequeño (ej. junto al audio en el editor de pistas). */
   compact?: boolean
+  /** Clases para forzar el tamaño/forma del recuadro (gana sobre heightClass). */
+  tileClassName?: string
+  /** Alto del recuadro cuando no se pasa tileClassName; el ancho sale del aspecto. */
+  heightClass?: string
+  /** Texto del recuadro vacío. */
+  placeholderLabel?: string
 }) {
   const [localPreview, setLocalPreview] = useState<string | null>(null)
   const [adjusting, setAdjusting] = useState(false)
@@ -311,85 +321,61 @@ export function ImageUploader({
 
   const displayUrl = localPreview || currentImageUrl
 
-  // Recuadro cuadrado: un solo ícono deja claro qué va ahí (usado junto al
-  // recuadro de audio en el editor de pistas, en vez de la barra larga).
-  if (compact) {
-    return (
-      <>
-        <div className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-dashed border-input bg-background">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-            aria-label="Subir imagen"
-          />
-          <button
-            type="button"
-            onClick={() => (displayUrl ? setAdjusting(true) : fileInputRef.current?.click())}
-            title={displayUrl ? "Tocá para acomodar la imagen" : "Subir imagen"}
-            aria-label={displayUrl ? "Acomodar imagen" : "Subir imagen"}
-            className="flex h-full w-full flex-col items-center justify-center gap-1 hover:bg-accent"
-          >
-            {displayUrl ? (
-              <img src={displayUrl} alt="Vista previa" className="h-full w-full object-cover" />
-            ) : (
-              <>
-                <ImagePlus className="size-5 text-muted-foreground" />
-                <span className="text-[9px] font-medium text-muted-foreground">Imagen</span>
-              </>
-            )}
-          </button>
-          {displayUrl && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              title="Cambiar imagen"
-              aria-label="Cambiar imagen"
-              className="absolute right-0.5 top-0.5 flex size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
-            >
-              <Upload className="size-3" />
-            </button>
-          )}
-        </div>
+  // Un único recuadro presionable: la imagen y el "subir/cambiar" son lo
+  // mismo (antes el botón vivía en una barra aparte, ajena a la miniatura).
+  //   · Tocar el recuadro  → elige o cambia el archivo.
+  //   · Badge "Acomodar"   → abre el editor de encuadre (solo si ya hay imagen).
+  // El tamaño lo define tileClassName (si se pasa) o, por defecto, el alto
+  // heightClass con el ancho saliendo del aspecto.
+  const boxSize = compact ? "size-20" : tileClassName ?? heightClass
+  const boxStyle = compact || tileClassName ? undefined : { aspectRatio: String(aspect) }
 
-        {adjusting && displayUrl && (
-          <ImageAdjustModal
-            src={displayUrl}
-            aspect={aspect}
-            onCancel={() => setAdjusting(false)}
-            onConfirm={handleAdjustConfirm}
-          />
-        )}
-      </>
-    )
-  }
-
-  // Fila horizontal (miniatura + botón) en vez de apilar la vista previa
-  // arriba del botón — el inspector aprovecha el ancho y se acorta el scroll.
   return (
     <>
-      <div className="flex items-stretch gap-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+        aria-label={placeholderLabel}
+      />
+      <div
+        className={`relative shrink-0 overflow-hidden rounded-lg border border-dashed border-input bg-background ${boxSize}`}
+        style={boxStyle}
+      >
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          title={displayUrl ? "Cambiar imagen" : placeholderLabel}
+          aria-label={displayUrl ? "Cambiar imagen" : placeholderLabel}
+          className="flex h-full w-full flex-col items-center justify-center gap-1 hover:bg-accent"
+        >
+          {displayUrl ? (
+            <img src={displayUrl} alt="Vista previa" className="h-full w-full object-cover" />
+          ) : (
+            <>
+              <ImagePlus className={compact ? "size-5 text-muted-foreground" : "size-6 text-muted-foreground"} />
+              <span
+                className={`px-1 text-center font-medium text-muted-foreground ${compact ? "text-[9px]" : "text-[11px]"}`}
+              >
+                {placeholderLabel}
+              </span>
+            </>
+          )}
+        </button>
         {displayUrl && (
           <button
             type="button"
             onClick={() => setAdjusting(true)}
-            title="Tocá para acomodar la imagen"
+            title="Acomodar imagen"
             aria-label="Acomodar imagen"
-            className="group relative size-14 shrink-0 overflow-hidden rounded-lg border border-sidebar-border bg-muted"
+            className="absolute right-1 top-1 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 text-white transition-colors hover:bg-black/80"
           >
-            <img src={displayUrl} alt="Vista previa" className="h-full w-full object-cover" />
-            <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
-              <Move className="size-4 text-white" />
-            </span>
+            <Move className="size-3" />
+            {!compact && <span className="text-[10px] font-medium leading-none">Acomodar</span>}
           </button>
         )}
-        <label className="flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
-          <Upload className="size-3.5 text-muted-foreground" />
-          <span>{displayUrl ? "Cambiar imagen" : "Subir imagen"}</span>
-          <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-        </label>
       </div>
 
       {adjusting && displayUrl && (
@@ -414,12 +400,6 @@ export function ImageUploader({
 const MAX_AUDIO_FILE_SIZE_MB = 100
 const MAX_AUDIO_FILE_SIZE_BYTES = MAX_AUDIO_FILE_SIZE_MB * 1024 * 1024
 
-const AUDIO_BITRATE_OPTIONS: { value: AudioBitrate; label: string }[] = [
-  { value: "192k", label: "192 kbps" },
-  { value: "256k", label: "256 kbps" },
-  { value: "320k", label: "320 kbps" },
-]
-
 // Extensiones que ya vienen en un contenedor comprimido válido — mismo
 // criterio que COMPRESSED_AUDIO_EXTS en lib/audio-transcode, pero acá también
 // cuenta "mpeg/mpg/mp2" como candidatas a re-codificar (ver esa lista: se
@@ -432,21 +412,24 @@ function AudioUploader({
   currentAudioUrl,
   blobRegistry,
   compact = false,
+  previewButton,
+  durationLabel,
 }: {
   onUploadReady: (blobUrl: string, fileHash: string) => void
   currentAudioUrl?: string
   blobRegistry: BlobRegistry
   /** Recuadro cuadrado con ícono en vez de la barra larga como disparador. */
   compact?: boolean
+  /** Botón de reproducir/pausar (lo arma el padre con el motor de audio). En
+      modo compacto va debajo del recuadro de audio, junto a la duración. */
+  previewButton?: React.ReactNode
+  /** Duración del archivo subido (ej. "3:24"), al lado del botón de reproducir. */
+  durationLabel?: string
 }) {
   const [fileName, setFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hashing, setHashing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // Calidad de MP3 para el PRÓXIMO archivo que se suba — solo importa cuando
-  // el archivo necesita conversión (wav/flac/aiff/ogg/mpeg suelto); un mp3/
-  // aac/m4a ya comprimido se sube tal cual, sin tocar su bitrate original.
-  const [bitrate, setBitrate] = useState<AudioBitrate>(DEFAULT_AUDIO_BITRATE)
   const [lastWasAlreadyCompressed, setLastWasAlreadyCompressed] = useState(false)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -495,10 +478,11 @@ function AudioUploader({
       setHashing(false)
     }
 
-    // Se asocia la calidad elegida a ESTE archivo — ver audioBitrateByFile,
-    // usado recién al publicar (uploadBlobFile en profile-editor.tsx).
-    audioBitrateByFile.set(file, bitrate)
-
+    // La calidad ya no se elige a mano: cada archivo se publica con la
+    // calidad con la que se subió — un mp3/aac/m4a se sube tal cual (su
+    // bitrate original) y un formato sin comprimir se convierte a mp3 al
+    // máximo (DEFAULT_AUDIO_BITRATE) en profile-editor. Por eso ya no se
+    // registra nada en audioBitrateByFile acá (el publish cae al default).
     const blobUrl = URL.createObjectURL(file)
     blobRegistry.current.set(blobUrl, file)
 
@@ -509,9 +493,6 @@ function AudioUploader({
 
   const hasAudio = Boolean(fileName || currentAudioUrl)
   const displayName = fileName || (currentAudioUrl ? "Audio cargado ✓" : null)
-  // El selector no tiene efecto sobre un archivo que ya viene comprimido — se
-  // deshabilita después de subir uno así para no sugerir que cambiaría algo.
-  const bitrateDisabled = Boolean(fileName) && lastWasAlreadyCompressed
 
   const ACCEPT_ATTR =
     ".mp3,.aac,.m4a,.wav,.flac,.aiff,.aif,.ogg,audio/mpeg,audio/aac,audio/mp4,audio/wav,audio/x-wav,audio/flac,audio/aiff,audio/ogg"
@@ -528,27 +509,6 @@ function AudioUploader({
       )}
       {hashing && <p className="text-[11px] text-muted-foreground">Calculando huella digital SHA-256...</p>}
       {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
-
-      <div className="flex items-center gap-1.5">
-        <span className="text-[11px] text-muted-foreground">Calidad:</span>
-        <div className="flex gap-1">
-          {AUDIO_BITRATE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              disabled={bitrateDisabled}
-              onClick={() => setBitrate(opt.value)}
-              className={`rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                bitrate === opt.value
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-input text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
     </>
   )
 
@@ -571,29 +531,46 @@ function AudioUploader({
   if (compact) {
     return (
       <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-dashed border-input bg-background">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPT_ATTR}
-            onChange={handleFileChange}
-            className="hidden"
-            aria-label="Subir audio"
-          />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPT_ATTR}
+          onChange={handleFileChange}
+          className="hidden"
+          aria-label="Subir audio"
+        />
+        {/* Columna a la derecha de la imagen, del mismo alto (size-20 = h-20):
+            arriba el recuadro para subir/cambiar el audio, abajo el botón de
+            reproducir junto a la duración del archivo. */}
+        <div className="flex h-20 flex-col gap-1.5">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title={hasAudio ? "Cambiar audio" : "Subir audio"}
             aria-label={hasAudio ? "Cambiar audio" : "Subir audio"}
-            className={`flex h-full w-full flex-col items-center justify-center gap-1 px-1 hover:bg-accent ${
+            className={`flex flex-1 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-input bg-background px-1 hover:bg-accent ${
               hasAudio ? "text-primary" : "text-muted-foreground"
             }`}
           >
             <Music className="size-5" />
-            <span className="text-center text-[9px] font-medium leading-tight">
-              {hasAudio ? "Cambiar" : "Audio"}
+            <span className="text-center text-[10px] font-medium leading-tight">
+              {hasAudio ? "Cambiar audio" : "Subir audio"}
             </span>
           </button>
+          <div className="flex h-8 shrink-0 items-center gap-2">
+            {previewButton}
+            {durationLabel ? (
+              <span
+                title="Calculado automáticamente al subir el audio"
+                aria-label={`Duración: ${durationLabel}`}
+                className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
+              >
+                {durationLabel}
+              </span>
+            ) : (
+              <span className="ml-auto text-[10px] text-muted-foreground/70">Sin audio</span>
+            )}
+          </div>
         </div>
         {statusBlock}
         {notesBlock}
@@ -782,21 +759,32 @@ function HeroFields({
           placeholder="Ej. Juan Pérez"
         />
       </Field>
-      <Field label="Foto de perfil (avatar)">
-        <ImageUploader
-          currentImageUrl={data.image}
-          onUploadReady={(url) => onChange({ ...data, image: url })}
-          blobRegistry={blobRegistry}
-        />
-      </Field>
-      <Field label="Banner de fondo">
-        <ImageUploader
-          currentImageUrl={data.banner}
-          onUploadReady={(url) => onChange({ ...data, banner: url })}
-          blobRegistry={blobRegistry}
-          aspect={16 / 9}
-        />
-      </Field>
+      {/* Foto de perfil (cuadrada) + banner (rectangular) uno al lado del otro:
+          cada recuadro es la propia imagen, presionable para subir/cambiar. */}
+      <div className="flex items-end gap-3">
+        <div className="space-y-1.5">
+          <span className="block text-xs font-medium text-muted-foreground">Foto de perfil</span>
+          <ImageUploader
+            currentImageUrl={data.image}
+            onUploadReady={(url) => onChange({ ...data, image: url })}
+            blobRegistry={blobRegistry}
+            aspect={1}
+            tileClassName="size-20"
+            placeholderLabel="Subir foto"
+          />
+        </div>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <span className="block text-xs font-medium text-muted-foreground">Banner de fondo</span>
+          <ImageUploader
+            currentImageUrl={data.banner}
+            onUploadReady={(url) => onChange({ ...data, banner: url })}
+            blobRegistry={blobRegistry}
+            aspect={16 / 9}
+            tileClassName="h-20 w-full"
+            placeholderLabel="Subir banner"
+          />
+        </div>
+      </div>
       <Field label="¿Qué eres?">
         <RoleTagPicker
           value={data.tagline || ""}
@@ -924,54 +912,51 @@ function SingleFields({
         />
       </Field>
       <div className="flex gap-2">
-        <Field label="Género">
-          <TextInput
-            value={data.genre || ""}
-            onChange={(e) => onChange({ ...data, genre: e.target.value })}
-            placeholder="Ej. Synth Pop"
-          />
-        </Field>
-        <Field label="Año">
-          <TextInput
-            value={data.year || ""}
-            onChange={(e) => onChange({ ...data, year: e.target.value })}
-            placeholder="Ej. 2026"
-          />
-        </Field>
+        <div className="min-w-0 flex-1">
+          <Field label="Género">
+            <GenreSelect
+              value={data.genre || ""}
+              onChange={(genre) => onChange({ ...data, genre })}
+            />
+          </Field>
+        </div>
+        <div className="w-24 shrink-0">
+          <Field label="Año">
+            <YearSelect value={data.year || ""} onChange={(year) => onChange({ ...data, year })} />
+          </Field>
+        </div>
       </div>
-      <Field label="Portada">
-        <ImageUploader
-          currentImageUrl={data.cover}
-          onUploadReady={(url) => onChange({ ...data, cover: url })}
-          blobRegistry={blobRegistry}
-        />
+      {/* Portada (cuadrada, presionable) a la izquierda; a su derecha el
+          recuadro de audio + reproducir/duración, todo del mismo alto. */}
+      <Field label="Portada y audio">
+        <div className="flex items-start gap-2">
+          <ImageUploader
+            compact
+            currentImageUrl={data.cover}
+            onUploadReady={(url) => onChange({ ...data, cover: url })}
+            blobRegistry={blobRegistry}
+          />
+          <AudioUploader
+            compact
+            currentAudioUrl={data.audioUrl}
+            onUploadReady={(url) => handleAudioUploaded(url)}
+            blobRegistry={blobRegistry}
+            previewButton={
+              <button
+                type="button"
+                onClick={togglePreview}
+                disabled={!data.audioUrl}
+                title={data.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
+                aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}
+                className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
+              >
+                {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+              </button>
+            }
+            durationLabel={data.duration}
+          />
+        </div>
       </Field>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={togglePreview}
-          disabled={!data.audioUrl}
-          title={data.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
-          aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}
-          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
-        >
-          {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-        </button>
-        {data.duration && (
-          <span
-            title="Calculado automáticamente al subir el audio"
-            aria-label={`Duración: ${data.duration}`}
-            className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
-          >
-            {data.duration}
-          </span>
-        )}
-      </div>
-      <AudioUploader
-        currentAudioUrl={data.audioUrl}
-        onUploadReady={(url) => handleAudioUploaded(url)}
-        blobRegistry={blobRegistry}
-      />
       <Field label="Descripción (opcional)">
         <textarea
           value={data.description || ""}
@@ -1307,21 +1292,23 @@ function TracksFields({
                 placeholder="Ej. Digital Ethereal"
               />
             </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Género">
-                <TextInput
-                  value={activeAlbum.genre || ""}
-                  onChange={(e) => setAlbum(activeAlbumIndex, { genre: e.target.value })}
-                  placeholder="Ej. Synth Pop"
-                />
-              </Field>
-              <Field label="Año">
-                <TextInput
-                  value={activeAlbum.year || ""}
-                  onChange={(e) => setAlbum(activeAlbumIndex, { year: e.target.value })}
-                  placeholder="Ej. 2026"
-                />
-              </Field>
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <Field label="Género">
+                  <GenreSelect
+                    value={activeAlbum.genre || ""}
+                    onChange={(genre) => setAlbum(activeAlbumIndex, { genre })}
+                  />
+                </Field>
+              </div>
+              <div className="w-24 shrink-0">
+                <Field label="Año">
+                  <YearSelect
+                    value={activeAlbum.year || ""}
+                    onChange={(year) => setAlbum(activeAlbumIndex, { year })}
+                  />
+                </Field>
+              </div>
             </div>
             <Field label="Portada del álbum">
               <ImageUploader
@@ -1345,6 +1332,18 @@ function TracksFields({
                   const track = activeAlbum.tracks[trackIndex]
                   if (!track) return null
                   const isPreviewing = Boolean(track.audioUrl) && engine.url === track.audioUrl && engine.playing
+                  const previewButton = (
+                    <button
+                      type="button"
+                      onClick={() => togglePreview(track.audioUrl)}
+                      disabled={!track.audioUrl}
+                      title={track.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
+                      aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
+                    >
+                      {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+                    </button>
+                  )
                   return (
                     <>
                       <input
@@ -1355,6 +1354,9 @@ function TracksFields({
                         placeholder="Nombre de la canción"
                         aria-label="Nombre de la canción"
                       />
+                      {/* Imagen (cuadrada, presionable) a la izquierda; a su
+                          derecha el recuadro de audio + reproducir/duración,
+                          todo del mismo alto para que vaya a la par. */}
                       <div className="flex items-start gap-2">
                         <ImageUploader
                           compact
@@ -1367,32 +1369,13 @@ function TracksFields({
                           currentAudioUrl={track.audioUrl}
                           onUploadReady={(url, hash) => handleAudioUploaded(activeAlbumIndex, trackIndex, url, hash)}
                           blobRegistry={blobRegistry}
+                          previewButton={previewButton}
+                          durationLabel={track.duration}
                         />
                       </div>
                       <p className="text-[10px] text-muted-foreground">
                         La imagen es opcional — si no subís una, se usa la portada del álbum.
                       </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => togglePreview(track.audioUrl)}
-                          disabled={!track.audioUrl}
-                          title={track.audioUrl ? "Escuchar antes de publicar" : "Sube un audio para poder escucharlo"}
-                          aria-label={isPreviewing ? "Pausar preescucha" : "Escuchar antes de publicar"}
-                          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:border-input disabled:bg-transparent disabled:text-muted-foreground/40 disabled:opacity-60"
-                        >
-                          {isPreviewing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-                        </button>
-                        {track.duration && (
-                          <span
-                            title="Calculado automáticamente al subir el audio"
-                            aria-label={`Duración: ${track.duration}`}
-                            className="ml-auto shrink-0 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums text-muted-foreground"
-                          >
-                            {track.duration}
-                          </span>
-                        )}
-                      </div>
                       <textarea
                         value={track.description || ""}
                         onChange={(e) => setTrack(activeAlbumIndex, trackIndex, "description", e.target.value)}

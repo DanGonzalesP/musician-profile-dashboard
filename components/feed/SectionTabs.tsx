@@ -75,8 +75,13 @@ export function SectionTabs({
 }) {
   return (
     <>
-      {/* ── Escritorio: píldora horizontal centrada arriba, con etiqueta ── */}
-      <div className="pointer-events-none absolute inset-x-0 top-4 z-50 hidden justify-center lg:flex">
+      {/* ── Escritorio: píldora horizontal centrada arriba, con etiqueta ──
+          El padding lateral (pl-72 = ancho de FeedSidebar, pr-80/pr-96 = ancho
+          del CommentsPanel) hace que la píldora se centre sobre la MISMA
+          columna donde vive el disco del feed, no sobre todo el viewport — así
+          "Servicios" (el botón central) queda alineado con el disco y no
+          desplazado a la derecha. */}
+      <div className="pointer-events-none absolute inset-x-0 top-4 z-50 hidden justify-center lg:flex lg:pl-72 lg:pr-80 xl:pr-96">
         <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-card/80 p-1 shadow-xl backdrop-blur-xl">
           {SECTIONS.map((s) => (
             <SectionButton
