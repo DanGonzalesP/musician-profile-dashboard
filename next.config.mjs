@@ -5,16 +5,20 @@
 // terceros nuevo (otro CDN, otra API), amplía aquí la directiva que toque.
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  // Next.js inyecta scripts inline; ffmpeg.wasm necesita 'wasm-unsafe-eval';
-  // Vercel Analytics carga desde va.vercel-scripts.com.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://va.vercel-scripts.com",
+  // Next.js inyecta scripts inline; ffmpeg.wasm necesita 'wasm-unsafe-eval' y
+  // carga su core como blob: (import() dinámico dentro del worker, ver
+  // lib/audio-transcode.ts) — sin "blob:" acá el navegador bloquea ese
+  // import con "Failed to fetch dynamically imported module"; Vercel
+  // Analytics carga desde va.vercel-scripts.com.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
   // Portadas/avatares/fotos viven en R2 y en dominios externos (YouTube
   // thumbnails, picsum de ejemplo...) — https: genérico, nunca http:.
   "img-src 'self' https: data: blob:",
   "media-src 'self' https: blob:",
-  // Supabase (REST + Realtime) y el PUT directo a R2 con URL firmada.
-  "connect-src 'self' https: wss:",
+  // Supabase (REST + Realtime), el PUT directo a R2 con URL firmada, y el
+  // fetch interno del .wasm de ffmpeg.wasm (se sirve como blob:, ver arriba).
+  "connect-src 'self' https: wss: blob:",
   "font-src 'self' data:",
   // Workers de ffmpeg.wasm y browser-image-compression.
   "worker-src 'self' blob:",
