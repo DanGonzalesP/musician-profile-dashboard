@@ -284,6 +284,10 @@ function ProfileEditorInner() {
   const [services, setServices] = useState<CatalogService[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dragPayload, setDragPayload] = useState<DragPayload>(null)
+  // Álbum que el usuario acaba de abrir en el lienzo (bloque "tracks") — se
+  // pasa al inspector para que enfoque el mismo álbum del lado derecho, en
+  // vez de quedarse en el primero por defecto.
+  const [focusAlbumId, setFocusAlbumId] = useState<string | null>(null)
   // Drawer de "Bloques" en mobile/tablet (< xl) — el aside se vuelve un
   // overlay a pantalla completa en vez de compartir espacio con el lienzo.
   const [mobileBlocksOpen, setMobileBlocksOpen] = useState(searchParams.get("abrir") === "bloques")
@@ -961,6 +965,7 @@ function ProfileEditorInner() {
                 .filter(Boolean) ?? []
             }
             creditsCount={(blocks.find((b) => b.type === "credits")?.data as CreditsData | undefined)?.credits.length ?? 0}
+            onAlbumSelect={setFocusAlbumId}
           />
         </main>
 
@@ -994,6 +999,7 @@ function ProfileEditorInner() {
             profileId={profileIdRef.current}
             isBand={isBandRef.current}
             onClose={() => setSelectedId(null)}
+            focusAlbumId={focusAlbumId}
           />
         </aside>
       </div>

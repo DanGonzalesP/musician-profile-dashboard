@@ -20,6 +20,7 @@ export function BlockRenderer({
   shareUrl,
   albumCovers = [],
   creditsCount = 0,
+  onAlbumSelect,
 }: {
   block: Block
   products?: CatalogProduct[]
@@ -27,6 +28,7 @@ export function BlockRenderer({
   shareUrl?: string
   albumCovers?: string[]
   creditsCount?: number
+  onAlbumSelect?: (albumId: string) => void
 }) {
   switch (block.type) {
     case "hero":
@@ -36,7 +38,7 @@ export function BlockRenderer({
     case "crowdfunding":
       return <CrowdfundingBlock data={block.data as CrowdfundingData} />
     case "tracks":
-      return <TrackListBlock data={block.data as TracksData} />
+      return <TrackListBlock data={block.data as TracksData} onAlbumSelect={onAlbumSelect} />
     case "credits":
       return <CreditsBlock data={block.data as CreditsData} />
     case "merch":

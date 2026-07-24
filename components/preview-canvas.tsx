@@ -25,6 +25,7 @@ type Props = {
   // Rol del Punto 4 sobre el perfil que se edita — "editor" solo puede abrir
   // el bloque "hero"; el resto queda bloqueado (sin controles, no seleccionable).
   activeRole?: "owner" | "admin" | "editor"
+  onAlbumSelect?: (albumId: string) => void
 }
 
 export function PreviewCanvas({
@@ -44,6 +45,7 @@ export function PreviewCanvas({
   albumCovers,
   creditsCount,
   activeRole = "owner",
+  onAlbumSelect,
 }: Props) {
   const [dropIndex, setDropIndex] = useState<number | null>(null)
 
@@ -134,6 +136,7 @@ export function PreviewCanvas({
                     albumCovers={albumCovers}
                     creditsCount={creditsCount}
                     locked={activeRole === "editor" && block.type !== "hero"}
+                    onAlbumSelect={onAlbumSelect}
                   />
                   <Indicator index={i + 1} />
                 </div>

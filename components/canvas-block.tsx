@@ -31,6 +31,7 @@ type Props = {
   // Punto 4: true cuando el rol activo ("editor" de banda) no puede tocar
   // este bloque — sin controles y sin poder abrir el inspector.
   locked?: boolean
+  onAlbumSelect?: (albumId: string) => void
 }
 
 export function CanvasBlock({
@@ -51,6 +52,7 @@ export function CanvasBlock({
   albumCovers,
   creditsCount,
   locked = false,
+  onAlbumSelect,
 }: Props) {
   const label = BLOCK_LIBRARY.find((b) => b.type === block.type)?.label ?? block.type
   // Atajo de "Compartir" en el propio control pill del bloque — solo visible
@@ -190,6 +192,7 @@ export function CanvasBlock({
           shareUrl={block.type === "hero" ? shareUrl : undefined}
           albumCovers={albumCovers}
           creditsCount={creditsCount}
+          onAlbumSelect={onAlbumSelect}
         />
       </div>
 

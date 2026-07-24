@@ -2,12 +2,11 @@
 
 // Orquesta el feed principal por SECCIONES (Roles / Servicios / Productos):
 //  · Roles     → el feed vertical de siempre (canciones + publicaciones),
-//                filtrable por los 7 roles, Grupos musicales y Tienda (esta
-//                última muestra la cuadrícula de perfiles que venden productos).
+//                filtrable por los 7 roles y Grupos musicales.
 //  · Servicios → cuadrícula de perfiles que ofrecen servicios; el primer ítem
 //                del panel es "Profesor" (categoría clases) en lugar de "Para ti".
 //  · Productos → cuadrícula de perfiles que venden productos, con "Tienda" al
-//                final del panel.
+//                final del panel — es la única sección donde aparece.
 // Los ítems del panel lateral se arman acá y se pasan al FeedSidebar genérico.
 
 import { useMemo, useState, type ComponentType } from "react"
@@ -125,7 +124,6 @@ export default function FeedExperience({
           shortLabel: r.label,
         })),
         { id: "grupos", icon: Users, label: "Grupos musicales", shortLabel: "Grupos", description: "Páginas de bandas y ensambles", highlight: true },
-        { id: "tienda", icon: Store, label: "Tienda", description: "Perfiles que venden productos", highlight: true },
       ]
     }
     if (section === "servicios") {
@@ -152,10 +150,7 @@ export default function FeedExperience({
   }, [section])
 
   // ── Feed vertical filtrado (solo sección Roles) ──────────────────────────
-  const feedFilter: FeedFilterId | null =
-    activeId === "todos" || activeId === "tienda"
-      ? null
-      : (activeId as FeedFilterId)
+  const feedFilter: FeedFilterId | null = activeId === "todos" ? null : (activeId as FeedFilterId)
 
   const filteredItems = useMemo(() => {
     if (feedFilter === null) return items
@@ -183,7 +178,6 @@ export default function FeedExperience({
         c[role.id] = items.filter((item) => itemRoles(item).includes(role.id)).length
       }
       c[GROUPS_FILTER_ID] = items.filter(itemIsGroup).length
-      c.tienda = productSellers.length
     } else if (section === "servicios") {
       for (const cat of SERVICE_CATEGORIES) {
         c[cat.id] = serviceProviders.filter((p) => p.categories.includes(cat.id)).length
@@ -197,7 +191,7 @@ export default function FeedExperience({
     return c
   }, [section, items, serviceProviders, productSellers])
 
-  const showVerticalFeed = section === "roles" && activeId !== "tienda"
+  const showVerticalFeed = section === "roles"
 
   return (
     <>

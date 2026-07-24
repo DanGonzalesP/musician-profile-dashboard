@@ -120,7 +120,15 @@ function TypewriterText({ text }: { text: string }) {
   return <>{text.slice(0, visibleChars)}</>
 }
 
-export function TrackListBlock({ data }: { data: TracksData }) {
+export function TrackListBlock({
+  data,
+  onAlbumSelect,
+}: {
+  data: TracksData
+  // Notifica (por id de álbum) cuando el usuario abre/cambia de álbum acá —
+  // usado en el editor para que el panel derecho enfoque el mismo álbum.
+  onAlbumSelect?: (albumId: string) => void
+}) {
   const { t } = useLocale()
   const albums = data.albums || []
   // selectedAlbum: cuál álbum debe estar en la posición izquierda del carrusel.
@@ -211,6 +219,8 @@ export function TrackListBlock({ data }: { data: TracksData }) {
 
   function handleSelectAlbum(index: number) {
     pauseCarouselBriefly()
+    const albumId = albums[index]?.id
+    if (albumId) onAlbumSelect?.(albumId)
 
     if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
     if (slideTimeoutRef.current) clearTimeout(slideTimeoutRef.current)
