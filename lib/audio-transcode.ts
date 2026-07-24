@@ -20,6 +20,9 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util"
 // lado), esas extensiones sí pasan por ffmpeg y salen como .mp3.
 export const COMPRESSED_AUDIO_EXTS = new Set(["mp3", "aac", "m4a"])
 
+export type AudioBitrate = "192k" | "256k" | "320k"
+export const DEFAULT_AUDIO_BITRATE: AudioBitrate = "320k"
+
 let ffmpegSingleton: FFmpeg | null = null
 let loadPromise: Promise<FFmpeg> | null = null
 
@@ -42,11 +45,14 @@ async function getFFmpeg(): Promise<FFmpeg> {
 
 /**
  * Si el archivo ya es mp3/aac/m4a, lo devuelve tal cual (ya está
- * comprimido, no hace falta re-procesarlo). Si es otro formato de audio
- * (wav, flac, aiff, ogg, etc.), lo convierte a MP3 192kbps.
+ * comprimido, no hace falta re-procesarlo — su bitrate original queda como
+ * está, el selector de calidad solo aplica a la conversión desde un formato
+ * sin comprimir). Si es otro formato de audio (wav, flac, aiff, ogg, etc.),
+ * lo convierte a MP3 en el bitrate indicado (por defecto 320kbps).
  */
 export async function ensureCompressedAudio(
   file: File,
+  bitrate: AudioBitrate = DEFAULT_AUDIO_BITRATE,
   onProgress?: (ratio: number) => void
 ): Promise<File> {
   const ext = (file.name.split(".").pop() ?? "").toLowerCase()
@@ -63,7 +69,7 @@ export async function ensureCompressedAudio(
 
   try {
     await ffmpeg.writeFile(inputName, await fetchFile(file))
-    await ffmpeg.exec(["-i", inputName, "-c:a", "libmp3lame", "-b:a", "192k", outputName])
+    await ffmpeg.exec(["-i", inputName, "-c:a", "libmp3lame", "-b:a", bitrate, outputName])
     const data = await ffmpeg.readFile(outputName)
     const mp3Name = file.name.replace(/\.\w+$/, "") + ".mp3"
     return new File([data as Uint8Array<ArrayBuffer>], mp3Name, { type: "audio/mpeg" })

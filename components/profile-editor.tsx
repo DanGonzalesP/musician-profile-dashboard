@@ -8,12 +8,12 @@ import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole }
 import { EditorHeader } from "@/components/editor-header"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
-import { BlockInspector } from "@/components/block-inspector"
+import { BlockInspector, audioBitrateByFile } from "@/components/block-inspector"
 import { Layers, LogOut, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { authedFetch } from "@/lib/authed-fetch"
 import imageCompression from "browser-image-compression"
-import { ensureCompressedAudio } from "@/lib/audio-transcode"
+import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE, type AudioBitrate } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
 import { ProfileSkeleton } from "@/components/blocks/skeletons"
 import { useToast } from "@/components/toast-provider"
@@ -204,7 +204,12 @@ async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Pro
   const folder: "images" | "audio" = ext in AUDIO_MIME_TYPES ? "audio" : "images"
   // Cualquier audio que no sea ya mp3/aac/m4a (ej. wav, flac, aiff) se
   // transcodifica en el navegador antes de subir — ver lib/audio-transcode.
-  const fileToUpload = folder === "audio" ? await ensureCompressedAudio(file) : file
+  // El bitrate lo eligió el artista en el selector del AudioUploader; queda
+  // asociado al File en audioBitrateByFile (ver block-inspector.tsx) porque
+  // ese es el único hilo que conecta "qué se eligió" con "qué archivo es" —
+  // pasa mucho tiempo (hasta que se publica) entre una cosa y la otra.
+  const bitrate = audioBitrateByFile.get(file) ?? DEFAULT_AUDIO_BITRATE
+  const fileToUpload = folder === "audio" ? await ensureCompressedAudio(file, bitrate) : file
   return uploadFileToStorage(fileToUpload, folder)
 }
 

@@ -18,6 +18,7 @@ import {
   serviceHasDelivery,
 } from "@/lib/catalog"
 import * as audioEngine from "@/lib/audio-engine"
+import { type AudioBitrate, DEFAULT_AUDIO_BITRATE } from "@/lib/audio-transcode"
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
@@ -43,6 +44,14 @@ function BackToPanelLink() {
 }
 
 export type BlobRegistry = React.MutableRefObject<Map<string, File>>
+
+// Bitrate de MP3 elegido por el artista para cada archivo de audio, keyeado
+// por la instancia de File (no por su blob URL: la URL identifica el archivo
+// ORIGINAL que se seleccionó, y eso es justo lo que hace falta recordar hasta
+// el momento de publicar — ver uploadBlobFile en profile-editor.tsx). Un
+// WeakMap evita mutar el File con una propiedad custom y se libera solo
+// cuando el archivo deja de estar referenciado.
+export const audioBitrateByFile = new WeakMap<File, AudioBitrate>()
 
 type Props = {
   block: Block | null
@@ -337,6 +346,19 @@ export function ImageUploader({
 const MAX_AUDIO_FILE_SIZE_MB = 100
 const MAX_AUDIO_FILE_SIZE_BYTES = MAX_AUDIO_FILE_SIZE_MB * 1024 * 1024
 
+const AUDIO_BITRATE_OPTIONS: { value: AudioBitrate; label: string }[] = [
+  { value: "192k", label: "192 kbps" },
+  { value: "256k", label: "256 kbps" },
+  { value: "320k", label: "320 kbps" },
+]
+
+// Extensiones que ya vienen en un contenedor comprimido válido — mismo
+// criterio que COMPRESSED_AUDIO_EXTS en lib/audio-transcode, pero acá también
+// cuenta "mpeg/mpg/mp2" como candidatas a re-codificar (ver esa lista: se
+// excluyeron a propósito para forzar mp3 real), así que el selector de
+// calidad SÍ les aplica.
+const ALREADY_COMPRESSED_EXTS = new Set(["mp3", "aac", "m4a"])
+
 function AudioUploader({
   onUploadReady,
   currentAudioUrl,
@@ -349,6 +371,11 @@ function AudioUploader({
   const [fileName, setFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hashing, setHashing] = useState(false)
+  // Calidad de MP3 para el PRÓXIMO archivo que se suba — solo importa cuando
+  // el archivo necesita conversión (wav/flac/aiff/ogg/mpeg suelto); un mp3/
+  // aac/m4a ya comprimido se sube tal cual, sin tocar su bitrate original.
+  const [bitrate, setBitrate] = useState<AudioBitrate>(DEFAULT_AUDIO_BITRATE)
+  const [lastWasAlreadyCompressed, setLastWasAlreadyCompressed] = useState(false)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return
@@ -381,6 +408,7 @@ function AudioUploader({
     }
 
     setError(null)
+    setLastWasAlreadyCompressed(ALREADY_COMPRESSED_EXTS.has(ext ?? ""))
 
     // Huella SHA-256 calculada aquí mismo, en el navegador, antes de que el
     // archivo toque Supabase — es la base del certificado de autoría.
@@ -395,6 +423,10 @@ function AudioUploader({
       setHashing(false)
     }
 
+    // Se asocia la calidad elegida a ESTE archivo — ver audioBitrateByFile,
+    // usado recién al publicar (uploadBlobFile en profile-editor.tsx).
+    audioBitrateByFile.set(file, bitrate)
+
     const blobUrl = URL.createObjectURL(file)
     blobRegistry.current.set(blobUrl, file)
 
@@ -405,6 +437,9 @@ function AudioUploader({
 
   const hasAudio = Boolean(fileName || currentAudioUrl)
   const displayName = fileName || (currentAudioUrl ? "Audio cargado ✓" : null)
+  // El selector no tiene efecto sobre un archivo que ya viene comprimido — se
+  // deshabilita después de subir uno así para no sugerir que cambiaría algo.
+  const bitrateDisabled = Boolean(fileName) && lastWasAlreadyCompressed
 
   return (
     <div className="space-y-1.5">
@@ -416,6 +451,28 @@ function AudioUploader({
       )}
       {hashing && <p className="text-[11px] text-muted-foreground">Calculando huella digital SHA-256...</p>}
       {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-[11px] text-muted-foreground">Calidad:</span>
+        <div className="flex gap-1">
+          {AUDIO_BITRATE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={bitrateDisabled}
+              onClick={() => setBitrate(opt.value)}
+              className={`rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                bitrate === opt.value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-input text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <label
         className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-xs font-medium transition-colors ${
           hasAudio
@@ -432,6 +489,11 @@ function AudioUploader({
           className="hidden"
         />
       </label>
+      {lastWasAlreadyCompressed && fileName && (
+        <p className="text-[11px] text-muted-foreground">
+          Este archivo ya viene comprimido — se sube tal cual, con su calidad original.
+        </p>
+      )}
       {!hasAudio && (
         <p className="text-[11px] text-muted-foreground">
           Si subís un formato sin comprimir (wav, flac, aiff), se convierte automáticamente a mp3 al publicar.
