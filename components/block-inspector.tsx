@@ -134,7 +134,7 @@ export function BlockInspector({
         <p className="text-sm font-semibold text-foreground">{def?.label}</p>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto bg-sidebar/40 p-4">
+      <div className="thin-scroll flex-1 space-y-6 overflow-y-auto bg-sidebar/40 p-4">
         {block.type === "hero" && (
           <HeroFields data={block.data as HeroData} onChange={update} blobRegistry={blobRegistry} />
         )}
@@ -392,7 +392,7 @@ export function ImageUploader({
   //   · Badge "Acomodar"   → abre el editor de encuadre (solo si ya hay imagen).
   // El tamaño lo define tileClassName (si se pasa) o, por defecto, el alto
   // heightClass con el ancho saliendo del aspecto.
-  const boxSize = compact ? "size-20" : tileClassName ?? heightClass
+  const boxSize = compact ? "size-28" : tileClassName ?? heightClass
   const boxStyle = compact || tileClassName ? undefined : { aspectRatio: String(aspect) }
 
   return (
@@ -615,10 +615,12 @@ function AudioUploader({
           className="hidden"
           aria-label="Subir audio"
         />
-        {/* Columna a la derecha de la imagen, del mismo alto (size-20 = h-20):
+        {/* Columna a la derecha de la imagen, del mismo alto (size-28 = h-28):
             arriba el recuadro para subir/cambiar el audio, abajo el botón de
-            reproducir junto a la duración del archivo. */}
-        <div className="flex h-20 flex-col gap-1.5">
+            reproducir junto a la duración del archivo. Al agrandar la imagen la
+            columna se hace más angosta, así el botón ▶ · nombre · duración
+            quedan más juntos (antes sobraba espacio entre ellos). */}
+        <div className="flex h-28 flex-col gap-1.5">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -1121,7 +1123,7 @@ function SingleFields({
           value={data.description || ""}
           onChange={(v) => onChange({ ...data, description: v })}
           minRows={3}
-          maxLength={800}
+          maxLength={2000}
           placeholder="Cuenta la historia detrás de esta canción: en qué te inspiraste, dónde la grabaste..."
         />
       </Field>
@@ -1539,7 +1541,7 @@ function TracksFields({
                         value={track.description || ""}
                         onChange={(v) => setTrack(activeAlbumIndex, trackIndex, "description", v)}
                         minRows={2}
-                        maxLength={600}
+                        maxLength={2000}
                         placeholder="Descripción (opcional): en qué te inspiraste, qué significa esta canción..."
                       />
                     </>
@@ -1634,7 +1636,7 @@ function AlbumCoverAndDescription({
           value={descriptions[descIndex] || ""}
           onChange={(v) => setActiveDescription(v)}
           minRows={3}
-          maxLength={700}
+          maxLength={1200}
           placeholder={ALBUM_DESCRIPTION_PLACEHOLDERS[descIndex]}
         />
       </div>
