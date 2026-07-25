@@ -50,7 +50,7 @@ export function CrowdfundingBlock({ data }: { data: CrowdfundingData }) {
       </h3>
 
       {data.description && (
-        <p className="mt-1.5 text-sm text-muted-foreground">{data.description}</p>
+        <p className="mt-1.5 whitespace-pre-line text-sm text-muted-foreground">{data.description}</p>
       )}
 
       {data.chosenStudio && (

@@ -223,7 +223,7 @@ function MilestoneCard({ milestone, index }: { milestone: LegadoMilestone; index
           <h3 className="font-display text-lg font-bold leading-snug text-foreground sm:text-xl">
             {milestone.title}
           </h3>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{milestone.description}</p>
+          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{milestone.description}</p>
         </div>
       </div>
     </DepthCard>

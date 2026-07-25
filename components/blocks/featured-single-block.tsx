@@ -36,6 +36,51 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
     if (isCurrent) audioEngine.seek(value);
   };
 
+  // Controles (reproducir + barra de progreso). En móvil se renderizan DEBAJO
+  // del disco y a todo el ancho de la tarjeta: al costado del título la barra
+  // quedaba tan angosta que era imposible buscar un momento exacto de la
+  // canción. En escritorio siguen en su lugar, dentro de la columna del texto.
+  const controls = (compact: boolean) => (
+    <div className={`flex items-center gap-2.5 ${compact ? "mt-3 w-full" : "mt-2"}`}>
+      <button
+        type="button"
+        onClick={togglePlay}
+        aria-label={isPlaying ? t("single_pause_aria") : t("single_play_aria")}
+        className={`flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_55%,transparent)] transition-opacity hover:opacity-90 ${
+          compact ? "size-11" : "size-9"
+        }`}
+      >
+        {isPlaying ? (
+          <Pause className={compact ? "size-5 fill-primary-foreground" : "size-4 fill-primary-foreground"} />
+        ) : (
+          <Play className={compact ? "ml-0.5 size-5 fill-primary-foreground" : "ml-0.5 size-4 fill-primary-foreground"} />
+        )}
+      </button>
+
+      <span className="w-8 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+        {formatTime(currentTime)}
+      </span>
+
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step={0.1}
+        value={Math.min(currentTime, duration || 0)}
+        disabled={!duration}
+        onChange={(e) => seek(Number(e.target.value))}
+        aria-label={t("track_seek_aria")}
+        className={`w-full flex-1 cursor-pointer appearance-none rounded-full bg-border accent-primary disabled:cursor-not-allowed ${
+          compact ? "h-1.5" : "h-1"
+        }`}
+      />
+
+      <span className="w-8 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+        {formatTime(duration)}
+      </span>
+    </div>
+  );
+
   if (!hasAudio) {
     return (
       <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
@@ -122,42 +167,14 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
             )}
           </div>
 
-          <div className="mt-2 flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={togglePlay}
-              aria-label={isPlaying ? t("single_pause_aria") : t("single_play_aria")}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_55%,transparent)] transition-opacity hover:opacity-90"
-            >
-              {isPlaying ? (
-                <Pause className="size-4 fill-primary-foreground" />
-              ) : (
-                <Play className="ml-0.5 size-4 fill-primary-foreground" />
-              )}
-            </button>
-
-            <span className="w-8 shrink-0 text-[11px] tabular-nums text-muted-foreground">
-              {formatTime(currentTime)}
-            </span>
-
-            <input
-              type="range"
-              min={0}
-              max={duration || 0}
-              step={0.1}
-              value={Math.min(currentTime, duration || 0)}
-              disabled={!duration}
-              onChange={(e) => seek(Number(e.target.value))}
-              aria-label={t("track_seek_aria")}
-              className="h-1 w-full flex-1 cursor-pointer appearance-none rounded-full bg-border accent-primary disabled:cursor-not-allowed"
-            />
-
-            <span className="w-8 shrink-0 text-[11px] tabular-nums text-muted-foreground">
-              {formatTime(duration)}
-            </span>
-          </div>
+          {/* Escritorio: los controles van acá, junto al título. */}
+          <div className="hidden sm:block">{controls(false)}</div>
         </div>
       </div>
+
+      {/* Móvil: los controles ocupan toda la fila de abajo, con el botón y la
+          barra más grandes para poder buscar cómodamente dentro de la pista. */}
+      <div className="sm:hidden">{controls(true)}</div>
     </div>
   );
 }

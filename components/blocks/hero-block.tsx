@@ -156,15 +156,18 @@ export function HeroBlock({
           mediante `order-*`: foto → nombre → línea única de acciones → bio →
           redes. */}
       <div className="relative px-6 pb-6 sm:px-8 sm:pb-8">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1fr_auto_1fr] sm:items-start sm:gap-8">
+        {/* En móvil las tres secciones (identidad → roles → redes) van casi
+            pegadas (gap-2) para no gastar altura: los roles y las redes usan
+            el mismo tamaño de letra que la ubicación y el nombre real. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-start sm:gap-8">
           {/* Columna izquierda — Contactar (desktop) + biografía corta.
               En móvil el botón de Contactar vive en la línea única de
               acciones de la columna central, no acá (se oculta con `hidden`
               para no duplicarlo). */}
-          <div className="order-2 flex flex-col items-center gap-3 sm:order-1 sm:items-start">
+          <div className="order-2 flex flex-col items-center gap-2 sm:order-1 sm:items-start sm:gap-3">
             <div className="hidden sm:block">{contactButton(false)}</div>
             {data.tagline && (
-              <p className="line-clamp-3 max-w-xs text-pretty text-center text-sm leading-relaxed text-muted-foreground sm:text-left">
+              <p className="line-clamp-3 max-w-xs text-pretty text-center text-[11px] leading-relaxed text-muted-foreground sm:text-left sm:text-sm">
                 {data.tagline}
               </p>
             )}
@@ -205,11 +208,11 @@ export function HeroBlock({
           {/* Columna derecha — Compartir (desktop) y redes. En móvil el
               botón de Compartir vive en la línea única de acciones de la
               columna central (se oculta acá para no duplicarlo). */}
-          <div className="order-3 flex flex-col items-center gap-3 sm:items-end">
+          <div className="order-3 flex flex-col items-center gap-2 sm:items-end sm:gap-3">
             <div className="hidden sm:block">{shareButton(false)}</div>
 
             {socials.length > 0 && (
-              <nav aria-label={t("hero_social_aria")} className="flex flex-nowrap items-center justify-center gap-2 sm:flex-wrap sm:justify-end">
+              <nav aria-label={t("hero_social_aria")} className="flex flex-nowrap items-center justify-center gap-1.5 sm:flex-wrap sm:justify-end sm:gap-2">
                 {socials.map((social, i) => {
                   const Icon = socialIcons[social.platform] ?? Music2
                   const label = social.label || SOCIAL_PLATFORM_LABELS[social.platform]
@@ -220,9 +223,9 @@ export function HeroBlock({
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={label}
-                      className="inline-flex size-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-background/60 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs"
+                      className="inline-flex size-7 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-background/60 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-xs"
                     >
-                      <Icon className="size-4 sm:size-3.5" />
+                      <Icon className="size-3.5" />
                       <span className="hidden sm:inline">{label}</span>
                     </a>
                   )

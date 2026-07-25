@@ -333,7 +333,7 @@ export function MediaViewer({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className="text-sm leading-snug text-white drop-shadow"
+              className="max-h-48 overflow-y-auto whitespace-pre-line text-sm leading-snug text-white drop-shadow scrollbar-thin"
             >
               {current.caption}
             </motion.p>

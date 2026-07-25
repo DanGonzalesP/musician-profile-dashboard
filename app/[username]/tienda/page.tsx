@@ -365,7 +365,7 @@ function ServiceCard({ service }: { service: CatalogService }) {
       <p className="text-lg font-semibold">{service.title || "Servicio"}</p>
 
       {service.description && (
-        <p className="text-sm leading-relaxed text-muted-foreground">{service.description}</p>
+        <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{service.description}</p>
       )}
 
       {(service.features?.length ?? 0) > 0 && (

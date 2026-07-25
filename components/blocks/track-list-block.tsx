@@ -52,6 +52,11 @@ function AlbumCover({
 
 const ALBUM_ITEM_WIDTH = 192 // w-48
 const ALBUM_ITEM_GAP = 12 // gap-3
+const ALBUM_STEP = ALBUM_ITEM_WIDTH + ALBUM_ITEM_GAP
+// Velocidad del auto-avance (px por frame, ~60fps) y suavidad con la que el
+// carrusel viaja hasta el álbum que se acaba de abrir.
+const CAROUSEL_AUTO_SPEED = 0.5
+const CAROUSEL_EASE = 0.16
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return "0:00"
@@ -65,15 +70,21 @@ const ALBUM_DESCRIPTION_ROTATE_MS = 6000
 function AlbumDescriptionCarousel({ descriptions }: { descriptions: string[] }) {
   const { t } = useLocale()
   const [index, setIndex] = useState(0)
+  // Se depende del CONTENIDO, no del array: el padre arma la lista en cada
+  // render (y re-renderiza en cada tick del audio), así que con `descriptions`
+  // como dependencia el temporizador se reiniciaba sin parar y el carrusel
+  // nunca alcanzaba a rotar mientras sonaba una pista.
+  const descriptionsKey = descriptions.join("|")
+  const total = descriptions.length
 
   useEffect(() => {
     setIndex(0)
-    if (descriptions.length <= 1) return
+    if (total <= 1) return
     const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % descriptions.length)
+      setIndex((prev) => (prev + 1) % total)
     }, ALBUM_DESCRIPTION_ROTATE_MS)
     return () => clearInterval(interval)
-  }, [descriptions])
+  }, [descriptionsKey, total])
 
   if (descriptions.length === 0) return null
 
@@ -82,7 +93,7 @@ function AlbumDescriptionCarousel({ descriptions }: { descriptions: string[] }) 
       <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {t("album_about_title")}
       </p>
-      <p key={index} className="animate-fade-in text-xs leading-relaxed text-muted-foreground">
+      <p key={index} className="animate-fade-in whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
         {descriptions[index]}
       </p>
       {descriptions.length > 1 && (
@@ -158,6 +169,123 @@ export function TrackListBlock({
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const switchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const slideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ─── Carrusel de portadas ────────────────────────────────────────────────
+  // Todo el movimiento vive en el scroll nativo del contenedor (no en un
+  // transform): así el loop es de verdad infinito incluso arrastrando con el
+  // dedo — al pasar de un juego de copias, la posición salta un juego exacto
+  // hacia atrás y, como las copias son idénticas, el salto es invisible.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  // Destino del desplazamiento suave (al abrir un álbum). Mientras hay
+  // destino pendiente NO se re-encuadra el loop, para que el viaje no se
+  // corte a mitad de camino.
+  const scrollTargetRef = useRef<number | null>(null)
+  const [viewportWidth, setViewportWidth] = useState(0)
+  const [isNarrow, setIsNarrow] = useState(false)
+
+  const singleSetWidth = albums.length * ALBUM_STEP
+  // Copias necesarias para que siempre haya un juego completo de margen a cada
+  // lado de la ventana visible (mínimo para que el loop no choque con ningún
+  // borde en ninguna dirección).
+  // (+24 por el padding horizontal y el gap que se pierde al final del track:
+  // así el recorrido scrolleable siempre supera los 2 juegos que necesita la
+  // banda del loop, incluso con un solo álbum en una pantalla ancha.)
+  const repeatCount = Math.max(3, Math.ceil((viewportWidth + 24) / Math.max(singleSetWidth, 1)) + 2)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const measure = () => {
+      setViewportWidth(el.clientWidth)
+      setIsNarrow(window.matchMedia("(max-width: 639px)").matches)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [albums.length])
+
+  // Deja la posición dentro de la banda [1 juego, 2 juegos): así siempre queda
+  // contenido para arrastrar hacia los dos lados.
+  function normalizeLoop() {
+    const el = scrollRef.current
+    if (!el || singleSetWidth <= 0) return
+    if (scrollTargetRef.current !== null) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    if (maxScroll < singleSetWidth * 2) return
+    let pos = el.scrollLeft
+    while (pos >= singleSetWidth * 2) pos -= singleSetWidth
+    while (pos < singleSetWidth) pos += singleSetWidth
+    if (Math.abs(pos - el.scrollLeft) > 0.5) el.scrollLeft = pos
+  }
+
+  // Posición inicial: un juego completo adentro, para poder arrastrar hacia
+  // atrás desde el primer momento.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || singleSetWidth <= 0) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    if (maxScroll < singleSetWidth * 2) return
+    el.scrollLeft = singleSetWidth
+  }, [singleSetWidth, repeatCount])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let raf = 0
+    const tick = () => {
+      raf = requestAnimationFrame(tick)
+      const target = scrollTargetRef.current
+      if (target !== null) {
+        const diff = target - el.scrollLeft
+        if (Math.abs(diff) < 1.2) {
+          el.scrollLeft = target
+          scrollTargetRef.current = null
+          normalizeLoop()
+        } else {
+          // Paso mínimo de 1px: si el navegador redondea scrollLeft a
+          // enteros, un paso más chico se perdería y el viaje quedaría
+          // trabado a pocos píxeles del destino.
+          const step = diff * CAROUSEL_EASE
+          el.scrollLeft += Math.abs(step) < 1 ? Math.sign(step) : step
+        }
+        return
+      }
+      if (carouselPaused || selectedAlbum !== null) return
+      el.scrollLeft += CAROUSEL_AUTO_SPEED
+      // Red de seguridad para el caso degenerado en el que no hay recorrido
+      // para la banda del loop (pocos álbumes en una pantalla muy ancha):
+      // al llegar al final vuelve al inicio en vez de quedarse trabado.
+      if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 0.5) el.scrollLeft = 0
+      normalizeLoop()
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carouselPaused, selectedAlbum, singleSetWidth])
+
+  // Lleva el álbum elegido a su lugar: centrado en móvil (pedido explícito
+  // para que el disco no quede pegado al borde) y a la izquierda en
+  // escritorio. Viaja a la copia más cercana, así se mueve lo mínimo.
+  function scrollAlbumIntoView(index: number) {
+    const el = scrollRef.current
+    if (!el || singleSetWidth <= 0) return
+    const centerOffset = isNarrow ? Math.max(0, (el.clientWidth - ALBUM_ITEM_WIDTH) / 2) : 0
+    // Dónde arranca la primera portada dentro del contenido (el px-1 del
+    // contenedor): sin esto el encuadre queda corrido por ese padding.
+    const first = el.firstElementChild?.firstElementChild as HTMLElement | null
+    const trackOffset = first
+      ? first.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft
+      : 0
+    const copy = Math.round(
+      (el.scrollLeft + centerOffset - trackOffset - index * ALBUM_STEP) / singleSetWidth
+    )
+    let target = trackOffset + (copy * albums.length + index) * ALBUM_STEP - centerOffset
+    const maxScroll = el.scrollWidth - el.clientWidth
+    while (target > maxScroll) target -= singleSetWidth
+    while (target < 0) target += singleSetWidth
+    scrollTargetRef.current = Math.min(Math.max(target, 0), maxScroll)
+  }
 
   // Detiene el motor solo si lo que suena ahora mismo pertenece a este bloque
   // — nunca corta la reproducción de otra superficie (feed, otro bloque).
@@ -247,6 +375,7 @@ export function TrackListBlock({
       setIsClosingPanel(true)
       switchTimeoutRef.current = setTimeout(() => {
         setSelectedAlbum(index)
+        scrollAlbumIntoView(index)
         slideTimeoutRef.current = setTimeout(() => {
           setIsClosingPanel(false)
           dropVinylFor(index)
@@ -256,6 +385,7 @@ export function TrackListBlock({
     }
 
     setSelectedAlbum(index)
+    scrollAlbumIntoView(index)
     slideTimeoutRef.current = setTimeout(() => dropVinylFor(index), 500)
   }
 
@@ -313,6 +443,12 @@ export function TrackListBlock({
   const currentTime = isActiveLoaded ? engine.currentTime : 0
   const duration = isActiveLoaded ? engine.duration : 0
 
+  // Si el motor global pasó a sonar algo que NO es de este bloque (un
+  // lanzamiento actual / single, u otra superficie), las descripciones
+  // desplegadas —la de la pista y la del álbum— se guardan: el disco sigue
+  // puesto, pero el texto deja de robar pantalla mientras se escucha otra cosa.
+  const otherSourcePlaying = engine.url != null && engine.url !== loadedUrlRef.current
+
   if (albums.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center text-sm text-muted-foreground">
@@ -321,16 +457,10 @@ export function TrackListBlock({
     )
   }
 
-  // Con pocos álbumes, una sola copia puede ser más angosta que el
-  // contenedor: al desplazar -50% del ancho total, la ventana visible queda
-  // parcialmente fuera del track y se ve "vacío". Se repite la lista las
-  // veces necesarias para que un solo set siempre cubra un ancho generoso,
-  // y se traslada por -(100/repeticiones)% en vez de un -50% fijo.
-  const singleSetWidth = albums.length * (ALBUM_ITEM_WIDTH + ALBUM_ITEM_GAP)
-  const repeatCount = Math.max(2, Math.ceil(1600 / Math.max(singleSetWidth, 1)) + 1)
+  // La lista se repite `repeatCount` veces (ver arriba): un juego completo de
+  // margen a cada lado de la ventana visible es lo que permite el loop sin
+  // costuras en ambas direcciones.
   const loopAlbums = Array.from({ length: repeatCount }, () => albums).flat()
-  const marqueeShiftPercent = 100 / repeatCount
-  const cycleSeconds = Math.max(albums.length * 4, 8)
 
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
@@ -338,34 +468,27 @@ export function TrackListBlock({
         {t("discography_title")}
       </div>
 
-      {/* Carrusel infinito de álbumes — overflow-x-auto (en vez de hidden) para
-          que, igual que el de Créditos, también se pueda arrastrar/deslizar
-          con el dedo o el mouse; se pausa la animación/auto-avance mientras
-          se interactúa, igual que ya hacía con el hover en escritorio. */}
+      {/* Carrusel infinito de álbumes — el movimiento es scroll nativo, así se
+          puede arrastrar/deslizar con el dedo o el mouse SIN llegar nunca a un
+          borde: al pasar de un juego de copias la posición vuelve un juego
+          atrás y, como son idénticas, no se ve ningún salto. El auto-avance se
+          pausa mientras se interactúa (y mientras hay un álbum abierto). */}
       <div
+        ref={scrollRef}
         className="-mx-1 overflow-x-auto px-1 pb-2 [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: "none" }}
+        onScroll={normalizeLoop}
         onMouseEnter={() => setCarouselPaused(true)}
         onMouseLeave={() => setCarouselPaused(false)}
-        onPointerDown={pauseCarouselBriefly}
+        onPointerDown={() => {
+          // Un arrastre manda: cancela el viaje suave en curso.
+          scrollTargetRef.current = null
+          pauseCarouselBriefly()
+        }}
         onTouchStart={pauseCarouselBriefly}
+        onWheel={pauseCarouselBriefly}
       >
-        <div
-          className={`flex w-max gap-3 ${selectedAlbum === null ? "animate-marquee" : ""}`}
-          style={
-            selectedAlbum === null
-              ? ({
-                  animationDuration: `${cycleSeconds}s`,
-                  animationPlayState: carouselPaused ? "paused" : "running",
-                  animationDirection: "reverse",
-                  "--marquee-shift": `${marqueeShiftPercent}%`,
-                } as React.CSSProperties)
-              : {
-                  transform: `translateX(-${selectedAlbum * (ALBUM_ITEM_WIDTH + ALBUM_ITEM_GAP)}px)`,
-                  transition: "transform 500ms ease",
-                }
-          }
-        >
+        <div className="flex w-max gap-3">
           {loopAlbums.map((album, i) => (
             <AlbumCover
               key={`${album.id}-${i}`}
@@ -382,8 +505,10 @@ export function TrackListBlock({
         <div className="mt-4 rounded-lg border border-border bg-background/40 p-4">
           <div className="flex flex-col gap-4 sm:flex-row">
             {/* El vinilo mide exactamente lo mismo que la portada en el carrusel (w-48 = 192px):
-                solo él se desliza al abrir/cambiar de álbum, el panel no se mueve. */}
-            <div className="flex w-48 shrink-0 items-center justify-center overflow-hidden">
+                solo él se desliza al abrir/cambiar de álbum, el panel no se mueve.
+                En móvil queda CENTRADO (mx-auto) igual que el álbum en el
+                carrusel; en escritorio sigue a la izquierda de las pistas. */}
+            <div className="mx-auto flex w-48 shrink-0 items-center justify-center overflow-hidden sm:mx-0">
               <div
                 className={`aspect-square w-48 shrink-0 overflow-hidden rounded-full shadow-2xl ${
                   isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
@@ -502,8 +627,8 @@ export function TrackListBlock({
                 </span>
               </div>
 
-              {activeTrack.description && (
-                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              {activeTrack.description && !otherSourcePlaying && (
+                <p className="mt-3 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
                   <TypewriterText key={`${panelAlbumIndex}-${currentTrackIndex}`} text={activeTrack.description} />
                 </p>
               )}
@@ -511,7 +636,9 @@ export function TrackListBlock({
           )}
 
           <AlbumDescriptionCarousel
-            descriptions={(activeAlbum.descriptions || []).map((d) => d.trim()).filter(Boolean)}
+            descriptions={
+              otherSourcePlaying ? [] : (activeAlbum.descriptions || []).map((d) => d.trim()).filter(Boolean)
+            }
           />
         </div>
       )}
