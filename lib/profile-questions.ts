@@ -57,21 +57,15 @@ export async function createProfileQuestion(params: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Inicia sesión para preguntarle al artista.")
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("user_id", user.id)
-    .eq("profile_type", "artist")
-    .maybeSingle()
-  const askerDisplayName =
-    profile?.display_name?.trim() || user.email?.split("@")[0] || "Alguien de la comunidad"
-
+  // asker_display_name lo escribe un TRIGGER en la base a partir del perfil
+  // real de quien pregunta (ver 0004_lock_remaining_rls.sql). Antes lo mandaba
+  // el cliente, así que se podía firmar una pregunta con el nombre de otro
+  // artista: RLS solo validaba asker_user_id, nunca el nombre mostrado.
   const { data, error } = await supabase
     .from("profile_questions")
     .insert({
       profile_id: params.profileId,
       asker_user_id: user.id,
-      asker_display_name: askerDisplayName,
       block_type: params.blockType,
       block_label: params.blockLabel,
       message: clean,

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { PROFILE_ID, normalizeBlockData, getSongOptions, type HeroData, type TracksData } from "@/lib/blocks";
+import { normalizeBlockData, getSongOptions, type HeroData, type TracksData } from "@/lib/blocks";
 import { fetchLegalSettings, saveLegalSettings, emptyLegalSettings, type LegalSettings } from "@/lib/legal-settings";
 import LayoutAdmin from "@/components/LayoutAdmin";
 import { LicenseTool } from "@/components/legal/license-tool";
@@ -42,7 +42,14 @@ export default function HerramientasLegalesPage() {
         return;
       }
 
-      const id = profile?.id ?? PROFILE_ID;
+      // Sin fila de perfil no se sigue: antes se caía al perfil semilla
+      // PROFILE_ID, un buzón compartido entre cuentas (ver AUDITORIA.md 9).
+      if (!profile) {
+        setErrorMensaje("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.");
+        setLoading(false);
+        return;
+      }
+      const id = profile.id;
       setProfileId(id);
 
       try {

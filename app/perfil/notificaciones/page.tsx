@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { PROFILE_ID } from "@/lib/blocks";
 import { fetchIncomingCreditRequests, resolveCreditRequest, type CreditRequest } from "@/lib/credit-requests";
 import { fetchIncomingQuestions, markQuestionRead, type ProfileQuestion } from "@/lib/profile-questions";
 import LayoutAdmin from "@/components/LayoutAdmin";
@@ -47,7 +46,14 @@ export default function NotificacionesPage() {
         return;
       }
 
-      const profileId = profile?.id ?? PROFILE_ID;
+      // Sin fila de perfil no se sigue: antes se caía al perfil semilla
+      // PROFILE_ID, un buzón compartido entre cuentas (ver AUDITORIA.md 9).
+      if (!profile) {
+        setErrorMessage("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.");
+        setLoading(false);
+        return;
+      }
+      const profileId = profile.id;
 
       try {
         const [foundRequests, foundQuestions] = await Promise.all([

@@ -1,8 +1,8 @@
 "use client"
 
 import { Suspense, useState, useEffect, useRef } from "react"
-import { useSearchParams } from "next/navigation"
-import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, defaultData, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID, SINGLETON_BLOCK_TYPES } from "@/lib/blocks"
+import { useRouter, useSearchParams } from "next/navigation"
+import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, defaultData, isKnownBlockType, mergePublicacionesEmbeds, SINGLETON_BLOCK_TYPES } from "@/lib/blocks"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog"
 import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
@@ -13,6 +13,8 @@ import { Layers, LogOut, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { authedFetch } from "@/lib/authed-fetch"
 import { sanitizeUrlFields } from "@/lib/safe-url"
+import { fetchDraft, saveDraft, clearDraft } from "@/lib/draft"
+import { ensureOwnProfile } from "@/lib/ensure-profile"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE, type AudioBitrate } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
@@ -157,10 +159,14 @@ async function compressImage(file: File): Promise<File> {
 async function uploadFileToStorage(file: File, folder: "images" | "audio"): Promise<string> {
   const uploadFile = folder === "images" ? await compressImage(file) : file
   const ext = (uploadFile.name.split(".").pop() ?? "bin").toLowerCase()
+  // Se usa || y no ?? a propósito: file.type puede venir como cadena VACÍA
+  // (el navegador no reconoció el archivo), y "" es un valor que ?? deja
+  // pasar. /api/upload-url ahora exige un content type multimedia válido, así
+  // que una cadena vacía haría fallar la subida con 400.
   const contentType =
     folder === "audio"
-      ? AUDIO_MIME_TYPES[ext] ?? "audio/mpeg"
-      : IMAGE_MIME_TYPES[ext] ?? uploadFile.type ?? "image/webp"
+      ? AUDIO_MIME_TYPES[ext] || "audio/mpeg"
+      : IMAGE_MIME_TYPES[ext] || uploadFile.type || "image/webp"
 
   const uploadBody =
     uploadFile.type === contentType ? uploadFile : new File([uploadFile], uploadFile.name, { type: contentType })
@@ -168,7 +174,7 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
   const presignRes = await authedFetch("/api/upload-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ folder, extension: ext, contentType }),
+    body: JSON.stringify({ folder, extension: ext, contentType, bytes: uploadFile.size }),
   })
   if (!presignRes.ok) {
     const body = await presignRes.json().catch(() => ({}))
@@ -280,6 +286,7 @@ export function ProfileEditor() {
 function ProfileEditorInner() {
   const { showToast } = useToast()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [blocks, setBlocks] = useState<Block[]>([])
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [services, setServices] = useState<CatalogService[]>([])
@@ -333,19 +340,25 @@ function ProfileEditorInner() {
     async function loadSavedBlocks() {
       try {
         // profile_blocks/products/services están indexados por el id real de
-        // la fila `profiles`. Se busca primero por el usuario autenticado y,
-        // si no tiene perfil propio todavía, se usa el perfil semilla
-        // PROFILE_ID como fallback — así cada cuenta guarda y recupera lo suyo.
+        // la fila `profiles`, resuelta a partir del usuario autenticado.
+        //
+        // Antes, sin sesión se caía al perfil semilla PROFILE_ID: eso hacía
+        // que cualquier visitante anónimo de /dashboard editara —y pisara—
+        // un perfil compartido. Ahora sin sesión se manda a /login, y si la
+        // cuenta todavía no tiene fila, ensureOwnProfile se la crea.
         const { data: { user } } = await supabase.auth.getUser()
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, display_name")
-          .eq("user_id", user?.id ?? PROFILE_ID)
-          .maybeSingle()
+        if (!user) {
+          router.replace("/login")
+          return
+        }
 
-        if (profileError) throw profileError
+        const ownProfile = await ensureOwnProfile(user)
+        if (!ownProfile) {
+          throw new Error("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.")
+        }
+        const profile = { id: ownProfile.id, display_name: ownProfile.displayName }
 
-        let profileId = profile?.id ?? PROFILE_ID
+        let profileId = profile.id
         let isBand = false
         let effectiveDisplayName = profile?.display_name ?? ""
         let role: BandRole = "owner"
@@ -388,20 +401,12 @@ function ProfileEditorInner() {
         }
 
         // El borrador se consulta en una llamada aparte: si falla (ej. la
-        // migración de draft_content todavía no corrió en Supabase) no debe
+        // migración de profile_private todavía no corrió en Supabase) no debe
         // tumbar la carga de lo ya publicado — solo se ignora el borrador.
-        let draft: { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] } | null = null
+        type EditorDraft = { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] }
+        let draft: EditorDraft | null = null
         if (profile || isBand) {
-          const { data: draftRow, error: draftError } = await supabase
-            .from("profiles")
-            .select("draft_content")
-            .eq("id", profileId)
-            .maybeSingle()
-          if (draftError) {
-            console.error("No se pudo leer el borrador (¿falta la migración draft_content?):", draftError)
-          } else {
-            draft = draftRow?.draft_content ?? null
-          }
+          draft = (await fetchDraft(profileId)) as EditorDraft | null
         }
 
         if (draft) {
@@ -497,10 +502,11 @@ function ProfileEditorInner() {
       const sanitizedServices = services.map(
         (s) => stripDeadBlobUrls(s as unknown as Record<string, unknown>) as unknown as CatalogService
       )
-      const { error } = await supabase
-        .from("profiles")
-        .update({ draft_content: { blocks: sanitizedBlocks, products: sanitizedProducts, services: sanitizedServices } })
-        .eq("id", profileId)
+      const { error } = await saveDraft(profileId, {
+        blocks: sanitizedBlocks,
+        products: sanitizedProducts,
+        services: sanitizedServices,
+      })
       if (error) console.error("[autosave] Error guardando borrador:", error)
     }, 1500)
 
@@ -604,6 +610,9 @@ function ProfileEditorInner() {
         profileId = profileIdRef.current
       } else {
         const { data: { user } } = await supabase.auth.getUser()
+        // Publicar exige sesión: sin ella no hay perfil propio sobre el que
+        // escribir (antes se caía al perfil semilla compartido PROFILE_ID).
+        if (!user) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión para publicar.")
 
         // No pisar el nombre/bio reales: si el perfil ya existe, se conservan
         // tal cual. Solo en la primera publicación (perfil nuevo) se usa un
@@ -611,14 +620,14 @@ function ProfileEditorInner() {
         const { data: existingProfile } = await supabase
           .from("profiles")
           .select("display_name, bio")
-          .eq("user_id", user?.id ?? PROFILE_ID)
+          .eq("user_id", user.id)
           .maybeSingle()
 
         const fallbackName =
-          user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || ""
+          user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || ""
 
         const profilePayload = {
-          user_id: user?.id ?? PROFILE_ID,
+          user_id: user.id,
           display_name: existingProfile?.display_name || fallbackName,
           bio: existingProfile?.bio || "",
         }
@@ -752,10 +761,7 @@ function ProfileEditorInner() {
       skipNextAutosaveRef.current = true
       let clearDraftError: { message: string } | null = null
       for (let attempt = 0; attempt < 3; attempt++) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ draft_content: null })
-          .eq("id", profileId)
+        const { error } = await clearDraft(profileId)
         clearDraftError = error
         if (!error) break
         await new Promise((resolve) => setTimeout(resolve, 500))

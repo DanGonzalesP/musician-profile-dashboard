@@ -27,7 +27,7 @@ export async function uploadImageNow(file: File): Promise<string> {
   const presignRes = await authedFetch("/api/upload-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ folder: "images", extension: ext, contentType }),
+    body: JSON.stringify({ folder: "images", extension: ext, contentType, bytes: uploadFile.size }),
   })
   if (!presignRes.ok) {
     const body = await presignRes.json().catch(() => ({}))

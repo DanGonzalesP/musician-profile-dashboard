@@ -69,18 +69,13 @@ export async function addPostComment(postId: string, content: string): Promise<P
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Inicia sesión para comentar.")
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("user_id", user.id)
-    .eq("profile_type", "artist")
-    .maybeSingle()
-  const authorName =
-    profile?.display_name?.trim() || user.email?.split("@")[0] || "Alguien de la comunidad"
-
+  // author_name lo escribe un TRIGGER en la base a partir del perfil real de
+  // quien comenta (ver 0004_lock_remaining_rls.sql). Antes lo mandaba el
+  // cliente, así que cualquiera podía firmar un comentario con el nombre de
+  // otro artista: RLS solo validaba user_id, nunca el nombre mostrado.
   const { data, error } = await supabase
     .from("feed_post_comments")
-    .insert({ post_id: postId, user_id: user.id, author_name: authorName, content: clean })
+    .insert({ post_id: postId, user_id: user.id, content: clean })
     .select("id, post_id, user_id, author_name, content, created_at")
     .single()
 

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { PROFILE_ID } from "@/lib/blocks";
 import {
   FeedTrack, 
   fetchMusicFeed, 
@@ -45,7 +44,10 @@ export default function MusicFeedForm() {
 
         if (profileError) throw profileError;
 
-        const resolvedProfileId = profile?.id ?? PROFILE_ID;
+        // Sin fila de perfil no se sigue: antes se caía al perfil semilla
+        // PROFILE_ID, un buzón compartido entre cuentas (ver AUDITORIA.md 9).
+        if (!profile) throw new Error("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.");
+        const resolvedProfileId = profile.id;
         setProfileId(resolvedProfileId);
         setDisplayName(profile?.display_name ?? "");
 

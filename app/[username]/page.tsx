@@ -48,9 +48,12 @@ function PerfilPublicoContent() {
   const [shareUrl, setShareUrl] = useState("");
   const [unifiedProfile, setUnifiedProfile] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("main");
-  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
+  // Ids de los perfiles que el visitante administra (el suyo y sus bandas).
+  // Se usa para saber si está mirando su propia página sin tener que exponer
+  // el user_id del dueño en una consulta pública.
+  const [viewerProfileIds, setViewerProfileIds] = useState<string[]>([]);
   const [isBand, setIsBand] = useState(false);
   const [profileAccent, setProfileAccent] = useState<AccentColor>("rojo");
 
@@ -59,8 +62,21 @@ function PerfilPublicoContent() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setViewerUserId(data.user?.id ?? null);
+    supabase.auth.getUser().then(async ({ data }) => {
+      const user = data.user;
+      setViewerUserId(user?.id ?? null);
+      if (!user) {
+        setViewerProfileIds([]);
+        return;
+      }
+      // Un usuario autenticado SÍ puede leer user_id/owner_user_id, así que
+      // resuelve del lado del visitante qué perfiles le pertenecen. Sin
+      // sesión esta consulta ni siquiera se lanza.
+      const { data: own } = await supabase
+        .from("profiles")
+        .select("id")
+        .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`);
+      setViewerProfileIds((own ?? []).map((row) => row.id as string));
     });
   }, []);
 
@@ -82,9 +98,13 @@ function PerfilPublicoContent() {
         // "nova-reyes" → "nova reyes"
         const displayNameSlug = username.replaceAll("-", " ");
 
+        // No se pide user_id: `profiles` ya no se lo entrega al rol anon (ver
+        // 0003_profile_private.sql). Para saber si quien mira es el dueño se
+        // compara contra SU PROPIO perfil, más abajo — así no hace falta
+        // exponer el user_id de nadie en una página pública.
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id, unified_profile, user_id, profile_type")
+          .select("id, unified_profile, profile_type")
           .ilike("display_name", displayNameSlug)
           .maybeSingle();
 
@@ -101,7 +121,6 @@ function PerfilPublicoContent() {
         }
 
         setUnifiedProfile(Boolean(profile.unified_profile));
-        setOwnerUserId(profile.user_id ?? null);
         setProfileId(profile.id);
         setIsBand(profile.profile_type === "band");
 
@@ -172,7 +191,7 @@ function PerfilPublicoContent() {
   // Solo el dueño del perfil lo ve — cierra el loop que abre "Vista previa"
   // en el editor: esa vista abre esta misma página pública en una pestaña
   // nueva, y hasta ahora no había forma de volver al panel desde ahí.
-  const isOwner = Boolean(ownerUserId && viewerUserId && ownerUserId === viewerUserId);
+  const isOwner = Boolean(profileId && viewerProfileIds.includes(profileId));
 
   // Si es el propio artista viendo su portal público (ej. desde "Vista
   // previa" del editor), la flecha vuelve a su panel de edición en vez del

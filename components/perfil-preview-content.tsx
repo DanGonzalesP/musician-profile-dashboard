@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { type Block, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds, PROFILE_ID } from "@/lib/blocks";
+import { type Block, type TracksData, type CreditsData, createBlock, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
+import { fetchDraft } from "@/lib/draft";
 import { ArrowLeft } from "lucide-react";
 
 type LoadingState = "loading" | "error" | "success";
@@ -37,27 +38,24 @@ export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean 
           return;
         }
 
-        // Misma resolución que el editor: perfil real del usuario, con
-        // PROFILE_ID como respaldo si todavía no tiene fila propia.
+        // Misma resolución que el editor: el perfil real del usuario. Sin
+        // fila propia no hay borrador que previsualizar — antes se caía al
+        // perfil semilla PROFILE_ID, compartido entre cuentas.
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("id")
-          .eq("user_id", user.id ?? PROFILE_ID)
+          .eq("user_id", user.id)
           .maybeSingle();
 
         if (profileError) throw profileError;
-
-        const profileId = profile?.id ?? PROFILE_ID;
-
-        let draft: { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] } | null = null;
-        if (profile) {
-          const { data: draftRow, error: draftError } = await supabase
-            .from("profiles")
-            .select("draft_content")
-            .eq("id", profileId)
-            .maybeSingle();
-          if (!draftError) draft = draftRow?.draft_content ?? null;
+        if (!profile) {
+          throw new Error("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.");
         }
+
+        const profileId = profile.id;
+
+        type PreviewDraft = { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] };
+        const draft = (await fetchDraft(profileId)) as PreviewDraft | null;
 
         if (draft) {
           setBlocks(mergePublicacionesEmbeds((draft.blocks ?? []).filter((b) => isKnownBlockType(b.type))));

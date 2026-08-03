@@ -15,6 +15,24 @@ export type OwnProfile = {
   unifiedProfile: boolean
 }
 
+/**
+ * Devuelve el id de perfil del usuario autenticado, creándolo si hiciera
+ * falta. Lanza si no se pudo resolver.
+ *
+ * Reemplaza al patrón `profile?.id ?? PROFILE_ID` que estaba repetido por
+ * toda la app. Ese fallback al perfil semilla hacía que cualquier cuenta sin
+ * fila propia —y, en las pantallas sin guard, cualquier visitante anónimo—
+ * terminara leyendo y ESCRIBIENDO sobre el mismo perfil compartido. Ver
+ * AUDITORIA.md §9.
+ */
+export async function resolveOwnProfileId(user: User): Promise<string> {
+  const profile = await ensureOwnProfile(user)
+  if (!profile) {
+    throw new Error("No se pudo resolver tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.")
+  }
+  return profile.id
+}
+
 export async function ensureOwnProfile(user: User): Promise<OwnProfile | null> {
   const { data: existing } = await supabase
     .from("profiles")

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { PROFILE_ID } from "@/lib/blocks";
 import LayoutAdmin from "@/components/LayoutAdmin";
 import { Loader2 } from "lucide-react";
 
@@ -46,7 +45,14 @@ export default function DashboardPage() {
         return;
       }
 
-      const profileId = profile?.id ?? PROFILE_ID;
+      // Sin fila de perfil no se sigue: antes se caía al perfil semilla
+      // PROFILE_ID, un buzón compartido entre cuentas (ver AUDITORIA.md 9).
+      if (!profile) {
+        setErrorMensaje("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.");
+        setLoading(false);
+        return;
+      }
+      const profileId = profile.id;
 
       const { data, error } = await supabase
         .from("order_items")

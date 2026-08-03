@@ -1,7 +1,10 @@
 import type { LucideIcon } from "lucide-react"
 import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Disc3, Rocket, Users, Sparkles, GalleryHorizontalEnd } from "lucide-react"
 
-export const PROFILE_ID = "00000000-0000-0000-0000-000000000000"
+// PROFILE_ID (el perfil semilla "00000000-...") se eliminó a propósito.
+// Era un fallback compartido: cualquier cuenta sin fila propia -y en las
+// pantallas sin guard, cualquier visitante anónimo- terminaba leyendo y
+// ESCRIBIENDO sobre el mismo perfil. Ver AUDITORIA.md seccion 9.
 
 export type BlockType =
   | "hero"

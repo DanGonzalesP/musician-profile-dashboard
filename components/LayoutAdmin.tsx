@@ -19,7 +19,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { PROFILE_ID } from "@/lib/blocks";
 import { fetchIncomingCreditRequests } from "@/lib/credit-requests";
 import { fetchUnreadQuestionCount } from "@/lib/profile-questions";
 import { Logo } from "@/components/logo";
@@ -39,27 +38,22 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
     async function cargarPerfil() {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Sin sesión no hay perfil que resolver. Antes se caía al perfil
+      // semilla PROFILE_ID, lo que hacía que dos visitantes anónimos
+      // compartieran (y pudieran pisar) los mismos datos. Ver PLAN.md §1.3.
+      if (!user) {
+        setPublicSlug("");
+        return;
+      }
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, display_name")
-        .eq("user_id", user?.id ?? PROFILE_ID)
+        .eq("user_id", user.id)
         .maybeSingle();
 
-      let name = profile?.display_name || "";
-      let profileId = profile?.id ?? null;
-
-      // Si el usuario logueado todavía no tiene su propia fila en `profiles`
-      // (el editor visual sigue publicando bajo el perfil semilla PROFILE_ID),
-      // usamos ese perfil semilla como respaldo para no dejar el enlace roto.
-      if (!name && user) {
-        const { data: seedProfile } = await supabase
-          .from("profiles")
-          .select("id, display_name")
-          .eq("user_id", PROFILE_ID)
-          .maybeSingle();
-        name = seedProfile?.display_name || "";
-        profileId = profileId ?? seedProfile?.id ?? null;
-      }
+      const name = profile?.display_name || "";
+      const profileId = profile?.id ?? null;
 
       setPublicSlug(name.trim().toLowerCase().replace(/\s+/g, "-"));
 
