@@ -12,6 +12,7 @@ import { AskAboutBlock } from "@/components/blocks/ask-about-block";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
+import { ReportDialog } from "@/components/report-dialog";
 import { useLocale } from "@/components/locale-provider";
 import { Store, ArrowLeft, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
 
@@ -402,6 +403,15 @@ export function PerfilPublicoClient() {
               {activeBlocks.map(renderBlock)}
             </>
           )}
+
+        {/* Denuncia de contenido: /legal/copyright y /legal/comunidad
+            describían este proceso pero no había forma de iniciarlo desde
+            la app. No se le muestra al propio dueño del perfil. */}
+        {!isOwner && profileId && (
+          <footer className="flex justify-center pb-6 pt-2">
+            <ReportDialog profileId={profileId} targetType="perfil" />
+          </footer>
+        )}
       </main>
     </div>
   );

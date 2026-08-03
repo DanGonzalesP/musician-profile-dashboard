@@ -17,6 +17,7 @@ import { AccentSwatches, AppAccentCard } from "@/components/accent-picker";
 import { isAccentColor, type AccentColor } from "@/lib/theme";
 import { ensureOwnProfile } from "@/lib/ensure-profile";
 import { isValidUsername, isUsernameAvailable } from "@/lib/username";
+import { ZonaDatosPersonales } from "@/components/zona-datos-personales";
 import {
   Check,
   Disc3,
@@ -378,6 +379,13 @@ export default function ConfigPerfilPage() {
             </button>
           </div>
         </form>
+
+        {/* Derechos sobre los datos personales: exportación y borrado.
+            Ley 29733 y GDPR — no existía ningún mecanismo, y Vibe almacena
+            DNIs para la Licencia Express. */}
+        <div className="mt-6">
+          <ZonaDatosPersonales displayName={displayName} />
+        </div>
       </div>
     </LayoutAdmin>
   );
