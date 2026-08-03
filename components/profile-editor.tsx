@@ -13,7 +13,7 @@ import { Layers, LogOut, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { authedFetch } from "@/lib/authed-fetch"
 import { sanitizeUrlFields } from "@/lib/safe-url"
-import { fetchDraft, saveDraft, clearDraft } from "@/lib/draft"
+import { fetchDraft, saveDraft } from "@/lib/draft"
 import { ensureOwnProfile } from "@/lib/ensure-profile"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE, type AudioBitrate } from "@/lib/audio-transcode"
@@ -333,6 +333,10 @@ function ProfileEditorInner() {
   // en el ciclo inmediatamente siguiente, las filas que Publish acaba de
   // marcar como is_visible:true.
   const skipNextAutosaveRef = useRef(false)
+  // Versión de contenido sobre la que se está editando. Se manda al publicar
+  // para que la base rechace el guardado si alguien más publicó mientras
+  // tanto, en vez de pisarlo en silencio (ver 0007_optimistic_concurrency).
+  const contentVersionRef = useRef<number | null>(null)
 
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null
 
@@ -356,11 +360,10 @@ function ProfileEditorInner() {
         if (!ownProfile) {
           throw new Error("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.")
         }
-        const profile = { id: ownProfile.id, display_name: ownProfile.displayName }
 
-        let profileId = profile.id
+        let profileId = ownProfile.id
         let isBand = false
-        let effectiveDisplayName = profile?.display_name ?? ""
+        let effectiveUsername = ownProfile.username
         let role: BandRole = "owner"
 
         // Punto 4: si el switcher tiene una banda seleccionada para este
@@ -373,12 +376,12 @@ function ProfileEditorInner() {
           if (selectedBandId) {
             const bandRole = await getEffectiveBandRole(selectedBandId, user.id)
             const { data: bandProfile } = bandRole
-              ? await supabase.from("profiles").select("id, display_name").eq("id", selectedBandId).maybeSingle()
+              ? await supabase.from("profiles").select("id, username").eq("id", selectedBandId).maybeSingle()
               : { data: null }
 
             if (bandRole && bandProfile) {
               profileId = bandProfile.id
-              effectiveDisplayName = bandProfile.display_name ?? ""
+              effectiveUsername = bandProfile.username ?? ""
               isBand = true
               role = bandRole
             } else {
@@ -387,27 +390,30 @@ function ProfileEditorInner() {
           }
         }
 
+        const { data: versionRow } = await supabase
+          .from("profiles")
+          .select("content_version")
+          .eq("id", profileId)
+          .maybeSingle()
+        contentVersionRef.current = versionRow?.content_version ?? null
+
         profileIdRef.current = profileId
         isBandRef.current = isBand
         setActiveRole(role)
 
-        // El link a compartir es el de la página pública real, no algo que
-        // se pueda armar en el borrador — solo existe si el perfil ya tiene
-        // un nombre publicado.
-        if (effectiveDisplayName) {
-          setPublicSlug(effectiveDisplayName.trim().toLowerCase().replaceAll(" ", "-"))
-        } else {
-          setPublicSlug("")
-        }
+        // El enlace público usa el username real, no un slug derivado del
+        // nombre: dos artistas pueden llamarse igual, y renombrarse no debe
+        // romper los QR ni los enlaces ya compartidos. Ver lib/username.ts.
+        setPublicSlug(effectiveUsername)
 
         // El borrador se consulta en una llamada aparte: si falla (ej. la
         // migración de profile_private todavía no corrió en Supabase) no debe
         // tumbar la carga de lo ya publicado — solo se ignora el borrador.
+        // profileId siempre está resuelto a esta altura (perfil personal
+        // garantizado por ensureOwnProfile, o la banda seleccionada), así que
+        // ya no hace falta condicionar la lectura del borrador.
         type EditorDraft = { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] }
-        let draft: EditorDraft | null = null
-        if (profile || isBand) {
-          draft = (await fetchDraft(profileId)) as EditorDraft | null
-        }
+        const draft = (await fetchDraft(profileId)) as EditorDraft | null
 
         if (draft) {
           const cleanBlocks = (draft.blocks ?? [])
@@ -663,31 +669,44 @@ function ProfileEditorInner() {
         console.error("[handlePublish] No se pudo leer el estado previo para limpiar R2:", err)
       }
 
-      // 4. Eliminar bloques anteriores y reinsertar los actualizados
-      const { error: deleteError } = await supabase
-        .from("profile_blocks")
-        .delete()
-        .eq("profile_id", profileId)
-
-      if (deleteError) throw deleteError
-
+      // 4. Reemplazar los bloques publicados, DE FORMA ATÓMICA.
+      //
+      // Antes esto eran un DELETE y un INSERT sueltos desde el navegador: si
+      // el insert fallaba (red inestable en móvil, error de RLS, payload
+      // rechazado) el perfil público quedaba VACÍO y sin vuelta atrás, porque
+      // el borrador ya se había consumido. Ahora ambas sentencias viven
+      // dentro de una función de Postgres, que corre en una sola transacción:
+      // si algo falla, lo publicado anterior queda intacto.
+      //
       // Último filtro antes de la base: ningún campo de enlace puede
       // persistirse con un esquema peligroso (javascript:, data:...). El
       // renderizado ya usa safeHref, pero esto evita que la fila sucia
       // llegue siquiera a guardarse — ver lib/safe-url.ts.
       const profileBlocksPayload = publishBlocks.map((b, index) => ({
-        profile_id: profileId,
         block_type: b.type,
         position_index: index,
         content: sanitizeUrlFields(b.data),
-        is_visible: true,
       }))
 
-      const { error: blocksError } = await supabase
-        .from("profile_blocks")
-        .insert(profileBlocksPayload)
+      const { data: nuevaVersion, error: blocksError } = await supabase.rpc("publish_profile", {
+        p_profile_id: profileId,
+        p_blocks: profileBlocksPayload,
+        p_expected_version: contentVersionRef.current,
+      })
 
-      if (blocksError) throw blocksError
+      if (blocksError) {
+        // La base rechaza la publicación si el perfil avanzó desde que se
+        // cargó el editor: alguien más (otra pestaña, el celular) publicó
+        // mientras tanto. Se avisa en vez de pisar su trabajo.
+        if (blocksError.message?.includes("conflicto_de_version")) {
+          throw new Error(
+            "Alguien más publicó cambios en este perfil desde otra sesión. Recarga la página para traer la versión más reciente y vuelve a aplicar lo tuyo."
+          )
+        }
+        throw blocksError
+      }
+
+      contentVersionRef.current = typeof nuevaVersion === "number" ? nuevaVersion : null
 
       // 4.5. Registrar el marcado de tiempo (certificado de autoría) de cada
       // pista que ya tiene huella SHA-256 calculada. Es "best effort": si
@@ -752,28 +771,17 @@ function ProfileEditorInner() {
       }
       blobRegistryRef.current.clear()
 
-      // Ya está publicado: se limpia el borrador para no recargarlo la
-      // próxima vez que se abra el editor. Si esta llamada falla (ej. una red
-      // inestable en móvil justo después de subir fotos) y queda un borrador
-      // viejo en la base, la próxima vez que se monte el editor (por ejemplo
-      // al volver del feed) esa fila vieja pisaría lo recién publicado —de
-      // ahí las fotos "desaparecidas". Por eso se reintenta antes de rendirse.
+      // El borrador ya quedó limpio DENTRO de la transacción de
+      // publish_profile, así que acá no hace falta ninguna llamada extra ni
+      // los 3 reintentos que había antes: o se publicó todo y se limpió el
+      // borrador, o no se hizo nada. Ese "a medias" —publicado pero con
+      // borrador viejo, que al reabrir el editor pisaba lo recién
+      // publicado— ya no puede ocurrir.
+      //
+      // El flag sigue siendo necesario: evita que el autoguardado del
+      // siguiente ciclo de React vuelva a escribir el borrador que se acaba
+      // de limpiar.
       skipNextAutosaveRef.current = true
-      let clearDraftError: { message: string } | null = null
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const { error } = await clearDraft(profileId)
-        clearDraftError = error
-        if (!error) break
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      }
-      if (clearDraftError) {
-        console.error("[handlePublish] Error limpiando borrador tras 3 intentos:", clearDraftError)
-        showToast(
-          "Se publicaron tus cambios, pero no se pudo limpiar el borrador. Si al volver ves contenido antiguo, vuelve a publicar.",
-          "error"
-        )
-        return
-      }
 
       showToast("¡Cambios publicados con éxito en tu perfil!", "success")
     } catch (err: unknown) {

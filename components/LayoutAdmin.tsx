@@ -48,14 +48,15 @@ export default function LayoutAdmin({ children }: { children: React.ReactNode })
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, display_name")
+        .select("id, username")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      const name = profile?.display_name || "";
       const profileId = profile?.id ?? null;
 
-      setPublicSlug(name.trim().toLowerCase().replace(/\s+/g, "-"));
+      // El enlace publico es el username real, no un slug derivado del
+      // nombre (que no es unico y cambia). Ver lib/username.ts.
+      setPublicSlug(profile?.username ?? "");
 
       if (user) {
         const { count } = await supabase

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { slugifyUsername } from "@/lib/username"
 
 // Punto 4: perfiles de banda + roles de gestión. Una banda es otra fila de
 // `profiles` (profile_type = "band"); quién puede editarla se resuelve acá y
@@ -111,9 +112,15 @@ export async function fetchMyProfiles(userId: string): Promise<MyProfileOption[]
 }
 
 export async function createBand(userId: string, displayName: string): Promise<string> {
+  // username es NOT NULL y único desde 0006_username.sql. Se deriva del nombre
+  // del grupo con sufijo aleatorio para evitar choques entre bandas homónimas;
+  // el dueño puede cambiarlo después desde configuración.
+  const base = slugifyUsername(displayName) || "grupo"
+  const username = `${base.slice(0, 24)}_${Math.random().toString(36).slice(2, 6)}`
+
   const { data, error } = await supabase
     .from("profiles")
-    .insert({ profile_type: "band", owner_user_id: userId, display_name: displayName })
+    .insert({ profile_type: "band", owner_user_id: userId, display_name: displayName, username })
     .select("id")
     .single()
 
@@ -139,29 +146,24 @@ export async function fetchBandMembers(bandProfileId: string): Promise<BandMembe
   }))
 }
 
-/** Invita por @username (profiles.display_name) — solo perfiles personales, no otras bandas. */
+/** Invita por @username real — solo perfiles personales, no otras bandas. */
 export async function inviteMember(bandProfileId: string, username: string, role: "admin" | "editor"): Promise<void> {
   const cleanUsername = username.trim().replace(/^@/, "")
   if (!cleanUsername) throw new Error("Escribe un nombre de usuario.")
 
-  // El @usuario suele escribirse con guiones ("nova-reyes") pero el
-  // display_name real lleva espacios ("Nova Reyes"). Se prueban ambas
-  // formas y se toma el primer perfil personal con cuenta real — sin
-  // maybeSingle(), que reventaba si dos perfiles compartían nombre.
-  const patterns = [cleanUsername, cleanUsername.replaceAll("-", " ")]
-  let target: { id: string; user_id: string | null; display_name: string | null } | null = null
+  // Búsqueda por username EXACTO. Antes se hacía .ilike sobre display_name
+  // probando variantes con guiones/espacios: eso podía invitar al artista
+  // equivocado cuando dos compartían nombre, y los comodines % y _ del texto
+  // escrito se interpretaban como patrón de búsqueda.
+  const { data, error: lookupError } = await supabase
+    .from("profiles")
+    .select("id, user_id, display_name, username")
+    .eq("profile_type", "artist")
+    .eq("username", cleanUsername.toLowerCase())
+    .maybeSingle()
+  if (lookupError) throw lookupError
 
-  for (const pattern of patterns) {
-    const { data, error: lookupError } = await supabase
-      .from("profiles")
-      .select("id, user_id, display_name")
-      .eq("profile_type", "artist")
-      .ilike("display_name", pattern)
-      .limit(5)
-    if (lookupError) throw lookupError
-    target = (data ?? []).find((p) => p.user_id) ?? null
-    if (target) break
-  }
+  const target = data?.user_id ? data : null
 
   if (!target?.user_id) {
     throw new Error(
@@ -178,7 +180,7 @@ export async function inviteMember(bandProfileId: string, username: string, role
     band_profile_id: bandProfileId,
     member_user_id: target.user_id,
     role,
-    invited_username: target.display_name,
+    invited_username: target.username,
   })
 
   if (error) {

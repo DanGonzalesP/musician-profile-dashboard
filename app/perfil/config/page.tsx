@@ -16,6 +16,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { AccentSwatches, AppAccentCard } from "@/components/accent-picker";
 import { isAccentColor, type AccentColor } from "@/lib/theme";
 import { ensureOwnProfile } from "@/lib/ensure-profile";
+import { isValidUsername, isUsernameAvailable } from "@/lib/username";
 import {
   Check,
   Disc3,
@@ -52,6 +53,8 @@ export default function ConfigPerfilPage() {
   const [unifiedProfile, setUnifiedProfile] = useState(false);
   const [roles, setRoles] = useState<MusicianRole[]>([]);
   const [profileAccent, setProfileAccent] = useState<AccentColor>("rojo");
+  const [username, setUsername] = useState("");
+  const [usernameOriginal, setUsernameOriginal] = useState("");
   const [guardado, setGuardado] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
   const router = useRouter();
@@ -75,6 +78,8 @@ export default function ConfigPerfilPage() {
       }
 
       setProfileId(profile.id);
+      setUsername(profile.username);
+      setUsernameOriginal(profile.username);
       setDisplayName(profile.displayName);
       setUnifiedProfile(profile.unifiedProfile);
 
@@ -117,18 +122,45 @@ export default function ConfigPerfilPage() {
     if (!profileId) return;
     setErrorMensaje("");
 
+    // El username es la identidad pública: va en la URL, en el QR y en las
+    // tarjetas ya impresas. Se valida el formato antes de tocar la base y se
+    // comprueba disponibilidad solo si de verdad cambió. Los enlaces viejos
+    // no se rompen: un trigger guarda el anterior en username_history y la
+    // página pública redirige (ver 0006_username.sql).
+    const nuevoUsername = username.trim().toLowerCase();
+    if (!isValidUsername(nuevoUsername)) {
+      setErrorMensaje(
+        "El nombre de usuario debe tener entre 3 y 30 caracteres, y solo letras minúsculas, números y guión bajo."
+      );
+      return;
+    }
+    if (nuevoUsername !== usernameOriginal) {
+      const libre = await isUsernameAvailable(nuevoUsername);
+      if (!libre) {
+        setErrorMensaje(`El nombre de usuario "${nuevoUsername}" ya está en uso o está reservado.`);
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({
+        username: nuevoUsername,
         display_name: displayName.trim(),
         unified_profile: unifiedProfile,
       })
       .eq("id", profileId);
 
     if (error) {
-      setErrorMensaje(error.message);
+      setErrorMensaje(
+        error.message.includes("profiles_username")
+          ? "Ese nombre de usuario no es válido o ya está tomado."
+          : error.message
+      );
       return;
     }
+
+    setUsernameOriginal(nuevoUsername);
 
     // Update aparte por la misma razón que la carga: si la columna todavía
     // no existe en Supabase, no debe bloquear el guardado del resto.
@@ -214,6 +246,36 @@ export default function ConfigPerfilPage() {
               className="w-full rounded-lg border border-input bg-background p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="Ej. Nova Reyes"
             />
+            <p className="mt-1 text-[11px] text-muted-foreground/80">
+              Es el nombre que se ve en tu perfil. Puede repetirse con el de otro artista.
+            </p>
+          </div>
+
+          {/* ── Nombre de usuario: la identidad única de la URL ──────────── */}
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Nombre de usuario</label>
+            <div className="flex items-center gap-1 rounded-lg border border-input bg-background pl-2.5 focus-within:ring-2 focus-within:ring-primary/50">
+              <span className="shrink-0 text-sm text-muted-foreground">vibe.app/</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                className="w-full bg-transparent py-2.5 pr-2.5 text-sm text-foreground focus:outline-none"
+                placeholder="nova_reyes"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground/80">
+              Entre 3 y 30 caracteres: solo minúsculas, números y guión bajo. Es único en Vibe y es
+              la dirección de tu página.{" "}
+              {usernameOriginal && username.trim().toLowerCase() !== usernameOriginal && (
+                <span className="text-amber-500">
+                  Al cambiarlo, tu enlace anterior (vibe.app/{usernameOriginal}) seguirá
+                  redirigiendo aquí, así que los QR ya impresos no se rompen.
+                </span>
+              )}
+            </p>
           </div>
 
           {/* ── Roles: definen qué eres como músico ───────────────────── */}

@@ -50,9 +50,10 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // TypeScript SÍ corre en el build. Estaba en ignoreBuildErrors: true, lo que
+  // desactivaba justo la red que protege un código de 21.000 líneas con JSONB
+  // sin esquema. El proyecto compila con 0 errores, así que no había ninguna
+  // deuda que justificara mantenerlo apagado.
   images: {
     unoptimized: true,
   },

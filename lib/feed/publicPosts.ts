@@ -44,16 +44,21 @@ export async function fetchPublicPosts(limit: number = 60): Promise<FeedPost[]> 
   const selects = [
     `id, profile_id, content, created_at, profiles ( display_name, musician_roles, profile_type )`,
     `id, profile_id, content, created_at, profiles ( display_name, musician_category, profile_type )`,
-    `id, profile_id, content, profiles ( display_name )`,
+    `id, profile_id, content, created_at, profiles ( display_name )`,
   ]
 
   let rows: PublicacionesRow[] | null = null
   for (const select of selects) {
+    // .order() explícito: sin ORDER BY, Postgres no garantiza ningún orden,
+    // así que este .limit() devolvía filas ARBITRARIAS. No eran "las 60
+    // publicaciones más recientes" sino 60 cualesquiera, y el contenido nuevo
+    // podía no aparecer nunca en el feed.
     const { data, error } = await supabase
       .from("profile_blocks")
       .select(select)
       .eq("block_type", "publicaciones")
       .eq("is_visible", true)
+      .order("created_at", { ascending: false })
       .limit(limit)
     if (!error) {
       rows = data as unknown as PublicacionesRow[]

@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
   type CatalogProduct,
@@ -26,6 +26,7 @@ import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { safeHref } from "@/lib/safe-url";
+import { resolveProfileByUsername } from "@/lib/username";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -48,6 +49,7 @@ type MobileView = "productos" | "servicios";
 
 export default function TiendaPage() {
   const params = useParams();
+  const router = useRouter();
   const username = (params?.username as string)?.trim().toLowerCase();
 
   const [displayName, setDisplayName] = useState("");
@@ -70,23 +72,29 @@ export default function TiendaPage() {
     async function cargar() {
       try {
         setState("loading");
-        const displayNameSlug = username.replaceAll("-", " ");
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, display_name, accent_color")
-          .ilike("display_name", displayNameSlug)
-          .maybeSingle();
+        // Igual que el perfil público: igualdad exacta por username, con
+        // redirect si el enlace usa uno antiguo. Ver lib/username.ts.
+        const profile = await resolveProfileByUsername(username);
 
         if (controller.signal.aborted) return;
-        if (profileError) throw new Error(profileError.message);
         if (!profile) {
           setState("error");
           setErrorMessage("Artista no encontrado");
           return;
         }
+        if (profile.redirectTo) {
+          router.replace(`/${profile.redirectTo}/tienda`);
+          return;
+        }
 
-        setDisplayName(profile.display_name ?? username);
-        if (isAccentColor(profile.accent_color)) setAccent(profile.accent_color);
+        setDisplayName(profile.displayName || username);
+
+        const { data: accentRow } = await supabase
+          .from("profiles")
+          .select("accent_color")
+          .eq("id", profile.id)
+          .maybeSingle();
+        if (accentRow && isAccentColor(accentRow.accent_color)) setAccent(accentRow.accent_color);
 
         const { products: prods, services: servs } = await fetchCatalog(profile.id);
         if (controller.signal.aborted) return;

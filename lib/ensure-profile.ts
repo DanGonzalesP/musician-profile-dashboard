@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
+import { slugifyUsername } from "@/lib/username"
 
 // Garantiza que la cuenta autenticada tenga su fila en `profiles`.
 //
@@ -11,6 +12,8 @@ import type { User } from "@supabase/supabase-js"
 
 export type OwnProfile = {
   id: string
+  /** Identidad pública del perfil: es lo que va en la URL. Ver lib/username.ts. */
+  username: string
   displayName: string
   unifiedProfile: boolean
 }
@@ -36,36 +39,49 @@ export async function resolveOwnProfileId(user: User): Promise<string> {
 export async function ensureOwnProfile(user: User): Promise<OwnProfile | null> {
   const { data: existing } = await supabase
     .from("profiles")
-    .select("id, display_name, unified_profile")
+    .select("id, username, display_name, unified_profile")
     .eq("user_id", user.id)
     .maybeSingle()
 
   if (existing) {
     return {
       id: existing.id,
+      username: existing.username ?? "",
       displayName: existing.display_name || "",
       unifiedProfile: Boolean(existing.unified_profile),
     }
   }
 
   const defaultName = user.email?.split("@")[0] || "artista"
+  // username es NOT NULL y unico desde 0006_username.sql. Se deriva del
+  // correo y se le agrega un sufijo aleatorio corto para que dos cuentas con
+  // el mismo prefijo (ana@gmail / ana@hotmail) no choquen en el alta. El
+  // artista puede cambiarlo después desde configuración.
+  const baseUsername = slugifyUsername(defaultName) || "artista"
+  const defaultUsername = `${baseUsername.slice(0, 24)}_${Math.random().toString(36).slice(2, 6)}`
 
   const { data: created, error } = await supabase
     .from("profiles")
-    .insert({ user_id: user.id, profile_type: "artist", display_name: defaultName })
-    .select("id, display_name, unified_profile")
+    .insert({
+      user_id: user.id,
+      profile_type: "artist",
+      display_name: defaultName,
+      username: defaultUsername,
+    })
+    .select("id, username, display_name, unified_profile")
     .single()
 
   if (error) {
     // Carrera benigna: el trigger de la DB pudo haberla creado en paralelo.
     const { data: retry } = await supabase
       .from("profiles")
-      .select("id, display_name, unified_profile")
+      .select("id, username, display_name, unified_profile")
       .eq("user_id", user.id)
       .maybeSingle()
     if (retry) {
       return {
         id: retry.id,
+        username: retry.username ?? "",
         displayName: retry.display_name || "",
         unifiedProfile: Boolean(retry.unified_profile),
       }
@@ -76,6 +92,7 @@ export async function ensureOwnProfile(user: User): Promise<OwnProfile | null> {
 
   return {
     id: created.id,
+    username: created.username ?? "",
     displayName: created.display_name || "",
     unifiedProfile: Boolean(created.unified_profile),
   }

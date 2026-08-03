@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { resolveProfileByUsername } from "@/lib/username";
 import { type Block, type BlockType, type TracksData, type CreditsData, BLOCK_LIBRARY, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
@@ -38,6 +39,7 @@ export default function PerfilPublicoPage() {
 function PerfilPublicoContent() {
   const { t } = useLocale();
   const params = useParams();
+  const router = useRouter();
   const username = (params?.username as string)?.trim().toLowerCase();
 
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -94,25 +96,16 @@ function PerfilPublicoContent() {
         setState("loading");
         setErrorMessage(null);
 
-        // Convertir slug URL → formato de búsqueda
-        // "nova-reyes" → "nova reyes"
-        const displayNameSlug = username.replaceAll("-", " ");
-
-        // No se pide user_id: `profiles` ya no se lo entrega al rol anon (ver
-        // 0003_profile_private.sql). Para saber si quien mira es el dueño se
-        // compara contra SU PROPIO perfil, más abajo — así no hace falta
-        // exponer el user_id de nadie en una página pública.
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, unified_profile, profile_type")
-          .ilike("display_name", displayNameSlug)
-          .maybeSingle();
+        // Resolución por `username` real: igualdad exacta, nunca ilike.
+        // Antes se buscaba con .ilike sobre display_name, lo que dejaba que
+        // los comodines % y _ de la URL hicieran match con perfiles
+        // arbitrarios, y colapsaba si dos artistas compartían nombre. Si el
+        // username es uno antiguo, resolveProfileByUsername devuelve el
+        // perfil actual con redirectTo para no romper QR ni enlaces ya
+        // compartidos. Ver lib/username.ts.
+        const profile = await resolveProfileByUsername(username);
 
         if (controller.signal.aborted) return;
-
-        if (profileError) {
-          throw new Error(`Error al buscar perfil: ${profileError.message}`);
-        }
 
         if (!profile) {
           setState("error");
@@ -120,9 +113,14 @@ function PerfilPublicoContent() {
           return;
         }
 
-        setUnifiedProfile(Boolean(profile.unified_profile));
+        if (profile.redirectTo) {
+          router.replace(`/${profile.redirectTo}`);
+          return;
+        }
+
+        setUnifiedProfile(profile.unifiedProfile);
         setProfileId(profile.id);
-        setIsBand(profile.profile_type === "band");
+        setIsBand(profile.profileType === "band");
 
         // Acento elegido por el artista para SU página. Consulta aparte y
         // tolerante: si la columna no existe (setup_vibra.sql sin correr),
@@ -152,7 +150,7 @@ function PerfilPublicoContent() {
           throw new Error(`Error al cargar bloques: ${blocksError.message}`);
         }
 
-        const isBandProfile = profile.profile_type === "band";
+        const isBandProfile = profile.profileType === "band";
         const parsedBlocks = mergePublicacionesEmbeds(
           (dbBlocks ?? [])
             .filter((b) => isKnownBlockType(b.block_type))
