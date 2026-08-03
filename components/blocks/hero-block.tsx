@@ -5,6 +5,7 @@ import { MapPin, Camera, Video, AtSign, Music2, Disc3, Share2, Clapperboard, Aud
 import type { HeroData, SocialPlatform } from "@/lib/blocks"
 import { SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
 import { resolveContactChannel, CONTACT_CHANNEL_ICONS, CONTACT_CHANNEL_LABELS } from "@/lib/contact-channel"
+import { safeHref } from "@/lib/safe-url"
 import { ShareProfileDialog } from "./share-profile-dialog"
 import { useLocale } from "@/components/locale-provider"
 
@@ -79,7 +80,7 @@ export function HeroBlock({
   const contactButton = (compact: boolean) =>
     contact && ContactIcon ? (
       <a
-        href={contact.href}
+        href={safeHref(contact.href)}
         target="_blank"
         rel="noopener noreferrer"
         aria-label={t("hero_contact_aria")}
@@ -219,7 +220,7 @@ export function HeroBlock({
                   return (
                     <a
                       key={i}
-                      href={social.href || "#"}
+                      href={safeHref(social.href)}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={label}

@@ -18,6 +18,7 @@ import {
   type PublicacionItem,
 } from "@/lib/blocks"
 import { MediaViewer } from "./media-viewer"
+import { safeHref } from "@/lib/safe-url"
 
 type RowData = { title: string; items: { item: PublicacionItem; globalIndex: number }[] }
 
@@ -169,7 +170,7 @@ function EmbedsRows({ embeds, startNumber }: { embeds: EmbedItem[]; startNumber:
                     <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-linear-to-t from-background/95 via-background/40 to-transparent p-3">
                       {item.title && <p className="line-clamp-2 text-xs font-medium text-foreground">{item.title}</p>}
                       <a
-                        href={item.url}
+                        href={safeHref(item.url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"

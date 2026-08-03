@@ -19,6 +19,7 @@ import {
 import type { ServiceData } from "@/lib/blocks"
 import { priceUnitLabel, serviceCategoryLabel, serviceDurationLabel, formatMoney, type CatalogService } from "@/lib/catalog"
 import { useLocale } from "@/components/locale-provider"
+import { safeHref } from "@/lib/safe-url"
 
 function modalityLabel(m: CatalogService["modality"]): string {
   if (m === "presencial") return "Presencial"
@@ -43,7 +44,7 @@ function BookButton({ service }: { service: CatalogService }) {
   if (!service.bookingUrl) return null
   return (
     <a
-      href={service.bookingUrl}
+      href={safeHref(service.bookingUrl)}
       target="_blank"
       rel="noopener noreferrer nofollow"
       className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] transition-all hover:opacity-90 hover:shadow-[0_0_32px_-6px_var(--primary)]"

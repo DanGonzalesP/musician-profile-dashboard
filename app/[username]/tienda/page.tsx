@@ -25,6 +25,7 @@ import {
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
+import { safeHref } from "@/lib/safe-url";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -313,7 +314,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
           <p className="text-base font-bold tabular-nums text-primary">{price}</p>
           {product.purchaseUrl ? (
             <a
-              href={product.purchaseUrl}
+              href={safeHref(product.purchaseUrl)}
               target="_blank"
               rel="noopener noreferrer nofollow"
               className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition-opacity hover:opacity-90 ${
@@ -405,7 +406,7 @@ function ServiceCard({ service }: { service: CatalogService }) {
         </p>
         {service.bookingUrl && (
           <a
-            href={service.bookingUrl}
+            href={safeHref(service.bookingUrl)}
             target="_blank"
             rel="noopener noreferrer nofollow"
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] transition-all hover:opacity-90"

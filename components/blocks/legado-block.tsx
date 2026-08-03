@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { LegadoData, LegadoGalleryItem, LegadoMilestone } from "@/lib/blocks"
+import { safeHref } from "@/lib/safe-url"
 
 // ---------------------------------------------------------------------------
 // Reveal — fade + translateY al entrar en viewport, una sola vez
@@ -522,7 +523,7 @@ export function LegadoBlock({ data }: { data: LegadoData }) {
                     </blockquote>
                     <figcaption className="mt-4 text-xs font-semibold text-primary">
                       {quote.url ? (
-                        <a href={quote.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        <a href={safeHref(quote.url)} target="_blank" rel="noopener noreferrer" className="hover:underline">
                           — {quote.source}
                         </a>
                       ) : (

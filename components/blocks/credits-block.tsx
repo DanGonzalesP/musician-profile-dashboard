@@ -6,6 +6,7 @@ import type { CreditItem, CreditsData } from "@/lib/blocks";
 import { useLocale } from "@/components/locale-provider";
 import { detectOembedProvider, getExternalEmbedUrl } from "@/lib/oembed";
 import { AutoScrollCarousel } from "./auto-scroll-carousel";
+import { safeHref } from "@/lib/safe-url"
 
 type Translate = (key: string, vars?: Record<string, string>) => string;
 
@@ -124,7 +125,7 @@ function CreditCard({
       <p className="truncate text-xs text-muted-foreground">{artist}</p>
       {isTiktok && (
         <a
-          href={credit.externalUrl}
+          href={safeHref(credit.externalUrl)}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"

@@ -1,13 +1,30 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
+import { authedFetch } from "@/lib/authed-fetch"
 
+// Herramienta de mantenimiento SOLO PARA ADMINISTRADORES. El permiso real lo
+// aplica el servidor (ver app/api/cleanup-orphaned-files/route.ts, que exige
+// sesión + estar en ADMIN_USER_IDS); este guard de sesión solo evita mostrar
+// un botón que de todos modos iba a responder 401.
 export default function CleanupPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) {
+        router.replace("/login")
+        return
+      }
+      setCheckingSession(false)
+    })
+  }, [router])
 
   async function handleCleanup() {
     setLoading(true)
@@ -15,7 +32,9 @@ export default function CleanupPage() {
     setResult(null)
 
     try {
-      const res = await fetch("/api/cleanup-orphaned-files", {
+      // authedFetch adjunta el access token de Supabase; sin él la ruta
+      // responde 401.
+      const res = await authedFetch("/api/cleanup-orphaned-files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: "audio" }),
@@ -34,6 +53,8 @@ export default function CleanupPage() {
       setLoading(false)
     }
   }
+
+  if (checkingSession) return null
 
   return (
     <div style={{ maxWidth: "800px", margin: "40px auto", fontFamily: "sans-serif", padding: "20px" }}>

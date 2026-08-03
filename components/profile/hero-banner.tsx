@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { HeroBlock, SocialPlatform } from "@/lib/artist-data"
+import { safeHref } from "@/lib/safe-url"
 
 type IconComponent = React.ComponentType<{ className?: string }>
 
@@ -94,7 +95,7 @@ export function HeroBanner({ block }: { block: HeroBlock }) {
             return (
               <a
                 key={social.platform}
-                href={social.href}
+                href={safeHref(social.href)}
                 className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
               >
                 <Icon className="size-4" />

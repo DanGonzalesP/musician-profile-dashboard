@@ -12,6 +12,7 @@ import { BlockInspector, audioBitrateByFile } from "@/components/block-inspector
 import { Layers, LogOut, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { authedFetch } from "@/lib/authed-fetch"
+import { sanitizeUrlFields } from "@/lib/safe-url"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE, type AudioBitrate } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
@@ -661,11 +662,15 @@ function ProfileEditorInner() {
 
       if (deleteError) throw deleteError
 
+      // Último filtro antes de la base: ningún campo de enlace puede
+      // persistirse con un esquema peligroso (javascript:, data:...). El
+      // renderizado ya usa safeHref, pero esto evita que la fila sucia
+      // llegue siquiera a guardarse — ver lib/safe-url.ts.
       const profileBlocksPayload = publishBlocks.map((b, index) => ({
         profile_id: profileId,
         block_type: b.type,
         position_index: index,
-        content: b.data,
+        content: sanitizeUrlFields(b.data),
         is_visible: true,
       }))
 
@@ -702,7 +707,11 @@ function ProfileEditorInner() {
       }
 
       // 5. Publicar catálogo de productos y servicios
-      await publishCatalog(profileId, publishProducts, publishServices)
+      await publishCatalog(
+        profileId,
+        sanitizeUrlFields(publishProducts),
+        sanitizeUrlFields(publishServices)
+      )
 
       // 5.5. Borrar de R2 los archivos que quedaron huérfanos: estaban en lo
       // publicado anteriormente (oldR2Urls) pero ya nada de este publish los

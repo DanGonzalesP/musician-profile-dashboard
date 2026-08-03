@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Music2, PlayCircle, Video } from "lucide-react"
 import { getYoutubeEmbedUrl } from "@/lib/youtube"
 import type { EmbedItem, EmbedsData } from "@/lib/blocks"
+import { safeHref } from "@/lib/safe-url"
 
 const containerVariants = {
   hidden: {},
@@ -136,7 +137,7 @@ function TikTokCard({ item }: { item: EmbedItem }) {
             <p className="line-clamp-2 text-xs font-medium text-foreground">{item.title}</p>
           )}
           <a
-            href={item.url}
+            href={safeHref(item.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"

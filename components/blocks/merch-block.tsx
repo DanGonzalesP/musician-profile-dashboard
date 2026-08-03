@@ -11,6 +11,7 @@ import { ArrowUpRight, Download, Package, ShoppingBag, Sparkles } from "lucide-r
 import type { MerchData } from "@/lib/blocks"
 import { productCategoryLabel, type CatalogProduct } from "@/lib/catalog"
 import { useLocale } from "@/components/locale-provider"
+import { safeHref } from "@/lib/safe-url"
 
 function formatPrice(product: CatalogProduct): string {
   const value = Number(product.price)
@@ -57,7 +58,7 @@ function BuyButton({ product, big = false }: { product: CatalogProduct; big?: bo
   if (product.purchaseUrl) {
     return (
       <a
-        href={product.purchaseUrl}
+        href={safeHref(product.purchaseUrl)}
         target="_blank"
         rel="noopener noreferrer nofollow"
         className={`${base} bg-primary text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] hover:opacity-90 hover:shadow-[0_0_32px_-6px_var(--primary)]`}
