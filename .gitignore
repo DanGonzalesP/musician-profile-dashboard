@@ -15,3 +15,6 @@ node_modules
 .DS_Store
 .vercel
 .env*
+
+# Cache incremental de TypeScript: se regenera, no va al repo
+*.tsbuildinfo
