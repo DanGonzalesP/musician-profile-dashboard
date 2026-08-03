@@ -54,7 +54,12 @@ export function PreviewCanvas({
     setDropIndex(null)
   }
 
-  const Indicator = ({ index }: { index: number }) => (
+  // Se renderiza con una función (renderIndicator) y NO con un componente
+  // declarado dentro del cuerpo: un componente creado en cada render tiene
+  // una identidad de tipo nueva cada vez, así que React desmonta y remonta
+  // el subárbol y pierde su estado. Acá además rompía sutilmente el
+  // arrastrar-y-soltar, porque el nodo se reemplazaba a mitad del gesto.
+  const renderIndicator = (index: number) => (
     <div
       onDragOver={(e) => {
         e.preventDefault()
@@ -116,7 +121,7 @@ export function PreviewCanvas({
             </div>
           ) : (
             <>
-              <Indicator index={0} />
+              {renderIndicator(0)}
               {blocks.map((block, i) => (
                 <div key={block.id}>
                   <CanvasBlock
@@ -138,7 +143,7 @@ export function PreviewCanvas({
                     locked={activeRole === "editor" && block.type !== "hero"}
                     onAlbumSelect={onAlbumSelect}
                   />
-                  <Indicator index={i + 1} />
+                  {renderIndicator(i + 1)}
                 </div>
               ))}
             </>

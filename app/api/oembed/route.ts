@@ -6,6 +6,7 @@ import {
   type OembedMetadata,
   type OembedProvider,
 } from "@/lib/oembed"
+import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
 
 // Autocompletado de metadatos (título, artista principal, miniatura) al
 // pegar un enlace externo en un crédito del Bloque 4. Corre server-side para
@@ -20,6 +21,12 @@ import {
 // request inválido (sin url, o plataforma no soportada) responde 400.
 export async function GET(request: Request) {
   try {
+    // Esta ruta no exige sesión (solo lee metadata publica), así que el
+    // límite va por IP: 30 por minuto alcanza de sobra para pegar enlaces en
+    // el editor, y corta el uso como proxy gratuito hacia terceros.
+    const limite = checkRateLimit(identificarSolicitante(request), 30, 60)
+    if (!limite.permitido) return respuesta429(limite.reintentarEn)
+
     const { searchParams } = new URL(request.url)
     const url = searchParams.get("url")
 
@@ -36,7 +43,7 @@ export async function GET(request: Request) {
     return NextResponse.json(metadata)
   } catch (error: any) {
     console.error("[api/oembed]", error)
-    return NextResponse.json({ error: error.message ?? "No se pudo leer el enlace" }, { status: 500 })
+    return NextResponse.json({ error: "No se pudo leer el enlace" }, { status: 500 })
   }
 }
 

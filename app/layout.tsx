@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Geist_Mono, Plus_Jakarta_Sans, Unbounded } from 'next/font/google'
 import './globals.css'
+import { SITE_URL } from '@/lib/site'
 import { ThemeScript } from '@/components/theme-script'
 import { LocaleProvider } from '@/components/locale-provider'
 import { ToastProvider } from '@/components/toast-provider'
@@ -11,9 +12,17 @@ const unbounded = Unbounded({ subsets: ['latin'], variable: '--font-unbounded' }
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'Vibe — Tu música, tu escenario',
+  // metadataBase resuelve a absolutas todas las URLs relativas de los
+  // metadatos (canonical, openGraph.url, imágenes). Sin esto, las redes
+  // sociales descartan la tarjeta al recibir una ruta relativa.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'Vibe — Tu música, tu escenario',
+    // Cada perfil define su propio título completo; esta plantilla cubre el
+    // resto de las páginas.
+    template: '%s',
+  },
   description: 'Vibe: la plataforma donde músicos de todos los rubros publican su música, su trayectoria, su tienda y sus servicios en un solo perfil.',
-  generator: 'v0.app',
   icons: {
     icon: [
       {

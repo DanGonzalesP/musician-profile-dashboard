@@ -27,6 +27,18 @@ export default function MusicFeedForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
+  // Declarada ANTES del efecto que la usa: estaba después, así que el
+  // efecto la capturaba sin inicializar (temporal dead zone).
+  const handleError = (err: unknown) => {
+    if (err instanceof Error) {
+      setMessage({ text: err.message, type: "error" });
+      return;
+    }
+    const e = err as { message?: string; code?: string; details?: string; hint?: string };
+    const errorText = e.message || JSON.stringify(err);
+    setMessage({ text: errorText, type: "error" });
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -61,16 +73,6 @@ export default function MusicFeedForm() {
     }
     loadData();
   }, [router]);
-
-  const handleError = (err: unknown) => {
-    if (err instanceof Error) {
-      setMessage({ text: err.message, type: "error" });
-      return;
-    }
-    const e = err as { message?: string; code?: string; details?: string; hint?: string };
-    const errorText = e.message || JSON.stringify(err);
-    setMessage({ text: errorText, type: "error" });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

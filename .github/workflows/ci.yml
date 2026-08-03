@@ -1,0 +1,49 @@
+name: CI
+
+# Puerta de calidad de cada cambio. Antes no existía ninguna: el proyecto
+# tenía "lint" declarado pero ESLint sin instalar, TypeScript apagado en el
+# build (ignoreBuildErrors) y cero pruebas. Un error de tipos o una política
+# de RLS reabierta llegaban a producción sin que nada avisara.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  calidad:
+    name: Tipos, lint y build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Comprobar tipos
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint
+        run: pnpm exec eslint .
+
+      - name: Pruebas
+        run: pnpm test
+
+      - name: Build
+        # Las variables públicas son necesarias para que el build resuelva;
+        # en CI van valores de relleno porque no se conecta a nada real.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ejemplo.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: clave-de-relleno-para-ci
+          NEXT_PUBLIC_R2_PUBLIC_URL: https://ejemplo.r2.dev
+        run: pnpm build

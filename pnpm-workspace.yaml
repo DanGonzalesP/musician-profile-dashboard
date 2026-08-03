@@ -5,6 +5,7 @@ allowBuilds:
   core-js: true
   msw: true
   sharp: true
+  unrs-resolver: set this to true or false
 
 patchedDependencies:
   '@ffmpeg/ffmpeg': patches/@ffmpeg__ffmpeg.patch

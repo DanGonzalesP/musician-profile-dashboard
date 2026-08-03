@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/server-auth";
+import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +10,11 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Inicia sesión para generar imágenes." }, { status: 401 });
     }
+
+    // 10 imagenes por hora y por usuario: generoso para un artista armando su
+    // perfil, inútil para agotar los créditos de la API.
+    const limite = checkRateLimit(identificarSolicitante(request, user.id), 10, 3600);
+    if (!limite.permitido) return respuesta429(limite.reintentarEn);
 
     const { prompt } = await request.json();
 
@@ -44,6 +50,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: data.data[0].url });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // No se devuelve error.message crudo: filtra detalles internos y mensajes
+    // del proveedor externo.
+    console.error("[api/generate-image]", error);
+    return NextResponse.json({ error: "No se pudo generar la imagen." }, { status: 500 });
   }
 }

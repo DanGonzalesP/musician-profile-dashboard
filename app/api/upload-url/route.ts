@@ -3,6 +3,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
+import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
 
 // Genera una URL firmada de subida directa a R2. El archivo NUNCA pasa por
 // este servidor/función serverless — el navegador hace el PUT directo a R2
@@ -28,6 +29,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Inicia sesión para subir archivos." }, { status: 401 })
     }
     const { user, supabase } = auth
+
+    // 120 subidas por hora: publicar un álbum con portadas y pistas entra
+    // holgado, pero frena un script que quiera llenar el bucket.
+    const limite = checkRateLimit(identificarSolicitante(request, user.id), 120, 3600)
+    if (!limite.permitido) return respuesta429(limite.reintentarEn)
 
     const { folder, extension, contentType, bytes, profileId } = await request.json()
 

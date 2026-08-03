@@ -26,6 +26,15 @@ function LoginForm() {
   const [exitoMensaje, setExitoMensaje] = useState("");
   const searchParams = useSearchParams();
   const [isRegistering, setIsRegistering] = useState(searchParams.get("modo") === "registro");
+  // El middleware manda acá con ?redirect=<ruta> cuando alguien intenta
+  // entrar a una página protegida sin sesión. Se valida que sea una ruta
+  // interna: un redirect abierto permitiría mandar al usuario a un dominio
+  // ajeno tras iniciar sesión (phishing con la marca de Vibe).
+  const redirectParam = searchParams.get("redirect");
+  const destino =
+    redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+      ? redirectParam
+      : "/dashboard";
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const router = useRouter();
 
@@ -48,7 +57,7 @@ function LoginForm() {
         // Confirmación de correo desactivada: la sesión ya existe. Se crea
         // la fila de perfil de inmediato y la cuenta entra directo al panel.
         await ensureOwnProfile(data.user);
-        router.push("/dashboard");
+        router.push(destino);
       } else {
         // Confirmación de correo activada: hay que revisar la bandeja antes
         // de poder iniciar sesión (el perfil lo crea el trigger de la DB).
@@ -64,7 +73,7 @@ function LoginForm() {
       } else {
         // Red de seguridad para cuentas creadas antes del trigger de la DB.
         if (data.user) await ensureOwnProfile(data.user);
-        router.push("/dashboard");
+        router.push(destino);
       }
     }
   };
