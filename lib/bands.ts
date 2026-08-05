@@ -11,6 +11,10 @@ export type BandRole = "owner" | "admin" | "editor"
 export type MyProfileOption = {
   id: string
   displayName: string
+  // Identidad pública real (lo que va en la URL /[username]) — NO se deriva
+  // del nombre: el username lleva un sufijo aleatorio, así que slugificar el
+  // display_name nunca coincide con él. Ver lib/username.ts y ensure-profile.ts.
+  username: string
   isBand: boolean
   role: BandRole
 }
@@ -78,34 +82,34 @@ export async function fetchMyProfiles(userId: string): Promise<MyProfileOption[]
 
   const { data: personal } = await supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, username")
     .eq("user_id", userId)
     .eq("profile_type", "artist")
     .maybeSingle()
 
   if (personal) {
-    options.push({ id: personal.id, displayName: personal.display_name || "Mi Perfil", isBand: false, role: "owner" })
+    options.push({ id: personal.id, displayName: personal.display_name || "Mi Perfil", username: personal.username ?? "", isBand: false, role: "owner" })
   }
 
   const { data: ownedBands } = await supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, username")
     .eq("owner_user_id", userId)
     .eq("profile_type", "band")
 
   for (const band of ownedBands ?? []) {
-    options.push({ id: band.id, displayName: band.display_name || "Grupo sin nombre", isBand: true, role: "owner" })
+    options.push({ id: band.id, displayName: band.display_name || "Grupo sin nombre", username: band.username ?? "", isBand: true, role: "owner" })
   }
 
   const { data: memberships } = await supabase
     .from("band_members")
-    .select("role, profiles!band_members_band_profile_id_fkey(id, display_name)")
+    .select("role, profiles!band_members_band_profile_id_fkey(id, display_name, username)")
     .eq("member_user_id", userId)
     .eq("status", "accepted")
 
-  for (const m of (memberships ?? []) as unknown as { role: BandRole; profiles: { id: string; display_name: string | null } | null }[]) {
+  for (const m of (memberships ?? []) as unknown as { role: BandRole; profiles: { id: string; display_name: string | null; username: string | null } | null }[]) {
     if (!m.profiles) continue
-    options.push({ id: m.profiles.id, displayName: m.profiles.display_name || "Grupo sin nombre", isBand: true, role: m.role })
+    options.push({ id: m.profiles.id, displayName: m.profiles.display_name || "Grupo sin nombre", username: m.profiles.username ?? "", isBand: true, role: m.role })
   }
 
   return options

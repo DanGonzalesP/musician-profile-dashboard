@@ -16,6 +16,9 @@ export default function FeedHeader() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [personalDisplayName, setPersonalDisplayName] = useState("");
+  // Username REAL del perfil personal (identidad pública, lo que va en la URL).
+  // No se deriva del nombre: el username lleva un sufijo aleatorio.
+  const [personalUsername, setPersonalUsername] = useState("");
   const [bands, setBands] = useState<MyProfileOption[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -27,6 +30,7 @@ export default function FeedHeader() {
       if (!active) return;
       const personal = profiles.find((p) => !p.isBand);
       setPersonalDisplayName(personal?.displayName ?? "");
+      setPersonalUsername(personal?.username ?? "");
       setBands(profiles.filter((p) => p.isBand));
 
       if (personal) {
@@ -57,6 +61,7 @@ export default function FeedHeader() {
         loadProfiles(user.id);
       } else {
         setPersonalDisplayName("");
+        setPersonalUsername("");
         setBands([]);
         setUnreadCount(0);
       }
@@ -68,7 +73,11 @@ export default function FeedHeader() {
     };
   }, []);
 
-  const personalSlug = personalDisplayName.trim().toLowerCase().replace(/\s+/g, "-");
+  // Antes se slugificaba el display_name — pero el username real no se deriva
+  // del nombre (lleva sufijo aleatorio), así que ese slug apuntaba a un perfil
+  // inexistente ("Error desconocido al cargar el perfil"). Se usa el username
+  // real; solo si aún no está disponible se cae al slug como último recurso.
+  const personalSlug = personalUsername || personalDisplayName.trim().toLowerCase().replace(/\s+/g, "-");
 
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-linear-to-b from-background/90 to-transparent px-6 py-4">

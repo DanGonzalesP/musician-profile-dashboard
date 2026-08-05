@@ -1,3 +1,4 @@
+import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 // Protección de rutas en el BORDE, antes de renderizar nada.
@@ -12,7 +13,7 @@ import { NextResponse, type NextRequest } from "next/server"
 
 const RUTAS_PROTEGIDAS = ["/dashboard", "/perfil", "/grupo", "/cleanup"]
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const necesitaSesion = RUTAS_PROTEGIDAS.some(
@@ -20,15 +21,36 @@ export function middleware(request: NextRequest) {
   )
   if (!necesitaSesion) return NextResponse.next()
 
-  // Supabase guarda la sesión en cookies con el prefijo "sb-". Acá solo se
-  // comprueba que EXISTA una: validar la firma del JWT en el edge exigiría
-  // traer el cliente de Supabase a cada request, y no aporta nada — quien
-  // falsifique una cookie igual choca contra RLS en cuanto pida datos.
-  const tieneSesion = request.cookies
-    .getAll()
-    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token") && cookie.value)
+  // Se lee la sesión REAL desde las cookies con el cliente de @supabase/ssr,
+  // en vez de solo comprobar que exista una cookie con nombre "sb-...". El
+  // cliente de navegador (lib/supabase.ts) guarda la sesión en esas mismas
+  // cookies, así que acá el edge la puede validar y refrescar. `setAll` deja
+  // que Supabase renueve el token expirado escribiendo las cookies nuevas en
+  // la respuesta — sin esto la sesión se caería sola al vencer el access token.
+  let response = NextResponse.next({ request })
 
-  if (tieneSesion) return NextResponse.next()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+        },
+      },
+    }
+  )
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) return response
 
   // Se recuerda a dónde iba para devolverlo ahí después de iniciar sesión.
   const login = new URL("/login", request.url)
