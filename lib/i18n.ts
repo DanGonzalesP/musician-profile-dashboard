@@ -70,6 +70,8 @@ export const dictionaries: Record<Locale, Dict> = {
     single_untitled: "Sin título",
     single_play_aria: "Reproducir",
     single_pause_aria: "Pausar",
+    single_show_controls_aria: "Mostrar controles de reproducción",
+    single_hide_controls_aria: "Ocultar controles de reproducción",
     single_cover_alt: "Portada del single",
 
     crowdfunding_eyebrow: "Meta de Producción",
@@ -240,6 +242,8 @@ export const dictionaries: Record<Locale, Dict> = {
     single_untitled: "Untitled",
     single_play_aria: "Play",
     single_pause_aria: "Pause",
+    single_show_controls_aria: "Show playback controls",
+    single_hide_controls_aria: "Hide playback controls",
     single_cover_alt: "Single cover",
 
     crowdfunding_eyebrow: "Production Goal",

@@ -66,9 +66,9 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
   return (
     <div ref={containerRef} className="relative flex items-center rounded-full border border-border bg-card/70 py-1 pl-1 pr-3 backdrop-blur transition-colors hover:bg-accent/40">
       <Link
-        href="/dashboard"
-        title={t("feed_menu_edit_profile")}
-        aria-label={t("feed_menu_edit_profile")}
+        href={`/${personalSlug}`}
+        title={t("feed_menu_artist_panel")}
+        aria-label={t("feed_menu_artist_panel")}
         className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
       >
         {initial}

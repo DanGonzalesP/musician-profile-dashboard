@@ -848,6 +848,22 @@ function ProfileEditorInner() {
     })
   }
 
+  // Mueve un bloque a una posición absoluta del arreglo. Lo usa el
+  // reordenamiento por pestañas del lienzo: los vecinos de una misma sección
+  // no siempre son adyacentes en `blocks`. Misma corrección de índice que
+  // handleDropAt para el caso "se mueve hacia adelante".
+  function moveBlockToIndex(id: string, targetIndex: number) {
+    setBlocks((prev) => {
+      const from = prev.findIndex((b) => b.id === id)
+      if (from < 0) return prev
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      const target = from < targetIndex ? targetIndex - 1 : targetIndex
+      next.splice(Math.max(0, Math.min(target, next.length)), 0, moved)
+      return next
+    })
+  }
+
   function updateBlock(id: string, data: Block["data"]) {
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, data: { ...b.data, ...data } } : b)))
   }
@@ -975,6 +991,7 @@ function ProfileEditorInner() {
             onDelete={deleteBlock}
             onClearContent={clearBlockContent}
             onMove={moveBlock}
+            onMoveTo={moveBlockToIndex}
             onDropAt={handleDropAt}
             onReorderStart={(index) => setDragPayload({ kind: "reorder", index })}
             onDragEnd={() => setDragPayload(null)}

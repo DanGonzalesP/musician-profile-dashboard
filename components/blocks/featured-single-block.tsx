@@ -22,6 +22,11 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
   const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState);
   useEffect(() => audioEngine.subscribe(setEngine), []);
 
+  // Solo en móvil: los controles (reproducir + barra) arrancan ocultos y se
+  // despliegan al tocar el disco/portada de la izquierda. En escritorio no
+  // aplica — ahí los controles siguen siempre visibles junto al título.
+  const [expanded, setExpanded] = useState(false);
+
   const hasAudio = Boolean(url);
   const isCurrent = url != null && engine.url === url;
   const isPlaying = isCurrent && engine.playing;
@@ -116,7 +121,13 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-5">
       <div className="flex items-center gap-4">
-        <div className="relative flex size-24 shrink-0 items-center justify-center sm:size-28">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? t("single_hide_controls_aria") : t("single_show_controls_aria")}
+          className="relative flex size-24 shrink-0 cursor-pointer items-center justify-center sm:size-28 sm:cursor-default"
+        >
           <div
             aria-hidden
             className={`absolute inset-0 rounded-full blur-lg transition-opacity duration-500 ${
@@ -143,7 +154,7 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
               className="size-20 rounded-full border-2 border-black/70 object-cover sm:size-24"
             />
           </div>
-        </div>
+        </button>
 
         <div className="min-w-0 flex-1">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
@@ -173,8 +184,9 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
       </div>
 
       {/* Móvil: los controles ocupan toda la fila de abajo, con el botón y la
-          barra más grandes para poder buscar cómodamente dentro de la pista. */}
-      <div className="sm:hidden">{controls(true)}</div>
+          barra más grandes para poder buscar cómodamente dentro de la pista.
+          Arrancan ocultos y solo se muestran al tocar el disco (ver expanded). */}
+      <div className={`sm:hidden ${expanded ? "block" : "hidden"}`}>{controls(true)}</div>
     </div>
   );
 }
