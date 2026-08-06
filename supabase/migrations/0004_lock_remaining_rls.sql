@@ -115,11 +115,14 @@ begin
     execute format('drop policy if exists %I on donations', pol.policyname);
   end loop;
 
-  -- Solo el perfil que recibe la donación ve sus registros.
-  execute $p$
-    create policy "donations_select_recipient" on donations for select
-    to authenticated using (get_profile_role(profile_id) in ('owner', 'admin'))
-  $p$;
+  -- Sin política de lectura a propósito: la tabla queda CERRADA (deny-by-
+  -- default). donations es de un esquema viejo que referencia al artista por
+  -- artist_id (bigint), no por profile_id, así que no encaja con
+  -- get_profile_role(profile_id). El código actual ya no lee esta tabla desde
+  -- el cliente; solo el service role (backoffice) la consulta. Si más adelante
+  -- se reactivan las donaciones, definir aquí la política según el esquema real
+  -- (p. ej. mapear artist_id → perfil) antes de volver a exponerla.
+  raise notice 'donations: RLS activado y politicas viejas eliminadas. Queda CERRADA (sin politica de lectura).';
 end $$;
 
 
