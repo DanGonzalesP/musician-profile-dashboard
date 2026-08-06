@@ -66,7 +66,6 @@ const PostScreen = forwardRef<HTMLDivElement, PostScreenProps>(function PostScre
               className="max-h-[55dvh] w-full object-contain"
             />
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={post.url}
               alt={post.caption || post.authorName}

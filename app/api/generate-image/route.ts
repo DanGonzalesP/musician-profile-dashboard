@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/server-auth";
-import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit";
+import { getAuthenticatedContext } from "@/lib/server-auth";
+import { checkAuthenticatedRateLimit, checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
     // Solo usuarios autenticados: esta ruta consume créditos de la API de
     // imágenes — sin este check cualquiera podría agotarlos.
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
+    const auth = await getAuthenticatedContext(request);
+    if (!auth) {
       return NextResponse.json({ error: "Inicia sesión para generar imágenes." }, { status: 401 });
     }
 
+    const { user, supabase } = auth;
+
     // 10 imagenes por hora y por usuario: generoso para un artista armando su
     // perfil, inútil para agotar los créditos de la API.
-    const limite = checkRateLimit(identificarSolicitante(request, user.id), 10, 3600);
+    const limite =
+      (await checkAuthenticatedRateLimit(supabase, "image-generation", 10, 3600)) ??
+      checkRateLimit(identificarSolicitante(request, user.id), 10, 3600);
     if (!limite.permitido) return respuesta429(limite.reintentarEn);
 
     const { prompt } = await request.json();

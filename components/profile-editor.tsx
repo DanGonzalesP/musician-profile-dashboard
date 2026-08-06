@@ -16,7 +16,7 @@ import { sanitizeUrlFields } from "@/lib/safe-url"
 import { fetchDraft, saveDraft } from "@/lib/draft"
 import { ensureOwnProfile } from "@/lib/ensure-profile"
 import imageCompression from "browser-image-compression"
-import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE, type AudioBitrate } from "@/lib/audio-transcode"
+import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
 import { ProfileSkeleton } from "@/components/blocks/skeletons"
 import { useToast } from "@/components/toast-provider"
@@ -304,6 +304,7 @@ function ProfileEditorInner() {
   // Slug de la página pública ya publicada (deriva de profiles.display_name)
   // — solo existe una vez que el artista publicó al menos una vez.
   const [publicSlug, setPublicSlug] = useState("")
+  const [editorProfile, setEditorProfile] = useState<{ id: string | null; isBand: boolean }>({ id: null, isBand: false })
   // Rol efectivo del usuario sobre el perfil que se está editando ahora
   // mismo — "owner" para el perfil personal o una banda propia, "admin"/
   // "editor" para un miembro de banda. Controla qué puede tocar en el
@@ -399,6 +400,7 @@ function ProfileEditorInner() {
 
         profileIdRef.current = profileId
         isBandRef.current = isBand
+        setEditorProfile({ id: profileId, isBand })
         setActiveRole(role)
 
         // El enlace público usa el username real, no un slug derivado del
@@ -478,7 +480,7 @@ function ProfileEditorInner() {
       }
     }
     loadSavedBlocks()
-  }, [])
+  }, [router])
 
   // Autoguardado de borrador: cada cambio se sube a profiles.draft_content
   // (columna aparte, nunca leída por el perfil público). No toca
@@ -1036,8 +1038,8 @@ function ProfileEditorInner() {
             onProductsChange={setProducts}
             services={services}
             onServicesChange={setServices}
-            profileId={profileIdRef.current}
-            isBand={isBandRef.current}
+            profileId={editorProfile.id}
+            isBand={editorProfile.isBand}
             onClose={() => setSelectedId(null)}
             focusAlbumId={focusAlbumId}
           />

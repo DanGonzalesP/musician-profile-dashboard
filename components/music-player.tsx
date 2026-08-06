@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Play, Pause, Volume2, SkipForward, SkipBack } from "lucide-react"
+import { Play, Pause, SkipForward, SkipBack } from "lucide-react"
 
 interface Track {
   id: string
@@ -18,6 +18,7 @@ export function MusicPlayer({ tracks }: MusicPlayerProps) {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const currentTrack = tracks[currentTrackIndex]
@@ -29,7 +30,7 @@ export function MusicPlayer({ tracks }: MusicPlayerProps) {
         audioRef.current.play().catch(() => setIsPlaying(false))
       }
     }
-  }, [currentTrackIndex])
+  }, [currentTrack?.audio_file_url, isPlaying])
 
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return
@@ -45,6 +46,11 @@ export function MusicPlayer({ tracks }: MusicPlayerProps) {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime)
     }
+  }
+
+  const handleLoadedMetadata = () => {
+    const nextDuration = audioRef.current?.duration
+    if (nextDuration && Number.isFinite(nextDuration)) setDuration(nextDuration)
   }
 
   const handleNext = () => {
@@ -70,6 +76,7 @@ export function MusicPlayer({ tracks }: MusicPlayerProps) {
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleNext}
       />
       
@@ -84,7 +91,7 @@ export function MusicPlayer({ tracks }: MusicPlayerProps) {
         <input
           type="range"
           min="0"
-          max={audioRef.current?.duration || currentTrack.duration_seconds || 100}
+          max={duration || currentTrack.duration_seconds || 100}
           value={currentTime}
           onChange={(e) => {
             if (audioRef.current) {

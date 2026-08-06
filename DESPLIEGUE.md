@@ -39,6 +39,15 @@ error antes de la siguiente. Todas son idempotentes (puedes repetirlas).
 | 5 | `0006_username.sql` | Identidad única + historial | ⚠️ Backfill masivo |
 | 6 | `0007_optimistic_concurrency.sql` | Control de versión al publicar | Bajo |
 | 7 | `0008_moderacion_y_cumplimiento.sql` | Reportes, DMCA, borrado de cuenta | Bajo — solo crea |
+| 8 | `0009_shared_rate_limits.sql` | Límite de subidas/IA compartido entre instancias | Bajo — solo crea |
+
+> **0009 es opcional pero recomendada.** Sin ella, el límite de frecuencia de
+> `/api/upload-url` y `/api/generate-image` sigue funcionando, pero en memoria de
+> cada instancia serverless (más laxo bajo mucho paralelismo). Al aplicarla, el
+> contador pasa a Postgres y se vuelve global. El código detecta solo si está
+> aplicada: si falta, cae al límite local sin romper nada (ver `lib/rate-limit.ts`).
+> La función RPC solo deja a cada usuario tocar su propio contador (`auth.uid()`),
+> así que nadie puede bloquear a otro ni manipular su cuota.
 
 ### Sobre 0003 (la más importante y la más delicada)
 

@@ -29,7 +29,6 @@ type TabKey = "main" | "legado" | "publicaciones";
 // (profiles.unified_profile), se muestran todos los bloques juntos en
 // position_index, sin pestañas (merch/servicio siguen fuera).
 const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "credits"];
-const EXTRA_TAB_TYPES: BlockType[] = ["legado", "publicaciones", "embeds"];
 // Bloques que ya no se renderizan en el perfil (viven en /tienda).
 const STORE_BLOCK_TYPES: BlockType[] = ["merch", "service"];
 
@@ -185,7 +184,7 @@ export function PerfilPublicoClient() {
     cargarPerfil();
 
     return () => controller.abort();
-  }, [username]);
+  }, [username, router]);
 
   // Solo el dueño del perfil lo ve — cierra el loop que abre "Vista previa"
   // en el editor: esa vista abre esta misma página pública en una pestaña

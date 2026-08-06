@@ -8,7 +8,7 @@
 // salen de la tabla products/services vía fetchCatalog — la misma fuente que
 // alimenta los bloques del editor.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -111,7 +111,7 @@ export function TiendaClient() {
 
     cargar();
     return () => controller.abort();
-  }, [username]);
+  }, [username, router]);
 
   const backButton = (
     <Link
@@ -272,7 +272,6 @@ function ProductCard({ product }: { product: CatalogProduct }) {
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card/50 transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_16px_40px_-16px_var(--primary)]">
       <div className="relative aspect-square w-full overflow-hidden bg-muted/40">
         {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image}
             alt={product.name}

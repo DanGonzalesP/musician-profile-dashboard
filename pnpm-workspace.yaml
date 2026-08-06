@@ -1,6 +1,19 @@
 packages:
   - "."
 
+# Fuerza versiones parcheadas de dependencias transitivas que Next.js empaqueta
+# en su propio árbol (postcss y sharp). Son bumps dentro de la misma major, sin
+# cambios de API:
+#   • postcss 8.4.31 → 8.5.x: herramienta de build de CSS; procesa el CSS del
+#     propio proyecto (entrada de confianza), nunca entrada de un atacante.
+#   • sharp 0.34 → 0.35: dep opcional de next/image; este proyecto usa
+#     images.unoptimized, así que sharp ni se invoca en runtime.
+# Sin esto, `pnpm audit --prod` reporta CVEs que en la práctica no son
+# explotables aquí, pero que conviene cerrar para no enmascarar otras reales.
+overrides:
+  postcss: "^8.5.23"
+  sharp: "^0.35.0"
+
 allowBuilds:
   core-js: true
   msw: true

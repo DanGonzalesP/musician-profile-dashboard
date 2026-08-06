@@ -42,7 +42,7 @@ export function validateMp3Url(url: string): boolean {
     const parsedUrl = new URL(url);
     const pathname = parsedUrl.pathname.toLowerCase();
     return VALID_AUDIO_EXTENSIONS.some((ext) => pathname.endsWith(ext));
-  } catch (error) {
+  } catch {
     return false;
   }
 }

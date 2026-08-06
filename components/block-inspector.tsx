@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, Album, Track, ReleaseType, SocialLink, SocialPlatform, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
+import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, Album, Track, SocialLink, SocialPlatform, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
 import { BLOCK_LIBRARY, SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
 import {
   type CatalogProduct,
@@ -23,7 +23,7 @@ import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
 import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
 import { MUSICIAN_ROLES } from "@/lib/musician-roles"
-import { X, Trash2, Loader2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check, AlertCircle } from "lucide-react"
+import { X, Trash2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check, AlertCircle } from "lucide-react"
 import { resolveContactChannel, CONTACT_CHANNEL_ICONS, CONTACT_CHANNEL_LABELS } from "@/lib/contact-channel"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { LegadoFields } from "@/components/inspector/legado-fields"
@@ -2097,7 +2097,6 @@ function MultiImageUploader({
     <div className="flex flex-wrap gap-2">
       {images.map((url, i) => (
         <div key={`${url}-${i}`} className="group relative size-14 shrink-0 overflow-hidden rounded-lg border border-sidebar-border">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={url} alt="" className="size-full object-cover" />
           <button
             type="button"

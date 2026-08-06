@@ -1,5 +1,3 @@
-import Script from "next/script"
-
 // Script bloqueante en <head>: corre antes de la hidratación para evitar un
 // parpadeo de tema/acento incorrecto (FOUC). Las claves deben coincidir con
 // THEME_STORAGE_KEY y ACCENT_STORAGE_KEY en lib/theme.ts — no se puede
@@ -22,8 +20,6 @@ const THEME_INIT_SCRIPT = `
 
 export function ThemeScript() {
   return (
-    <Script id="theme-init" strategy="beforeInteractive">
-      {THEME_INIT_SCRIPT}
-    </Script>
+    <script id="theme-init" dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
   )
 }

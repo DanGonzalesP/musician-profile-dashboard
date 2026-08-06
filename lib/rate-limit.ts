@@ -72,6 +72,41 @@ export function checkRateLimit(
 }
 
 /**
+ * Límite compartido para rutas autenticadas. Cuando la migración 0009 está
+ * aplicada, el contador vive en Postgres y por tanto se mantiene entre
+ * instancias serverless. `null` conserva el límite local en despliegues que
+ * todavía no hayan aplicado la migración.
+ */
+export async function checkAuthenticatedRateLimit(
+  supabase: SupabaseClient,
+  bucket: string,
+  maxPeticiones: number,
+  ventanaSegundos: number
+): Promise<ResultadoRateLimit | null> {
+  const { data, error } = await supabase.rpc("consume_authenticated_rate_limit", {
+    p_bucket: bucket,
+    p_limit: maxPeticiones,
+    p_window_seconds: ventanaSegundos,
+  })
+
+  if (error) {
+    // Una instalación anterior a la migración no debe perder la capacidad de
+    // subir archivos; usa el control local hasta que se despliegue el esquema.
+    if (error.code === "PGRST202") return null
+    console.error("[rate-limit] No se pudo consultar el límite compartido", error)
+    return null
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row.is_allowed !== "boolean" || typeof row.retry_after !== "number") return null
+  return {
+    permitido: row.is_allowed,
+    restantes: row.is_allowed ? 0 : 0,
+    reintentarEn: Math.max(0, Math.ceil(row.retry_after)),
+  }
+}
+
+/**
  * Identifica a quien hace la petición. Se prefiere el id de usuario cuando
  * hay sesión: es mucho más estable que la IP, que se comparte entre todos los
  * clientes detrás de un mismo NAT (una universidad, una oficina, un móvil).
@@ -99,3 +134,4 @@ export function respuesta429(reintentarEn: number): Response {
     }
   )
 }
+import type { SupabaseClient } from "@supabase/supabase-js"

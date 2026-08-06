@@ -7,7 +7,7 @@ import typescript from "eslint-config-next/typescript"
 // Se usa el flat config nativo de eslint-config-next 16 (no FlatCompat, que
 // no es compatible con ESLint 10).
 
-export default [
+const config = [
   ...coreWebVitals,
   ...typescript,
   {
@@ -57,3 +57,5 @@ export default [
     },
   },
 ]
+
+export default config
