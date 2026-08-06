@@ -110,7 +110,22 @@ function getEl(): HTMLAudioElement | null {
   return el
 }
 
+// Silencia cualquier otro <audio>/<video> AUDIBLE del DOM cuando el motor
+// arranca. Garantiza "una sola cosa suena a la vez en la plataforma" incluso
+// para superficies que no pasan por el motor —el visor de video de
+// Publicaciones (MediaViewer) reproduce con sonido por su cuenta—. No toca
+// medios muteados (miniaturas decorativas del feed, que solo animan) ni el
+// propio elemento del motor, que no vive en el DOM.
+function pauseForeignMedia() {
+  if (typeof document === "undefined") return
+  document.querySelectorAll("video, audio").forEach((node) => {
+    const media = node as HTMLMediaElement
+    if (media !== el && !media.paused && !media.muted) media.pause()
+  })
+}
+
 function safePlay(element: HTMLAudioElement, myToken: number) {
+  pauseForeignMedia()
   const p = element.play()
   if (p && typeof p.then === "function") {
     p.then(() => {

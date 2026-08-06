@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 import { ChevronDown, ChevronUp, Heart, Link2, Pause, Play, Share2, Volume2, VolumeX, X } from "lucide-react"
 import type { PublicacionItem } from "@/lib/blocks"
+import * as audioEngine from "@/lib/audio-engine"
 
 const SWIPE_DISTANCE = 80
 const SWIPE_VELOCITY = 500
@@ -74,6 +75,11 @@ export function MediaViewer({
   useEffect(() => {
     videoRefs.current.forEach((video, i) => {
       if (i === index && current?.type === "video" && !paused) {
+        // Una sola cosa suena a la vez: si hay una canción sonando en el motor
+        // global, se pausa al abrir un video con sonido (el visor es una
+        // experiencia inmersiva a pantalla completa). Si el video está
+        // silenciado, se deja la música tal cual.
+        if (!video.muted) audioEngine.pause()
         video.play().catch(() => {
           video.muted = true
           setMuted(true)
@@ -280,7 +286,14 @@ export function MediaViewer({
             <>
               <button
                 type="button"
-                onClick={() => setMuted((m) => !m)}
+                onClick={() =>
+                  setMuted((m) => {
+                    // Al activar el sonido de un video, cortar la música del
+                    // motor para no encimar dos sonidos.
+                    if (m) audioEngine.pause()
+                    return !m
+                  })
+                }
                 aria-label={muted ? "Activar sonido" : "Silenciar"}
                 className="group flex flex-col items-center gap-1 text-white"
               >

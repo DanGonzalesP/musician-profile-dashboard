@@ -125,6 +125,14 @@ using (
   )
 );
 
+-- IMPRESCINDIBLE: esta política lee profiles.is_suspended al evaluar cada
+-- lectura de profile_blocks. Como 0003/0006 le revocaron a anon el acceso a
+-- profiles y solo le concedieron una lista blanca de columnas, sin este grant
+-- un visitante SIN sesión recibe "permission denied for table profiles" y NO
+-- puede ver ningún perfil público. is_suspended es una bandera de moderación,
+-- no un dato sensible, así que exponerla a lectura pública no tiene riesgo.
+grant select (is_suspended) on profiles to anon;
+
 
 -- ─── 4) Registro de auditoría ─────────────────────────────────────────────
 -- Sin esto, cuando alguien dice "se borró mi contenido" no hay con qué
