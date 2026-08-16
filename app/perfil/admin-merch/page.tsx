@@ -55,26 +55,11 @@ function fullUpdatePayload(p: CatalogProduct) {
   };
 }
 
-function legacyUpdatePayload(p: CatalogProduct) {
-  return {
-    title: p.name,
-    price: Number(p.price) || 0,
-    images_urls: p.images,
-    stock_quantity: p.stock,
-  };
-}
-
-function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  return error.code === "42703" || error.code === "PGRST204" || /column/i.test(error.message ?? "");
-}
-
 export default function AdminMerchPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [errorMensaje, setErrorMensaje] = useState("");
-  const [avisoMigracion, setAvisoMigracion] = useState(false);
   const [editing, setEditing] = useState<CatalogProduct | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -144,25 +129,10 @@ export default function AdminMerchPage() {
           ...fullUpdatePayload(editing),
         };
         const { error } = await supabase.from("products").insert([payload]);
-        if (error) {
-          if (!isMissingColumn(error)) throw error;
-          setAvisoMigracion(true);
-          const { error: legacyError } = await supabase.from("products").insert([
-            { seller_id: profileId, type: "merch", position_index: products.length, ...legacyUpdatePayload(editing) },
-          ]);
-          if (legacyError) throw legacyError;
-        }
+        if (error) throw error;
       } else {
         const { error } = await supabase.from("products").update(fullUpdatePayload(editing)).eq("id", editing.id);
-        if (error) {
-          if (!isMissingColumn(error)) throw error;
-          setAvisoMigracion(true);
-          const { error: legacyError } = await supabase
-            .from("products")
-            .update(legacyUpdatePayload(editing))
-            .eq("id", editing.id);
-          if (legacyError) throw legacyError;
-        }
+        if (error) throw error;
       }
       setEditing(null);
       cargarProductos(profileId);
@@ -185,8 +155,7 @@ export default function AdminMerchPage() {
     const value = flag === "is_active" ? !p.isActive : !p.isFeatured;
     const { error } = await supabase.from("products").update({ [flag]: value }).eq("id", p.id);
     if (error) {
-      if (isMissingColumn(error)) setAvisoMigracion(true);
-      else setErrorMensaje(error.message);
+      setErrorMensaje(error.message);
       return;
     }
     cargarProductos(profileId);
@@ -236,13 +205,6 @@ export default function AdminMerchPage() {
             {errorMensaje}
           </div>
         )}
-        {avisoMigracion && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-500">
-            Se guardó lo básico, pero los campos avanzados (categoría, variantes, enlace de compra...)
-            necesitan que las migraciones versionadas estén aplicadas en Supabase.
-          </div>
-        )}
-
         {/* ── Formulario de creación/edición ── */}
         {editing && (
           <ProductForm

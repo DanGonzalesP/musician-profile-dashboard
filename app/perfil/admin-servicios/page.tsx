@@ -65,19 +65,6 @@ function fullUpdatePayload(s: CatalogService) {
   };
 }
 
-function legacyUpdatePayload(s: CatalogService) {
-  return {
-    title: s.title,
-    price: Number(s.price) || 0,
-    description: s.description || null,
-  };
-}
-
-function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  return error.code === "42703" || error.code === "PGRST204" || /column/i.test(error.message ?? "");
-}
-
 const MODALITIES = [
   { id: "presencial", label: "Presencial" },
   { id: "online", label: "Online" },
@@ -89,7 +76,6 @@ export default function AdminServiciosPage() {
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [errorMensaje, setErrorMensaje] = useState("");
-  const [avisoMigracion, setAvisoMigracion] = useState(false);
   const [editing, setEditing] = useState<CatalogService | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -145,25 +131,10 @@ export default function AdminServiciosPage() {
         const { error } = await supabase.from("services").insert([
           { profile_id: profileId, position_index: services.length, ...fullUpdatePayload(editing) },
         ]);
-        if (error) {
-          if (!isMissingColumn(error)) throw error;
-          setAvisoMigracion(true);
-          const { error: legacyError } = await supabase.from("services").insert([
-            { profile_id: profileId, position_index: services.length, ...legacyUpdatePayload(editing) },
-          ]);
-          if (legacyError) throw legacyError;
-        }
+        if (error) throw error;
       } else {
         const { error } = await supabase.from("services").update(fullUpdatePayload(editing)).eq("id", editing.id);
-        if (error) {
-          if (!isMissingColumn(error)) throw error;
-          setAvisoMigracion(true);
-          const { error: legacyError } = await supabase
-            .from("services")
-            .update(legacyUpdatePayload(editing))
-            .eq("id", editing.id);
-          if (legacyError) throw legacyError;
-        }
+        if (error) throw error;
       }
       setEditing(null);
       cargarServicios(profileId);
@@ -186,8 +157,7 @@ export default function AdminServiciosPage() {
     const value = flag === "is_active" ? !s.isActive : !s.isFeatured;
     const { error } = await supabase.from("services").update({ [flag]: value }).eq("id", s.id);
     if (error) {
-      if (isMissingColumn(error)) setAvisoMigracion(true);
-      else setErrorMensaje(error.message);
+      setErrorMensaje(error.message);
       return;
     }
     cargarServicios(profileId);
@@ -230,13 +200,6 @@ export default function AdminServiciosPage() {
             {errorMensaje}
           </div>
         )}
-        {avisoMigracion && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-500">
-            Se guardó lo básico, pero los campos avanzados (categoría, modalidad, qué incluye...)
-            necesitan que las migraciones versionadas estén aplicadas en Supabase.
-          </div>
-        )}
-
         {editing && (
           <ServiceForm
             service={editing}
