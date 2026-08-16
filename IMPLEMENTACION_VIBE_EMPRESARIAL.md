@@ -1,0 +1,366 @@
+# Implementación del Plan Empresarial — registro de ejecución
+
+Registro de lo **completado y verificado localmente**, de lo que quedó **bloqueado
+por una acción estrictamente humana**, y de la evidencia real de cada gate. Sigue
+la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
+[`PLAN_VIBE_EMPRESARIAL.md`](PLAN_VIBE_EMPRESARIAL.md).
+
+- **Fecha:** 16 de agosto de 2026
+- **HEAD:** `6ffa555` (`chore: eliminar componentes muertos AccionPublica y FormularioDonacion`)
+- **Índice:** vacío — **no se ha hecho ningún commit** (así lo pidió la consigna).
+  Todo el trabajo vive en el árbol de trabajo.
+- **Entorno:** Windows 11 (26200) · Node v24.16.0 · pnpm 11.10.0 · Next 16.2.12 ·
+  TypeScript 5.7.3 · Vitest 4.1.10 · Playwright 1.62.
+
+> Esta sesión **retomó** el árbol no commiteado que dejó una auditoría
+> interrumpida. Se revisó pieza por pieza, se corrigió lo que estaba roto, se
+> borraron los artefactos que no debían versionarse, y se llevó hasta el final
+> todo lo que se podía terminar sin credenciales, sin Docker y sin mutar nada
+> externo (ver §3 y §4).
+
+---
+
+## 1. Gates obligatorios — resultado real
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Tipos | `pnpm typecheck` | ✅ **0 errores** |
+| Lint | `pnpm lint` (`--max-warnings=22`) | ✅ **0 errores, 22 warnings** (exit 0) |
+| Pruebas unitarias | `pnpm test` | ✅ **18 archivos, 217 pruebas** |
+| QA agregado | `pnpm qa` | ✅ verde de punta a punta |
+| Build | `pnpm build` | ✅ **exit 0**, 34 rutas |
+| **E2E + axe** | `pnpm test:e2e` | ✅ **88 pruebas verdes** (chromium escritorio + móvil) |
+| **Regresión visual** | `pnpm test:visual` | ✅ **20 instantáneas ARIA verdes**, 20 capturas de píxeles omitidas (esperan aprobación humana) |
+| **Smoke** | `node scripts/smoke-staging.mjs` | ✅ **7 de 7 en verde** contra un servidor local (§2.11) |
+
+**Cambio en el número de pruebas:** de **68 en 7 archivos** (línea base `6ffa555`)
+a **217 unitarias en 18 archivos + 88 E2E + 20 visuales** = **325 pruebas
+ejecutables**, todas verdes.
+
+**Gates de base de datos (`pnpm db:verify`, `pnpm test:db`): siguen
+BLOQUEADOS.** Son los únicos. Ver §4.
+
+---
+
+## 2. Lo que se completó
+
+### 2.1 F1 · Línea base e higiene — cerrada
+`AGENTS.md`, `.github/CODEOWNERS`, `.github/dependabot.yml`,
+`.github/pull_request_template.md`, `.env.example` (14 variables, sin valores),
+`docs/linea-base.md`, `docs/deuda-react-compiler.md`. Trinquete de lint en 22.
+
+### 2.2 F2 · Residuos de seguridad — cerrada
+- **P-04** `cleanup-orphaned-files` ya no devuelve `error.message`.
+- **P-05** haystack con el cliente autenticado del admin, incluye
+  `profile_private.draft_content`, cruza contra `media_assets` con ventana de
+  gracia de 7 días (`lib/cleanup-orphans.ts`, probado sin red) y **aborta** si
+  no pudo leer alguna fuente.
+- **P-06** `image-proxy` cuenta bytes reales (`lib/stream-limit.ts`) y responde 413.
+- **P-07** `identificarSolicitante()` sólo confía en `x-forwarded-for` con proxy
+  de confianza.
+
+### 2.3 F3 · Validación de esquema del contenido — capa de código y migración listas
+`lib/blocks-schema.ts` (valida forma, no contenido) + modo observación por
+defecto + `supabase/migrations/0010_validar_bloques.sql`.
+
+### 2.4 F5 · Anti-abuso en las escrituras del navegador — capa de código y migración listas
+`supabase/migrations/0011_limites_de_escritura.sql` + `lib/rate-limit-errors.ts`
+adoptado en comentarios, preguntas, reportes y bloqueos.
+
+### 2.5 F4 · CSP con nonce y aislamiento — cerrada localmente
+
+- `proxy.ts` genera un nonce criptográfico distinto por documento, lo inyecta
+  en la request y en la response y conserva la renovación de cookies de
+  Supabase en la misma petición.
+- `lib/csp.ts` construye la política fail-closed: `script-src` no contiene
+  `unsafe-inline`; `unsafe-eval` sólo existe en desarrollo; ffmpeg conserva
+  `blob:`/`wasm-unsafe-eval`; imágenes, conexiones e iframes se acotan a los
+  proveedores que Vibe usa.
+- `app/layout.tsx` lee el nonce y el script bloqueante de tema lo recibe sin
+  producir desajustes de hidratación. COOP es `same-origin`; CORP es
+  `same-site`, salvo la imagen Open Graph que debe poder consumirse desde
+  WhatsApp/Slack/Discord y sale `cross-origin`.
+- `tests/e2e/csp.spec.ts` comprueba nonces únicos, las cabeceras y **cero
+  violaciones CSP** en legal, feed y perfil, escritorio y móvil. La auditoría
+  detectó y corrigió una primera versión que activaba el overlay de Next y
+  bloqueaba un botón móvil.
+
+### 2.6 F8 · E2E, accesibilidad y regresión visual — **cerrada localmente**
+
+Es el cambio más grande de esta sesión, y el que desbloqueó todo lo demás.
+
+**El problema que había:** las specs interceptaban la red del navegador con
+`page.route`. Eso sólo cubre la mitad de la aplicación: en cuanto una consulta
+sale del servidor (`generateMetadata`, sitemap, Server Components) el navegador
+no la ve y no hay nada que interceptar. Por eso las pruebas de contenido estaban
+marcadas como "requieren Supabase local" y se saltaban solas.
+
+**La solución:** `tests/e2e/fixtures/servidor-supabase.mjs`, un **PostgREST de
+mentira** (~340 líneas) que sirve `tests/e2e/fixtures/datos.json`.
+`playwright.config.ts` lo arranca y le apunta `NEXT_PUBLIC_SUPABASE_URL`, así
+que **las dos mitades** —render en servidor y navegador— reciben los mismos
+fixtures deterministas. Sin Docker, sin credenciales, sin un solo dato real.
+Implementa el subconjunto de PostgREST que la aplicación usa: `select` con
+recursos embebidos y `!inner`, filtros por operador, `or`, `order`, `limit`,
+`offset`, la negociación de "un solo objeto" de `.maybeSingle()`, y la RPC
+`descubrimiento_perfiles`.
+
+Con eso, **ya no hay ni una prueba saltada por falta de datos**:
+
+| Spec | Qué congela |
+|---|---|
+| `perfil-publico.spec.ts` | HTML del servidor con contenido; **render sin JavaScript**; metadatos sociales; 404 real; perfil suspendido; sitemap sin suspendidos; axe en perfil y tienda |
+| `feed.spec.ts` | pista pública en el feed; **nada de un perfil suspendido**; foco con teclado; axe |
+| `invariantes-publicas.spec.ts` | 401 en `cleanup`/`delete-file`/`upload-url`/`eliminar-cuenta`; 400 en `image-proxy`; robots y sitemap; cabeceras de seguridad |
+| `auth.spec.ts` | redirección en el borde de las rutas protegidas |
+| `legal-a11y.spec.ts` | axe en las 6 páginas legales y el login |
+| `health.spec.ts` | contrato de `/api/health` sin filtrar internos |
+| `tests/visual/capture.spec.ts` | estructura ARIA de 5 páginas en 4 anchos |
+
+**Dos violaciones de accesibilidad reales, encontradas por la suite y
+corregidas** (ninguna cambia un píxel; detalle en `docs/accesibilidad.md`):
+1. `/legal/cookies`: región scrolleable sin foco de teclado (WCAG 2.1.1, seria).
+2. Riel de filtros del feed en móvil: `role="tablist"` con hijos que no son
+   pestañas (WCAG 1.3.1, **crítica**).
+
+**Capa visual en dos niveles**, con el patrón que resuelve el problema
+Windows/Linux: la instantánea **ARIA** es determinista, se versiona como texto y
+se compara en todos los sistemas (20 referencias generadas y verdes); la capa de
+**píxeles** lleva la plataforma en el nombre del archivo y **se omite** mientras
+no exista una referencia aprobada. Generarlas es `pnpm test:visual:update`, y es
+una decisión humana porque definen oficialmente cómo se ve Vibe.
+
+### 2.7 F9 · CI empresarial — al día con lo que existe
+`.github/workflows/ci.yml`: `permissions: contents: read`, `concurrency`,
+`timeout-minutes`, job de **gitleaks**, job de **calidad** (audit bloqueante →
+typecheck → lint con trinquete → test → build → `git diff --check`), job de
+**E2E** y job de **regresión visual (capa ARIA)**. Los dos últimos corren de
+verdad, sin credenciales. El job de base de datos sigue con `if: false` y su
+motivo escrito al lado. Todas las acciones externas están fijadas a un commit
+SHA inmutable; `pnpm audit --audit-level=high` sale 0 (quedan 5 moderadas y 1
+baja).
+
+### 2.8 F10 · Perfil público renderizado en el servidor — **cerrada localmente**
+
+Cierra **P-18**, **P-19** y **P-21**, con la estrategia de islas del plan: el
+componente cliente **no se reescribió**.
+
+- `lib/supabase-server.ts` → `fetchPublicProfilePage(username)`: perfil, bloques
+  y catálogo en una sola ida, en paralelo, memorizada con `unstable_cache` y
+  **etiquetada por perfil**.
+- `app/[username]/page.tsx` y `app/[username]/tienda/page.tsx` resuelven en el
+  servidor y pasan `datosIniciales`.
+- `profile-client.tsx` / `tienda-client.tsx` aceptan esa prop **opcional**: si
+  viene, calculan el estado inicial en el primer render con **las mismas
+  funciones de mapeo que ya usaban** (`dbBlockToBlock`, `rowToProduct`,
+  `rowToService`) y no hacen el `useEffect` de carga. Si no viene —Supabase
+  caído en el servidor— se comportan exactamente como antes. Revertir la fase es
+  quitar una prop.
+- `app/[username]/opengraph-image.tsx` *(nuevo)*: tarjeta social compuesta. Un
+  artista **sin foto** ya no comparte un enlace sin imagen (P-19).
+- `app/acciones/revalidar-perfil.ts` *(nuevo)*: Server Action que invalida la
+  etiqueta al publicar, para que el artista vea su cambio al instante y no en 5
+  minutos. Best-effort: nunca convierte un fallo de caché en un fallo de
+  publicación.
+- Un username inexistente devuelve **404 de verdad** (antes: 200 con el texto
+  "Artista no encontrado", un soft 404 que Google indexa igual).
+
+**Evidencia de que el arreglo es real**, no una afirmación: dos pruebas cargan
+el perfil y la tienda **con JavaScript deshabilitado** y verifican que el nombre
+del artista, su lema y su single **se ven**. Sin hidratación posible, lo que se
+ve es lo que mandó el servidor.
+
+### 2.9 F11 (parcial) · Feed, agregación y paginación
+- **P-16** — `supabase/migrations/0012_descubrimiento_y_feed.sql` *(nuevo)*:
+  `descubrimiento_perfiles(tipo, limite)`, `security invoker`, con el `group by`
+  en Postgres y excluyendo perfiles suspendidos e ítems inactivos.
+  El límite público queda acotado a 100 aunque un cliente pida más.
+  `lib/feed/discovery.ts` la usa **si existe** y cae a la agregación anterior si
+  no, así que la migración se puede aplicar antes o después del código.
+- **P-17** — `lib/feed/keyset.ts` *(nuevo, probado)*: cursor `(created_at, id)`
+  con desempate, y `fetchAllPublicFeed`/`fetchPublicPosts` aceptan `cursor`. Las
+  consultas pasan a tener un **orden total**, sin el cual una paginación por
+  cursor se cuelga repitiendo el mismo bloque. Los índices que la hacen barata
+  están en `0012`.
+- **P-20** — `images.unoptimized` se mantiene, por la decisión ya razonada del
+  plan (§F11).
+
+### 2.10 F12 (parcial) · Observabilidad y salud
+- `lib/log.ts` (probado): JSON estructurado con redacción recursiva de PII,
+  tokens, claves y contenido, incluso cuando aparecen incrustados en el texto
+  de una excepción o una URL firmada. No registra pilas con rutas locales.
+  **Cero `console.*` en `app/api/`** (verificado).
+- `app/api/health/route.ts`: 200/503 según Supabase y R2, con timeout de 3 s,
+  rate limit y `no-store`. **No filtra** bucket, URL ni detalle.
+- **P-02**: `generate-image` responde 503 con mensaje claro si falta
+  `TOGETHER_API_KEY`.
+
+### 2.11 F13 (parcial) · Smoke ejecutable y verificado
+`scripts/smoke-staging.mjs` dejó de ser un archivo que nadie corrió. Se ejecutó
+contra un servidor local con los fixtures y devolvió **7 de 7 en verde**:
+
+```
+✅ GET /api/health responde y reporta estado — status 503, estado=degradado (aceptado)
+✅ GET /api/health no filtra internos — limpio
+✅ POST /api/cleanup-orphaned-files sin sesión → 401
+✅ GET /api/image-proxy con host no permitido → 400
+✅ GET /sitemap.xml tiene entradas — status 200
+✅ GET /robots.txt responde — status 200
+✅ GET /artista_prueba sirve HTML con contenido (render server, F10) — 39 023 bytes
+Smoke OK: 7 chequeos en verde.
+```
+
+`SMOKE_PERMITIR_DEGRADADO=1` acepta un health en 503 **sólo** cuando falta una
+dependencia a propósito (el entorno local no tiene R2). Contra producción,
+"degradado" sigue siendo un fallo ruidoso.
+
+### 2.12 P-34 · Suspensión efectiva en todas las superficies de lectura
+Cuatro capas, todas con prueba:
+
+| Superficie | Cómo se aplica | Prueba |
+|---|---|---|
+| Perfil público y tienda | `fetchPublicProfilePage` → 404 antes de renderizar y antes de cachear | E2E |
+| Sitemap | se pide `is_suspended` y se filtra; si el select falla, se sirven sólo las rutas estáticas | E2E |
+| Feed de pistas y publicaciones | filtro por `profiles.is_suspended` | E2E |
+| Descubrimiento (productos/servicios) | filtro en `aggregate()` **y** en el RPC de `0012` | unitaria + E2E |
+
+### 2.13 P-03 · Las dos pantallas rotas del panel
+`/perfil/pedidos` y `/perfil/dashboard` consultaban `order_items` (que no
+existe) y mostraban **el texto crudo de Postgres al usuario**:
+`relation "public.order_items" does not exist`. Ahora `lib/errores-de-consulta.ts`
+(probado, 10 casos) traduce el error a la voz del producto sin filtrar nombres
+de tablas ni de esquemas, y el dashboard sigue mostrando el resto de sus cifras
+en vez de cortarse entero.
+
+Esto **no** decide la pregunta de producto —implementar pedidos o retirar las
+pantallas—, que sigue siendo tuya (§8 #6 del plan). Sólo deja de mentirle al
+usuario mientras tanto.
+
+### 2.14 F14 (parcial) · Privacidad operable sin inventar privilegios
+
+- `components/zona-datos-personales.tsx` conecta la exportación JSON y la
+  eliminación irreversible de cuenta desde `/perfil/config`; la ruta de
+  borrado elimina primero los objetos inventariados en R2 y después la cuenta.
+- `components/legal/consentimiento-cookies.tsx` mantiene Vercel Analytics
+  apagado hasta una aceptación explícita, recuerda aceptar/rechazar de forma
+  fail-closed y funciona con teclado. Tiene 11 casos unitarios y 14 ejecuciones
+  E2E (7 conductas × escritorio/móvil).
+- La suspensión ya desaparece de perfil, tienda, feed y sitemap (§2.12).
+- El panel `/admin/reportes` no se improvisó: `ADMIN_USER_IDS` sólo existe en
+  el entorno de Vercel y no puede convertirse honestamente en una política RLS.
+  F14 se cierra cuando se apruebe cómo representar administradores en Postgres,
+  junto con el correo y los plazos institucionales del takedown.
+
+---
+
+## 3. Qué se corrigió del árbol que se retomó
+
+1. **`pnpm typecheck` estaba en rojo.** `playwright.visual.config.ts` pasaba
+   `timeout` dentro de `toMatchAriaSnapshot`, opción que no existe en esa
+   posición. Con el typecheck roto, `pnpm qa` no pasaba y el build habría
+   fallado.
+2. **`playwright-report/` y `test-results/` estaban sin rastrear en el árbol.**
+   Son salidas regenerables que además pueden llevar capturas de la sesión. Se
+   borraron y se añadieron al `.gitignore`, junto con `blob-report/` y los
+   temporales del CLI de Supabase.
+3. **Las pruebas de contenido se saltaban solas** con una nota que las declaraba
+   imposibles sin Supabase local. No lo eran: ver §2.5.
+4. **La instantánea ARIA se guardaba con sufijo de plataforma**
+   (`-win32.aria.yml`), lo que la habría vuelto incomparable en el CI de Linux —
+   justo lo contrario de para lo que existe esa capa.
+5. **La capa de píxeles fallaba en vez de omitirse** cuando no había referencia
+   para el sistema operativo actual, pese a que la configuración decía lo
+   contrario en un comentario.
+6. **`reuseExistingServer` reutilizaba un `next dev` de una corrida anterior.**
+   Provocó una tanda de 18 fallos que no correspondían a ningún problema del
+   repositorio. Ahora siempre se arranca fresco.
+7. **`scripts/smoke-staging.mjs` nunca se había ejecutado.** Se corrigió lo que
+   hacía falta y se corrió (§2.11).
+
+---
+
+## 4. Bloqueos estrictamente humanos (con evidencia)
+
+Sólo quedan estos. Todo lo demás que antes figuraba como bloqueo resultó
+resoluble con fixtures.
+
+| # | Bloqueo | Evidencia exacta | Fase |
+|---|---|---|---|
+| A | **Docker daemon apagado.** Sin daemon, `supabase start` no levanta nada. | `docker info` → `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine` | F6/F7 |
+| B | **No existe `0000_baseline.sql`.** Ninguna migración crea `profiles` ni `profile_blocks`, pero `0002`/`0003` las referencian → `supabase db reset` fallaría aunque Docker estuviera vivo. El baseline se genera con `supabase db diff` **contra producción**: requiere `supabase link` y credenciales. | `docs/migraciones.md`, sección "El baseline" | F6 |
+| C | **`pnpm db:verify` y `pnpm test:db` bloqueados.** Ambos se ejecutaron: el primero salió 1 porque Docker no responde; el segundo salió 1 antes de las 13 pruebas por ausencia de `SUPABASE_TEST_URL`/claves locales. | salida de ambos comandos del 16-08-2026 | F6/F7 |
+| D | **Aprobar las capturas de píxeles de referencia.** Definen oficialmente cómo se ve Vibe; no las fabrica un agente. Un comando: `pnpm test:visual:update`, revisar cada PNG, versionar. Mientras tanto la capa ARIA sí corre y bloquea. | `tests/visual/referencias/` sólo tiene `.aria.yml` | F8 |
+| E | **Verificación externa del estado desplegado (F0)**: anon key sin DNIs, `cleanup` 401 en producción, etc. Requiere tu base y tus variables de Vercel. *(El equivalente local ya corre en `invariantes-publicas.spec.ts` y en el smoke.)* | — | F0 |
+| F | **Aplicar `0010`, `0011` y `0012`.** Forward-only, escritas, idempotentes, sin aplicar. Ninguna rompe nada mientras espera: el código detecta su ausencia y sigue como antes. | `docs/migraciones.md`, tabla de estado | F3/F5/F11 |
+| G | **Accesibilidad del editor con teclado.** Exige una sesión autenticada real; el servidor de fixtures es de sólo lectura y sin auth **a propósito**, porque simular un JWT válido significaría falsificar Supabase Auth entero o meter una credencial en el repositorio. | `docs/accesibilidad.md` | F8 |
+| H | **Decisiones de proveedor y de negocio:** Sentry vs. log drains (F12), captcha vs. confirmación de correo (F5), staging y backups (F13), correo institucional y plazos de DMCA (F14), cuota por perfil (F11), política de `orders`/`donations` (F0 #6). | §8 del plan | varias |
+
+Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
+`pnpm test:visual` y el smoke pasen en verde hoy.
+
+---
+
+## 5. Fases no cerrables sólo desde el repositorio
+
+- **F4 está cerrada localmente.** Queda la comprobación humana en navegador
+  real de los seis embeds y ffmpeg.wasm; las superficies públicas y la consola
+  CSP sí están automatizadas en escritorio y móvil.
+- **F6 (más allá del andamiaje):** los 23 `.sql` históricos **no** se movieron a
+  `legacy/` — hacerlo antes del baseline es perder la única descripción del
+  esquema que existe.
+- **F7 (más allá de `helpers.ts` + `rls-perfiles.test.ts`):** necesita A y B.
+- **F13/F14:** staging, backups, restauración probada y panel de moderación.
+  El banner de consentimiento, la exportación y el borrado de datos ya están
+  conectados. Los **runbooks y la documentación ya están escritos**
+  (`docs/staging.md`, `docs/backups.md`, `docs/runbooks/*`,
+  `docs/retencion-de-datos.md`, `docs/rotacion-de-credenciales.md`); lo que
+  falta es la infraestructura, que cuesta dinero y vive en tus cuentas.
+
+---
+
+## 6. Riesgos abiertos
+
+1. **`0010`/`0011`/`0012` sin aplicar ni probar contra una base real.** Escritas
+   con cuidado (idempotentes, `not valid`, mensajes estables), pero su
+   comportamiento sólo se verifica con `test:db`, hoy bloqueado. Las tres tienen
+   su contrapartida en código diseñada para funcionar **con y sin** ellas.
+2. **El equivalente en JavaScript de `descubrimiento_perfiles`** que usa el
+   servidor de fixtures puede divergir del SQL. Si diverge, las pruebas dejan de
+   describir lo que corre en producción. Está señalado en el propio archivo; la
+   verificación real llega con `test:db`.
+3. **La capa de píxeles no protege nada todavía.** Hasta que existan referencias
+   aprobadas, un cambio visual fino puede pasar: lo que hoy detecta la suite es
+   un cambio de **estructura**, no de color o espaciado.
+4. **Cuotas y moderación administrativa siguen dependiendo de decisiones de
+   producto/arquitectura.** No se creó una falsa capa: la cuota necesita el
+   límite aprobado y el panel necesita una identidad de administrador también
+   representada en Postgres para que RLS sea la segunda barrera.
+
+---
+
+## 7. Acciones humanas pendientes (orden de urgencia)
+
+1. Encender **Docker Desktop** y generar `0000_baseline.sql` con
+   `supabase db diff` — desbloquea F6, F7 y el job de base de datos del CI.
+2. Aplicar **`0010`** (queda en modo observación), **`0011`** y **`0012`**.
+3. Correr la verificación externa de **F0** contra producción.
+4. `pnpm test:visual:update`, revisar las capturas y versionarlas.
+5. Definir dueños de **CODEOWNERS** y activar la protección de rama.
+6. `TOGETHER_API_KEY` y las decisiones de proveedor del punto H de §4.
+
+*(Lista completa y priorizada: §8 del `PLAN_VIBE_EMPRESARIAL.md`.)*
+
+---
+
+## 8. Cómo reproducir todo esto
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm qa            # typecheck + lint + 217 unitarias
+pnpm build
+pnpm test:e2e      # 88 pruebas: E2E + axe, escritorio y móvil
+pnpm test:visual   # 20 instantáneas ARIA en 4 anchos
+```
+
+Ninguno de esos cuatro comandos necesita Docker, credenciales, ni red hacia
+Supabase, R2 o cualquier tercero.

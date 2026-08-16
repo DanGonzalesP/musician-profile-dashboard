@@ -3,6 +3,7 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { r2Client, R2_BUCKET_NAME } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
 import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
+import { idDePeticion, logError, logInfo } from "@/lib/log"
 
 // Borrado de cuenta — derecho de supresión (Ley 29733 art. 20 / GDPR art. 17).
 //
@@ -17,6 +18,7 @@ import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate
 // habría forma de saber qué borrar.
 
 export async function POST(request: Request) {
+  const requestId = idDePeticion(request)
   try {
     const auth = await getAuthenticatedContext(request)
     if (!auth) {
@@ -33,7 +35,10 @@ export async function POST(request: Request) {
       .select("key")
 
     if (assetsError) {
-      console.error("[api/eliminar-cuenta] No se pudo listar los archivos", assetsError)
+      logError("api/eliminar-cuenta", "no se pudo listar los archivos del usuario", assetsError, {
+        requestId,
+        userId: user.id,
+      })
       return NextResponse.json(
         { error: "No se pudo preparar la eliminación. Inténtalo de nuevo." },
         { status: 500 }
@@ -49,7 +54,10 @@ export async function POST(request: Request) {
       try {
         await r2Client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }))
       } catch (err) {
-        console.error("[api/eliminar-cuenta] Error borrando de R2", key, err)
+        logError("api/eliminar-cuenta", "fallo al borrar un objeto de R2", err, {
+          requestId,
+          userId: user.id,
+        })
         fallidos.push(key)
       }
     }
@@ -58,12 +66,25 @@ export async function POST(request: Request) {
     // el resto cae por los ON DELETE CASCADE ya declarados.
     const { error: rpcError } = await supabase.rpc("eliminar_mi_cuenta")
     if (rpcError) {
-      console.error("[api/eliminar-cuenta] Fallo el borrado en la base", rpcError)
+      logError("api/eliminar-cuenta", "fallo el borrado en la base", rpcError, {
+        requestId,
+        userId: user.id,
+      })
       return NextResponse.json(
         { error: "No se pudo eliminar la cuenta. Escríbenos y lo hacemos manualmente." },
         { status: 500 }
       )
     }
+
+    // Se registra el hecho (auditoría del derecho de supresión) pero nunca los
+    // datos borrados.
+    logInfo("api/eliminar-cuenta", "cuenta eliminada", {
+      requestId,
+      userId: user.id,
+      archivos: assets?.length ?? 0,
+      fallidos: fallidos.length,
+      resultado: "ok",
+    })
 
     return NextResponse.json({
       eliminada: true,
@@ -71,7 +92,7 @@ export async function POST(request: Request) {
       archivosPendientes: fallidos.length,
     })
   } catch (error) {
-    console.error("[api/eliminar-cuenta]", error)
+    logError("api/eliminar-cuenta", "error inesperado al eliminar la cuenta", error, { requestId })
     return NextResponse.json({ error: "No se pudo eliminar la cuenta." }, { status: 500 })
   }
 }

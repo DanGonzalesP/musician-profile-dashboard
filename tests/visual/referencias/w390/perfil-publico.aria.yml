@@ -1,0 +1,17 @@
+- link "Volver al feed":
+  - /url: /
+- main:
+  - paragraph: En vivo desde la suite de pruebas
+  - img "Artista de Prueba"
+  - heading "Artista de Prueba" [level=2]
+  - text: Lima, Peru
+  - button "Preguntarle al artista sobre esto"
+  - link "Merch y servicios":
+    - /url: /artista_prueba/tienda
+  - button "Mostrar controles de reproducción":
+    - img "Portada del single"
+  - text: Lanzamiento Actual
+  - heading "Cancion de Prueba" [level=3]
+  - text: /Rock • \d+ — El single destacado del artista de prueba\./
+  - button "Preguntarle al artista sobre esto"
+  - button "Reportar"

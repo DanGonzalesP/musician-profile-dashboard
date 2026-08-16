@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import type { FeedTrack } from "@/lib/musicFeed"
+import { expresionKeyset, type CursorFeed } from "@/lib/feed/keyset"
 import { parseMusicianRoles, type MusicianRole } from "@/lib/musician-roles"
 
 // Publicaciones de los usuarios en el feed principal. No hay una tabla
@@ -36,14 +37,19 @@ type PublicacionesRow = {
     musician_roles?: unknown
     musician_category?: string | null
     profile_type?: string | null
+    is_suspended?: boolean | null
   } | null
 }
 
-export async function fetchPublicPosts(limit: number = 60): Promise<FeedPost[]> {
+/**
+ * Página de publicaciones del feed. `cursor` habilita la paginación keyset
+ * (P-17); sin él devuelve la primera página, igual que antes.
+ */
+export async function fetchPublicPosts(limit: number = 60, cursor?: CursorFeed): Promise<FeedPost[]> {
   // Igual que fetchAllPublicFeed: se degrada si faltan columnas nuevas.
   const selects = [
-    `id, profile_id, content, created_at, profiles ( display_name, musician_roles, profile_type )`,
-    `id, profile_id, content, created_at, profiles ( display_name, musician_category, profile_type )`,
+    `id, profile_id, content, created_at, profiles ( display_name, musician_roles, profile_type, is_suspended )`,
+    `id, profile_id, content, created_at, profiles ( display_name, musician_category, profile_type, is_suspended )`,
     `id, profile_id, content, created_at, profiles ( display_name )`,
   ]
 
@@ -52,14 +58,19 @@ export async function fetchPublicPosts(limit: number = 60): Promise<FeedPost[]> 
     // .order() explícito: sin ORDER BY, Postgres no garantiza ningún orden,
     // así que este .limit() devolvía filas ARBITRARIAS. No eran "las 60
     // publicaciones más recientes" sino 60 cualesquiera, y el contenido nuevo
-    // podía no aparecer nunca en el feed.
-    const { data, error } = await supabase
+    // podía no aparecer nunca en el feed. El `id desc` completa el orden para
+    // que el cursor no se cuelgue con dos filas de la misma marca de tiempo.
+    let consulta = supabase
       .from("profile_blocks")
       .select(select)
       .eq("block_type", "publicaciones")
       .eq("is_visible", true)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(limit)
+    if (cursor) consulta = consulta.or(expresionKeyset(cursor))
+
+    const { data, error } = await consulta
     if (!error) {
       rows = data as unknown as PublicacionesRow[]
       break
@@ -69,6 +80,9 @@ export async function fetchPublicPosts(limit: number = 60): Promise<FeedPost[]> 
 
   const posts: FeedPost[] = []
   for (const row of rows) {
+    // Segunda capa de la suspensión (P-34), igual que en musicFeed: las
+    // publicaciones de un perfil suspendido no llegan al feed.
+    if (row.profiles?.is_suspended === true) continue
     const content = row.content as { items?: unknown } | null
     const items = Array.isArray(content?.items) ? content.items : []
     const roles = parseMusicianRoles(row.profiles?.musician_roles ?? row.profiles?.musician_category)

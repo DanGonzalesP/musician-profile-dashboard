@@ -1,0 +1,41 @@
+- banner:
+  - link "Ir al feed principal":
+    - /url: /
+    - text: Vibe
+  - link "Volver al feed":
+    - /url: /
+  - navigation:
+    - link "Términos y Condiciones":
+      - /url: /legal/terminos
+    - link "Privacidad":
+      - /url: /legal/privacidad
+    - link "Derechos de autor":
+      - /url: /legal/copyright
+    - link "Cookies":
+      - /url: /legal/cookies
+    - link "Normas de comunidad":
+      - /url: /legal/comunidad
+- main:
+  - heading "Centro legal" [level=1]
+  - paragraph: Vibe es una plataforma donde los músicos publican su obra, venden sus productos y ofrecen sus servicios. Estos documentos explican cómo funciona todo eso de forma justa y segura para artistas y fans.
+  - 'link "Términos y Condiciones Las reglas de uso de Vibe: tu cuenta, tu contenido, la tienda y los servicios."':
+    - /url: /legal/terminos
+    - paragraph: Términos y Condiciones
+    - paragraph: "Las reglas de uso de Vibe: tu cuenta, tu contenido, la tienda y los servicios."
+  - link "Política de Privacidad Qué datos recogemos, para qué, con quién se procesan y tus derechos.":
+    - /url: /legal/privacidad
+    - paragraph: Política de Privacidad
+    - paragraph: Qué datos recogemos, para qué, con quién se procesan y tus derechos.
+  - 'link "Política de Derechos de Autor Cómo protegemos la música: reclamos por infracción, retiros y contranotificaciones."':
+    - /url: /legal/copyright
+    - paragraph: Política de Derechos de Autor
+    - paragraph: "Cómo protegemos la música: reclamos por infracción, retiros y contranotificaciones."
+  - link "Política de Cookies y almacenamiento local Qué guardamos en tu navegador (tema, idioma, sesión) y cómo controlarlo.":
+    - /url: /legal/cookies
+    - paragraph: Política de Cookies y almacenamiento local
+    - paragraph: Qué guardamos en tu navegador (tema, idioma, sesión) y cómo controlarlo.
+  - link "Normas de Comunidad Lo que esperamos de cada artista y fan para que la plataforma sea un buen escenario.":
+    - /url: /legal/comunidad
+    - paragraph: Normas de Comunidad
+    - paragraph: Lo que esperamos de cada artista y fan para que la plataforma sea un buen escenario.
+  - paragraph: "/Última actualización: \\d+ de julio de \\d+\\. Estos documentos son una base preparada para una plataforma de música con contenido de usuarios; no constituyen asesoría legal — antes del lanzamiento conviene que un abogado los revise para tu caso concreto\\./"

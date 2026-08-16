@@ -462,7 +462,12 @@ export const SINGLETON_BLOCK_TYPES: BlockType[] = ["hero"]
 // "embeds" ya no se ofrece en la librería (se fusionó con Publicaciones),
 // pero sigue siendo un tipo conocido para poder LEER los bloques guardados
 // antes de la fusión y plegarlos vía mergePublicacionesEmbeds().
-const KNOWN_BLOCK_TYPES: BlockType[] = [...BLOCK_LIBRARY.map((b) => b.type), "embeds"]
+//
+// Se exporta porque es la LISTA CANÓNICA de `block_type`: la usan el validador
+// de runtime (lib/blocks-schema.ts) y el `check` de la migración 0010. Si esta
+// lista y la de la base divergen, se rechaza contenido legítimo — por eso hay
+// una prueba que compara ambas.
+export const KNOWN_BLOCK_TYPES: BlockType[] = [...BLOCK_LIBRARY.map((b) => b.type), "embeds"]
 
 /**
  * Filtra block_type que ya no existen en BLOCK_LIBRARY (ej. "license", del
@@ -484,7 +489,10 @@ export function createBlock(type: BlockType): Block {
   }
 }
 
-type DbProfileBlock = {
+// Se exporta porque el perfil público ahora recibe estas filas ya resueltas
+// desde el servidor (F10) y las mapea con `dbBlockToBlock` en el primer
+// render, en vez de pedirlas con un useEffect.
+export type DbProfileBlock = {
   id: number
   block_type: string
   content: unknown

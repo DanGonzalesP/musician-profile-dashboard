@@ -1,8 +1,7 @@
 // Script bloqueante en <head>: corre antes de la hidratación para evitar un
 // parpadeo de tema/acento incorrecto (FOUC). Las claves deben coincidir con
 // THEME_STORAGE_KEY y ACCENT_STORAGE_KEY en lib/theme.ts — no se puede
-// importar el módulo TS directamente dentro de un script inline. Usa
-// next/script con beforeInteractive, la estrategia oficial de Next.js.
+// importar el módulo TS directamente dentro de un script inline.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
@@ -18,8 +17,17 @@ const THEME_INIT_SCRIPT = `
 })();
 `
 
-export function ThemeScript() {
+export function ThemeScript({ nonce }: { nonce?: string }) {
   return (
-    <script id="theme-init" dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+    <script
+      id="theme-init"
+      nonce={nonce}
+      // El navegador oculta deliberadamente el atributo content `nonce` al
+      // DOM después de procesarlo. React vería `nonce=""` al hidratar aunque
+      // el valor correcto sí se usó, por eso se suprime únicamente esta
+      // diferencia conocida y acotada.
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+    />
   )
 }

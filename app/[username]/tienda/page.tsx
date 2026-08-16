@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
-import { fetchProfileMeta } from "@/lib/supabase-server"
+import { notFound, redirect } from "next/navigation"
+import { fetchProfileMeta, fetchPublicProfilePage } from "@/lib/supabase-server"
 import { SITE_NAME } from "@/lib/site"
 import { TiendaClient } from "./tienda-client"
 
@@ -48,6 +49,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default function TiendaPage() {
-  return <TiendaClient />
+export default async function TiendaPage({ params }: Props) {
+  const { username } = await params
+  const resultado = await fetchPublicProfilePage(username)
+
+  if (resultado.estado === "redirigir") redirect(`/${resultado.username}/tienda`)
+  if (resultado.estado === "no-encontrado") notFound()
+  if (resultado.estado === "sin-servidor") return <TiendaClient />
+
+  return <TiendaClient datosIniciales={resultado.datos} />
 }

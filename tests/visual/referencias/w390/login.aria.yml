@@ -1,0 +1,26 @@
+- link "Volver al feed":
+  - /url: /
+- banner:
+  - link "Ir al feed principal":
+    - /url: /
+    - img
+  - heading "Bienvenido a Vibe" [level=2]
+  - paragraph: Ingresa para gestionar tu música y productos.
+- text: Correo Electrónico
+- textbox "correo@ejemplo.com"
+- text: Contraseña
+- textbox "••••••••"
+- button "Ingresar"
+- button "¿No tienes cuenta? Regístrate aquí"
+- paragraph:
+  - link "Términos":
+    - /url: /legal/terminos
+  - text: ·
+  - link "Privacidad":
+    - /url: /legal/privacidad
+  - text: ·
+  - link "Derechos de autor":
+    - /url: /legal/copyright
+  - text: ·
+  - link "Centro legal":
+    - /url: /legal

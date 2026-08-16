@@ -121,7 +121,10 @@ export function sanitizeUrlForStorage(raw: unknown): string {
 // audioUrl, photo, thumbnail): esos van a <img>/<audio>, no a un href, y
 // apuntan a R2 por https — pasarlos por el saneador no aporta nada y sí
 // arriesga romper contenido válido.
-const URL_FIELD_NAMES = new Set([
+// Se exporta para que lib/blocks-schema.ts valide EXACTAMENTE el mismo
+// conjunto de campos al persistir: dos listas separadas se desincronizan y una
+// de las dos capas empieza a rechazar (o a dejar pasar) lo que la otra no.
+export const URL_FIELD_NAMES = new Set([
   "contactUrl",
   "href",
   "purchaseUrl",

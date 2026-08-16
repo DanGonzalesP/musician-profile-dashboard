@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { resolveProfileByUsername } from "@/lib/username";
 import { type Block, type BlockType, type TracksData, type CreditsData, BLOCK_LIBRARY, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds } from "@/lib/blocks";
-import { type CatalogProduct, type CatalogService, fetchCatalog } from "@/lib/catalog";
+import { type CatalogProduct, type CatalogService, fetchCatalog, rowToProduct, rowToService } from "@/lib/catalog";
+import type { PerfilPublicoInicial } from "@/lib/supabase-server";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { AskAboutBlock } from "@/components/blocks/ask-about-block";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
@@ -32,32 +33,66 @@ const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks
 // Bloques que ya no se renderizan en el perfil (viven en /tienda).
 const STORE_BLOCK_TYPES: BlockType[] = ["merch", "service"];
 
+// Traduce las filas crudas que llegan del servidor (F10) a lo que el
+// componente ya sabía renderizar. Se usan LAS MISMAS funciones que aplicaba a
+// la respuesta de PostgREST cuando pedía los datos desde el navegador, así que
+// el resultado es idéntico byte a byte.
+function mapearDatosIniciales(datos: PerfilPublicoInicial) {
+  const isBandProfile = datos.profile.profileType === "band";
+  const blocks = mergePublicacionesEmbeds(
+    datos.blockRows
+      .filter((b) => isKnownBlockType(b.block_type))
+      .map((b) => dbBlockToBlock(b, { isBand: isBandProfile }))
+  );
+  return {
+    blocks,
+    products: datos.productRows.map(rowToProduct),
+    services: datos.serviceRows.map(rowToService),
+  };
+}
+
 // Parte interactiva del perfil publico. La página en sí
-// (app/[username]/page.tsx) es un Server Component que aporta los metadatos
-// para buscadores y redes; acá vive todo lo que necesita el navegador:
-// pestañas, reproductor, sesión del visitante.
-export function PerfilPublicoClient() {
+// (app/[username]/page.tsx) es un Server Component que resuelve el perfil, sus
+// bloques y su catálogo y los pasa acá ya listos (`datosIniciales`); acá vive
+// todo lo que necesita el navegador: pestañas, reproductor, sesión del
+// visitante.
+//
+// `datosIniciales` es OPCIONAL a propósito: si el servidor no pudo resolver el
+// perfil (Supabase caído, por ejemplo), este componente se comporta
+// exactamente como antes de F10 y carga los datos por su cuenta. El camino
+// viejo sigue vivo y probado, así que revertir la fase es quitar una prop.
+export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: PerfilPublicoInicial }) {
   const { t } = useLocale();
   const params = useParams();
   const router = useRouter();
-  const username = (params?.username as string)?.trim().toLowerCase();
+  const username = datosIniciales?.profile.username ?? (params?.username as string)?.trim().toLowerCase();
 
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [services, setServices] = useState<CatalogService[]>([]);
-  const [state, setState] = useState<LoadingState>("loading");
+  // Estado inicial calculado UNA vez: cuando el servidor ya trajo los datos,
+  // el primer render (el que produce el HTML) sale con el contenido puesto —
+  // ni esqueleto, ni parpadeo, ni un solo viaje del navegador a Supabase.
+  const [iniciales] = useState(() => (datosIniciales ? mapearDatosIniciales(datosIniciales) : null));
+
+  const [blocks, setBlocks] = useState<Block[]>(iniciales?.blocks ?? []);
+  const [products, setProducts] = useState<CatalogProduct[]>(iniciales?.products ?? []);
+  const [services, setServices] = useState<CatalogService[]>(iniciales?.services ?? []);
+  const [state, setState] = useState<LoadingState>(
+    iniciales ? (iniciales.blocks.length === 0 ? "empty" : "success") : "loading"
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState("");
-  const [unifiedProfile, setUnifiedProfile] = useState(false);
+  const [unifiedProfile, setUnifiedProfile] = useState(datosIniciales?.profile.unifiedProfile ?? false);
   const [activeTab, setActiveTab] = useState<TabKey>("main");
-  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(datosIniciales?.profile.id ?? null);
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   // Ids de los perfiles que el visitante administra (el suyo y sus bandas).
   // Se usa para saber si está mirando su propia página sin tener que exponer
   // el user_id del dueño en una consulta pública.
   const [viewerProfileIds, setViewerProfileIds] = useState<string[]>([]);
-  const [isBand, setIsBand] = useState(false);
-  const [profileAccent, setProfileAccent] = useState<AccentColor>("rojo");
+  const [isBand, setIsBand] = useState(datosIniciales?.profile.profileType === "band");
+  const acentoInicial = datosIniciales?.profile.accentColor;
+  const [profileAccent, setProfileAccent] = useState<AccentColor>(
+    isAccentColor(acentoInicial) ? acentoInicial : "rojo"
+  );
 
   useEffect(() => {
     setShareUrl(window.location.href);
@@ -83,6 +118,10 @@ export function PerfilPublicoClient() {
   }, []);
 
   useEffect(() => {
+    // El servidor ya trajo todo (F10): no hay nada que ir a buscar. Este
+    // camino sólo corre cuando la página no pudo resolverse en el servidor.
+    if (datosIniciales) return;
+
     if (!username) {
       setState("error");
       setErrorMessage("Perfil no especificado");
@@ -184,7 +223,7 @@ export function PerfilPublicoClient() {
     cargarPerfil();
 
     return () => controller.abort();
-  }, [username, router]);
+  }, [username, router, datosIniciales]);
 
   // Solo el dueño del perfil lo ve — cierra el loop que abre "Vista previa"
   // en el editor: esa vista abre esta misma página pública en una pestaña

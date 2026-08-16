@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
 
 // Preguntas de visitantes sobre un elemento puntual del perfil público —
 // tabla profile_questions (ver supabase/profile_questions_table.sql). El
@@ -75,9 +76,13 @@ export async function createProfileQuestion(params: {
 
   if (error) {
     throw new Error(
-      error.message.includes("profile_questions")
-        ? "Las preguntas aún no están activadas: falta correr supabase/profile_questions_table.sql."
-        : error.message
+      traducirErrorDeEscritura(
+        error,
+        "pregunta",
+        error.message.includes("profile_questions")
+          ? "Las preguntas aún no están activadas: falta correr supabase/profile_questions_table.sql."
+          : error.message
+      )
     )
   }
   return mapRow(data as QuestionRow)

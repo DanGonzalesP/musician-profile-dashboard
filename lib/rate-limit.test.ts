@@ -51,17 +51,72 @@ describe("checkRateLimit — contador local en memoria", () => {
 describe("identificarSolicitante", () => {
   const req = (headers: Record<string, string>) => new Request("https://x", { headers })
 
-  it("prefiere el id de usuario cuando hay sesión", () => {
+  // El entorno decide si x-forwarded-for es creíble (P-07). Cada bloque de
+  // abajo fija el suyo y lo restaura, para que el orden de las pruebas no
+  // importe.
+  const entornoOriginal = { VERCEL: process.env.VERCEL, TRUSTED_PROXY: process.env.TRUSTED_PROXY }
+  afterEach(() => {
+    process.env.VERCEL = entornoOriginal.VERCEL
+    process.env.TRUSTED_PROXY = entornoOriginal.TRUSTED_PROXY
+  })
+  function sinProxy() {
+    delete process.env.VERCEL
+    delete process.env.TRUSTED_PROXY
+  }
+
+  it("prefiere el id de usuario cuando hay sesión, con o sin proxy de confianza", () => {
+    sinProxy()
+    expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }), "u-9")).toBe("user:u-9")
+    process.env.VERCEL = "1"
     expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }), "u-9")).toBe("user:u-9")
   })
 
-  it("cae a la primera IP de x-forwarded-for cuando es anónimo", () => {
-    expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe("ip:1.2.3.4")
+  describe("con proxy de confianza", () => {
+    it("cae a la primera IP de x-forwarded-for cuando es anónimo (VERCEL=1)", () => {
+      process.env.VERCEL = "1"
+      expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe("ip:1.2.3.4")
+    })
+
+    it("también con TRUSTED_PROXY=true fuera de Vercel", () => {
+      sinProxy()
+      process.env.TRUSTED_PROXY = "true"
+      expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }))).toBe("ip:1.2.3.4")
+    })
+
+    it("usa x-real-ip si no hay forwarded, y un marcador si no hay nada", () => {
+      process.env.VERCEL = "1"
+      expect(identificarSolicitante(req({ "x-real-ip": "9.9.9.9" }))).toBe("ip:9.9.9.9")
+      expect(identificarSolicitante(req({}))).toBe("ip:desconocida")
+    })
   })
 
-  it("usa x-real-ip si no hay forwarded, y un marcador si no hay nada", () => {
-    expect(identificarSolicitante(req({ "x-real-ip": "9.9.9.9" }))).toBe("ip:9.9.9.9")
-    expect(identificarSolicitante(req({}))).toBe("ip:desconocida")
+  describe("sin proxy de confianza (P-07)", () => {
+    it("IGNORA x-forwarded-for: la cabecera la manda el cliente y es falsificable", () => {
+      sinProxy()
+      expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }))).toBe("ip:sin-proxy-confiable")
+    })
+
+    it("ignora también x-real-ip", () => {
+      sinProxy()
+      expect(identificarSolicitante(req({ "x-real-ip": "9.9.9.9" }))).toBe("ip:sin-proxy-confiable")
+    })
+
+    it("un atacante que rota la cabecera NO consigue cubos distintos", () => {
+      sinProxy()
+      const claves = new Set(
+        ["1.1.1.1", "2.2.2.2", "3.3.3.3"].map((ip) => identificarSolicitante(req({ "x-forwarded-for": ip })))
+      )
+      // Antes de P-07 esto daba 3 cubos y el límite por IP era decorativo.
+      expect(claves.size).toBe(1)
+    })
+
+    it("no confía en un TRUSTED_PROXY que no sea exactamente 'true'", () => {
+      sinProxy()
+      for (const valor of ["1", "yes", "TRUE", ""]) {
+        process.env.TRUSTED_PROXY = valor
+        expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }))).toBe("ip:sin-proxy-confiable")
+      }
+    })
   })
 })
 

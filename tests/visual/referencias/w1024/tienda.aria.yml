@@ -1,0 +1,19 @@
+- banner:
+  - link "Volver al perfil":
+    - /url: /artista_prueba
+  - text: Artista de Prueba
+- main:
+  - paragraph: Tienda
+  - heading "Productos" [level=2]
+  - text: 1 producto ¡Últimas 5! Ropa y textil
+  - paragraph: Polera de Prueba
+  - paragraph: Producto ficticio del artista de prueba.
+  - paragraph: /PEN \d+\.\d+/
+  - text: Consultar
+  - paragraph: Trabaja conmigo
+  - heading "Servicios" [level=2]
+  - text: 1 servicio Clases y mentoría
+  - paragraph: Clase de Prueba
+  - paragraph: Servicio ficticio del artista de prueba.
+  - text: /Online \d+ minutos/
+  - paragraph: /PEN \d+\.00por hora/

@@ -7,6 +7,7 @@ import {
   type OembedProvider,
 } from "@/lib/oembed"
 import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
+import { idDePeticion, logError, logWarn } from "@/lib/log"
 
 // Autocompletado de metadatos (título, artista principal, miniatura) al
 // pegar un enlace externo en un crédito del Bloque 4. Corre server-side para
@@ -20,6 +21,7 @@ import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate
 // cliente ya sabe mostrar "no se pudo leer, completa manualmente". Solo un
 // request inválido (sin url, o plataforma no soportada) responde 400.
 export async function GET(request: Request) {
+  const requestId = idDePeticion(request)
   try {
     // Esta ruta no exige sesión (solo lee metadata publica), así que el
     // límite va por IP: 30 por minuto alcanza de sobra para pegar enlaces en
@@ -41,8 +43,8 @@ export async function GET(request: Request) {
 
     const metadata = await resolveOembed(provider, url)
     return NextResponse.json(metadata)
-  } catch (error: any) {
-    console.error("[api/oembed]", error)
+  } catch (error) {
+    logError("api/oembed", "error inesperado resolviendo el enlace", error, { requestId })
     return NextResponse.json({ error: "No se pudo leer el enlace" }, { status: 500 })
   }
 }
@@ -83,7 +85,9 @@ async function fetchNativeOembed(provider: OembedProvider, endpoint: string): Pr
       thumbnailUrl: data.thumbnail_url ? String(data.thumbnail_url) : undefined,
     }
   } catch (error) {
-    console.error(`[api/oembed] ${provider}`, error)
+    // Nunca se registra la URL: es contenido que pegó el usuario.
+    logWarn("api/oembed", "el proveedor no respondió; se usa el fallback", { proveedor: provider })
+    logError("api/oembed", "detalle del fallo del proveedor", error, { proveedor: provider })
     return { provider, title: "", authorName: "", fallback: true }
   }
 }
@@ -129,7 +133,7 @@ async function fetchMetaOembed(provider: "facebook" | "instagram", url: string):
       embedUrl: publicEmbedUrl,
     }
   } catch (error) {
-    console.error(`[api/oembed] ${provider}`, error)
+    logError("api/oembed", "detalle del fallo del proveedor de Meta", error, { proveedor: provider })
     return { provider, title: "", authorName: "", thumbnailUrl: undefined, embedUrl: publicEmbedUrl, fallback: true }
   }
 }

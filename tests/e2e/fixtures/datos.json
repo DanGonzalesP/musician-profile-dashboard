@@ -1,0 +1,192 @@
+{
+  "_nota": "Datos de prueba INVENTADOS. Ni un dato real de ninguna persona: dos artistas de mentira que existen solo para que las pruebas E2E tengan qué renderizar. Es la fuente única de verdad del servidor falso de PostgREST (servidor-supabase.mjs) y de las aserciones de las specs (seed.ts).",
+
+  "profiles": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "user_id": "00000000-0000-0000-0000-0000000000aa",
+      "owner_user_id": null,
+      "username": "artista_prueba",
+      "display_name": "Artista de Prueba",
+      "bio": "Musica hecha para las pruebas automaticas.",
+      "profile_type": "artist",
+      "unified_profile": false,
+      "accent_color": "rojo",
+      "is_suspended": false,
+      "musician_roles": ["cantante"],
+      "musician_category": "cantante",
+      "content_version": 3,
+      "created_at": "2026-01-10T12:00:00.000Z"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "user_id": "00000000-0000-0000-0000-0000000000bb",
+      "owner_user_id": null,
+      "username": "suspendido_prueba",
+      "display_name": "Cuenta Suspendida De Prueba",
+      "bio": "Perfil suspendido por moderacion; no debe aparecer en ninguna superficie publica.",
+      "profile_type": "artist",
+      "unified_profile": false,
+      "accent_color": "azul",
+      "is_suspended": true,
+      "musician_roles": ["guitarrista"],
+      "musician_category": "guitarrista",
+      "content_version": 1,
+      "created_at": "2026-01-11T12:00:00.000Z"
+    }
+  ],
+
+  "username_history": [
+    {
+      "old_username": "nombre_viejo",
+      "profile_id": "00000000-0000-0000-0000-000000000001"
+    }
+  ],
+
+  "reserved_usernames": [{ "name": "admin" }],
+
+  "profile_blocks": [
+    {
+      "id": "00000000-0000-0000-0000-000000000010",
+      "profile_id": "00000000-0000-0000-0000-000000000001",
+      "block_type": "hero",
+      "position_index": 0,
+      "is_visible": true,
+      "content": {
+        "name": "Artista de Prueba",
+        "tagline": "En vivo desde la suite de pruebas",
+        "location": "Lima, Peru",
+        "image": "",
+        "banner": "",
+        "socials": []
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000011",
+      "profile_id": "00000000-0000-0000-0000-000000000001",
+      "block_type": "single",
+      "position_index": 1,
+      "is_visible": true,
+      "content": {
+        "title": "Cancion de Prueba",
+        "genre": "Rock",
+        "year": "2026",
+        "description": "El single destacado del artista de prueba.",
+        "cover": "https://ejemplo.r2.dev/images/single-prueba.png",
+        "audioUrl": "https://ejemplo.r2.dev/audio/single-prueba.mp3",
+        "duration": "3:21"
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000012",
+      "profile_id": "00000000-0000-0000-0000-000000000002",
+      "block_type": "hero",
+      "position_index": 0,
+      "is_visible": true,
+      "content": {
+        "name": "Cuenta Suspendida De Prueba",
+        "tagline": "No deberia verse",
+        "location": "Lima, Peru",
+        "image": "",
+        "banner": "",
+        "socials": []
+      }
+    }
+  ],
+
+  "products": [
+    {
+      "id": "00000000-0000-0000-0000-000000000020",
+      "seller_id": "00000000-0000-0000-0000-000000000001",
+      "type": "merch",
+      "title": "Polera de Prueba",
+      "price": 80,
+      "currency": "PEN",
+      "images_urls": [],
+      "description": "Producto ficticio del artista de prueba.",
+      "category": "ropa",
+      "product_kind": "fisico",
+      "variants": [],
+      "purchase_url": "",
+      "stock_quantity": 5,
+      "position_index": 0,
+      "is_active": true,
+      "is_featured": false,
+      "created_at": "2026-02-01T12:00:00.000Z"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000021",
+      "seller_id": "00000000-0000-0000-0000-000000000002",
+      "type": "merch",
+      "title": "Producto De Cuenta Suspendida",
+      "price": 50,
+      "currency": "PEN",
+      "images_urls": [],
+      "description": "No debe aparecer en descubrimiento.",
+      "category": "ropa",
+      "product_kind": "fisico",
+      "variants": [],
+      "purchase_url": "",
+      "stock_quantity": 5,
+      "position_index": 0,
+      "is_active": true,
+      "is_featured": false,
+      "created_at": "2026-02-02T12:00:00.000Z"
+    }
+  ],
+
+  "services": [
+    {
+      "id": "00000000-0000-0000-0000-000000000030",
+      "profile_id": "00000000-0000-0000-0000-000000000001",
+      "title": "Clase de Prueba",
+      "price": 120,
+      "currency": "PEN",
+      "price_unit": "hora",
+      "description": "Servicio ficticio del artista de prueba.",
+      "category": "clases",
+      "modality": "online",
+      "duration": "60",
+      "duration_unit": "min",
+      "delivery_time": "",
+      "features": [],
+      "booking_url": "",
+      "image_url": "",
+      "position_index": 0,
+      "is_active": true,
+      "is_featured": false,
+      "created_at": "2026-02-03T12:00:00.000Z"
+    }
+  ],
+
+  "music_feed": [
+    {
+      "id": "00000000-0000-0000-0000-000000000040",
+      "profile_id": "00000000-0000-0000-0000-000000000001",
+      "title": "Pista Publica de Prueba",
+      "audio_url": "https://ejemplo.r2.dev/audio/prueba.mp3",
+      "cover_image_url": "",
+      "duration_seconds": 201,
+      "created_at": "2026-03-01T12:00:00.000Z"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000041",
+      "profile_id": "00000000-0000-0000-0000-000000000002",
+      "title": "Pista De Cuenta Suspendida",
+      "audio_url": "https://ejemplo.r2.dev/audio/suspendida.mp3",
+      "cover_image_url": "",
+      "duration_seconds": 150,
+      "created_at": "2026-03-02T12:00:00.000Z"
+    }
+  ],
+
+  "feed_posts": [],
+  "feed_post_comments": [],
+  "feed_comments": [],
+  "profile_questions": [],
+  "notifications": [],
+  "content_reports": [],
+  "user_blocks": [],
+  "media_assets": [],
+  "profile_private": []
+}

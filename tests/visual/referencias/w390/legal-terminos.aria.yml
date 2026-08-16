@@ -1,0 +1,73 @@
+- banner:
+  - link "Ir al feed principal":
+    - /url: /
+    - text: Vibe
+  - link "Volver al feed":
+    - /url: /
+  - navigation:
+    - link "Términos y Condiciones":
+      - /url: /legal/terminos
+    - link "Privacidad":
+      - /url: /legal/privacidad
+    - link "Derechos de autor":
+      - /url: /legal/copyright
+    - link "Cookies":
+      - /url: /legal/cookies
+    - link "Normas de comunidad":
+      - /url: /legal/comunidad
+- main:
+  - article:
+    - heading "Términos y Condiciones" [level=1]
+    - paragraph: Bienvenido a Vibe. Estos Términos regulan el uso de la plataforma (el sitio web, el editor de perfiles, el feed, la tienda y todos los servicios asociados). Al crear una cuenta o usar Vibe, aceptas estos Términos. Si no estás de acuerdo, no uses la plataforma.
+    - heading "1. Qué es Vibe" [level=2]
+    - paragraph: Vibe es una plataforma para que músicos de cualquier rubro (autores, compositores, arreglistas, directores, productores, ingenieros de mezcla, intérpretes y grupos) publiquen su música, su trayectoria y sus publicaciones, vendan productos y ofrezcan servicios, y para que cualquier persona descubra ese contenido.
+    - heading "2. Tu cuenta" [level=2]
+    - list:
+      - listitem: /Debes tener al menos \d+ años \(o la edad mínima legal en tu país\) para crear una cuenta\. Para vender productos o servicios debes tener capacidad legal para contratar\./
+      - listitem: Eres responsable de mantener la confidencialidad de tu contraseña y de toda la actividad que ocurra en tu cuenta.
+      - listitem: La información de tu perfil debe ser veraz. No puedes hacerte pasar por otra persona, artista o agrupación.
+      - listitem: Los perfiles de grupo musical son gestionados por su creador y por los integrantes que él invite; el creador responde por la página del grupo.
+    - heading "3. Tu contenido y tus derechos" [level=2]
+    - paragraph: Todo lo que subas (música, letras, fotos, videos, textos, portadas) sigue siendo tuyo. Vibe no reclama la propiedad de tu obra.
+    - list:
+      - listitem:
+        - strong: "Licencia limitada a la plataforma:"
+        - text: al publicar contenido nos otorgas una licencia mundial, no exclusiva, gratuita y revocable para alojarlo, reproducirlo, transformarlo técnicamente (compresión, miniaturas, transcodificación) y mostrarlo dentro de Vibe, con el único fin de operar el servicio. Esta licencia termina cuando eliminas el contenido o tu cuenta, salvo copias técnicas temporales.
+      - listitem:
+        - strong: "Declaración de titularidad:"
+        - text: declaras que el contenido que subes es de tu autoría o que cuentas con todas las licencias y autorizaciones necesarias (incluidas las de coautores, intérpretes, productores fonográficos y sellos) para publicarlo.
+      - listitem:
+        - strong: "Colaboraciones y créditos:"
+        - text: los créditos internos requieren aprobación del dueño de la canción. Acreditar falsamente una participación puede llevar al retiro del crédito y a la suspensión de la cuenta.
+    - heading "4. Tienda, servicios y pagos" [level=2]
+    - list:
+      - listitem:
+        - text: Vibe funciona como una
+        - strong: vitrina
+        - text: ": los artistas publican productos y servicios con sus precios y enlaces de compra o reserva externos. Salvo que se indique lo contrario, Vibe"
+        - strong: no procesa pagos, no interviene en la transacción y no es parte del contrato
+        - text: entre artista y comprador.
+      - listitem: El artista es el único responsable de la veracidad de sus ofertas, del cumplimiento de las entregas, de las garantías, devoluciones y de sus obligaciones tributarias.
+      - listitem: Las campañas de apoyo y metas de financiamiento muestran montos referenciales declarados por el artista; verifica siempre las condiciones antes de aportar por canales externos.
+      - listitem: Está prohibido ofrecer productos o servicios ilegales, falsificados o que infrinjan derechos de terceros.
+    - heading "5. Conducta prohibida" [level=2]
+    - list:
+      - listitem: Subir contenido que infrinja derechos de autor, marcas u otros derechos (ver la Política de Derechos de Autor).
+      - listitem: Publicar contenido ilegal, difamatorio, de odio, o que sexualice a menores (tolerancia cero, se reporta a las autoridades).
+      - listitem: Spam, manipulación de métricas, scraping masivo, ingeniería inversa o intentos de vulnerar la seguridad de la plataforma.
+      - listitem: Usar la plataforma para suplantar identidades o para estafas.
+    - heading "6. Retiro de contenido y terminación" [level=2]
+    - paragraph: Podemos retirar contenido o suspender cuentas que infrinjan estos Términos, las Normas de Comunidad o la ley, con o sin aviso previo según la gravedad. Tú puedes eliminar tu contenido o tu cuenta cuando quieras. Aplicamos una política de infractores reincidentes en materia de derechos de autor.
+    - heading "7. Propiedad de la plataforma" [level=2]
+    - paragraph: El software, el diseño, el logotipo y la marca Vibe son de nuestra propiedad o de nuestros licenciantes. Estos Términos no te otorgan ningún derecho sobre ellos.
+    - heading "8. Descargo de responsabilidad" [level=2]
+    - paragraph: La plataforma se ofrece “tal cual” y “según disponibilidad”. En la medida máxima permitida por la ley, no garantizamos disponibilidad ininterrumpida ni ausencia de errores, y no respondemos por pérdidas derivadas de transacciones entre usuarios, contenido de terceros o causas fuera de nuestro control razonable.
+    - heading "9. Cambios a estos Términos" [level=2]
+    - paragraph: Podemos actualizar estos Términos. Si el cambio es sustancial, lo anunciaremos en la plataforma con anticipación razonable. Seguir usando Vibe después de la actualización implica tu aceptación.
+    - heading /\d+\. Ley aplicable y contacto/ [level=2]
+    - paragraph:
+      - text: "Estos Términos se rigen por las leyes de la Perú, sin perjuicio de las protecciones de consumidor que te correspondan en tu país de residencia. Consultas:"
+      - link "danielgonzales200427@gmail.com":
+        - /url: mailto:danielgonzales200427@gmail.com
+      - text: .
+  - paragraph: "/Última actualización: \\d+ de julio de \\d+\\. Estos documentos son una base preparada para una plataforma de música con contenido de usuarios; no constituyen asesoría legal — antes del lanzamiento conviene que un abogado los revise para tu caso concreto\\./"

@@ -1,3 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { logError } from "@/lib/log"
+
 // Limitación de tasa para las rutas de API.
 //
 // Ninguna ruta tenía límite. Los casos concretos que eso dejaba abiertos:
@@ -6,17 +9,10 @@
 //   • /api/oembed hace fetch a terceros sin autenticación: proxy gratis.
 //   • Comentarios, preguntas y registro: spam trivial.
 //
-// IMPLEMENTACIÓN Y SUS LÍMITES — leer antes de confiar en esto:
-// El contador vive en memoria del proceso. En Vercel cada función serverless
-// es su propia instancia y se recicla, así que el límite real es "por
-// instancia", no global: alguien con suficiente paralelismo puede superarlo.
-// Sirve para frenar el abuso accidental y el scripting básico, que es la
-// mayor parte del problema hoy.
-//
-// Para un límite de verdad hace falta un contador compartido (Upstash Redis o
-// el rate limiting de Vercel). Este módulo expone la misma interfaz que se
-// necesitaría entonces, así que cambiarlo es sustituir el cuerpo de
-// checkRateLimit, no tocar las rutas.
+// Las operaciones autenticadas consumen el contador distribuido de Postgres
+// (migración 0009). Las anónimas conservan una primera barrera local: sin una
+// identidad verificable, permitir que el cliente elija la clave de un RPC
+// compartido haría el límite trivialmente evadible.
 
 type Ventana = { conteo: number; expiraEn: number }
 
@@ -93,7 +89,9 @@ export async function checkAuthenticatedRateLimit(
     // Una instalación anterior a la migración no debe perder la capacidad de
     // subir archivos; usa el control local hasta que se despliegue el esquema.
     if (error.code === "PGRST202") return null
-    console.error("[rate-limit] No se pudo consultar el límite compartido", error)
+    logError("rate-limit", "no se pudo consultar el límite compartido", error, {
+      resultado: "error",
+    })
     return null
   }
 
@@ -107,15 +105,42 @@ export async function checkAuthenticatedRateLimit(
 }
 
 /**
+ * ¿Podemos creerle a `x-forwarded-for`?
+ *
+ * Solo si un proxy de confianza la reescribe en el borde. En Vercel eso pasa
+ * siempre y la plataforma expone `VERCEL=1` en el runtime, así que se detecta
+ * sola. Fuera de Vercel —local, un contenedor, un servidor propio— la cabecera
+ * la manda el cliente y es trivialmente falsificable: el límite por IP se evade
+ * mandando un `x-forwarded-for` distinto en cada petición.
+ *
+ * Fail-closed: por defecto NO se confía. Quien tenga un proxy inverso propio que
+ * sanee la cabecera lo declara con `TRUSTED_PROXY=true` (ver `.env.example`).
+ *
+ * Se lee en cada llamada, no una vez al importar el módulo, para que las
+ * pruebas puedan alternar el entorno sin recargar el módulo.
+ */
+function proxyDeConfianza(): boolean {
+  return process.env.VERCEL === "1" || process.env.TRUSTED_PROXY === "true"
+}
+
+/**
  * Identifica a quien hace la petición. Se prefiere el id de usuario cuando
  * hay sesión: es mucho más estable que la IP, que se comparte entre todos los
  * clientes detrás de un mismo NAT (una universidad, una oficina, un móvil).
+ *
+ * Sin proxy de confianza no hay ningún identificador de red honesto disponible
+ * a nivel de aplicación, así que todas las peticiones anónimas comparten el
+ * cubo `ip:sin-proxy-confiable`. Es deliberado y es la falla segura: prefiere
+ * limitar de más a que un atacante se salte el límite con un header. En
+ * producción (Vercel) esta rama no se toma nunca.
  */
 export function identificarSolicitante(request: Request, userId?: string): string {
   if (userId) return `user:${userId}`
 
-  // En Vercel la IP real llega en x-forwarded-for; el primer valor es el
-  // cliente y el resto son los proxies intermedios.
+  if (!proxyDeConfianza()) return "ip:sin-proxy-confiable"
+
+  // Con proxy de confianza: el primer valor de x-forwarded-for es el cliente y
+  // el resto son los proxies intermedios.
   const forwarded = request.headers.get("x-forwarded-for") ?? ""
   const ip = forwarded.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "desconocida"
   return `ip:${ip}`
@@ -134,4 +159,3 @@ export function respuesta429(reintentarEn: number): Response {
     }
   )
 }
-import type { SupabaseClient } from "@supabase/supabase-js"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
+import { idDePeticion, logError, logInfo } from "@/lib/log"
 
 // Borra de R2 archivos que quedaron huérfanos al publicar (ej. el usuario
 // reemplazó una pista o una imagen por otra). Lo llama profile-editor.tsx
@@ -28,12 +29,13 @@ const ALLOWED_FOLDERS = new Set(["images", "audio", "video"])
 const MAX_URLS = 100
 
 export async function POST(request: Request) {
+  const requestId = idDePeticion(request)
   try {
     const auth = await getAuthenticatedContext(request)
     if (!auth) {
       return NextResponse.json({ error: "Inicia sesión para borrar archivos." }, { status: 401 })
     }
-    const { supabase } = auth
+    const { supabase, user } = auth
 
     const { urls } = await request.json()
     if (!Array.isArray(urls) || urls.length === 0) {
@@ -63,7 +65,10 @@ export async function POST(request: Request) {
       .in("key", candidateKeys)
 
     if (ownedError) {
-      console.error("[api/delete-file] No se pudo verificar la propiedad", ownedError)
+      logError("api/delete-file", "no se pudo verificar la propiedad", ownedError, {
+        requestId,
+        userId: user.id,
+      })
       return NextResponse.json({ error: "No se pudo verificar la propiedad de los archivos" }, { status: 500 })
     }
 
@@ -91,14 +96,22 @@ export async function POST(request: Request) {
         await supabase.from("media_assets").delete().eq("key", key)
         deleted.push(url)
       } catch (err) {
-        console.error("[api/delete-file] Error borrando", key, err)
+        logError("api/delete-file", "fallo al borrar objeto de R2", err, { requestId, userId: user.id })
         skipped.push(url)
       }
     }
 
+    logInfo("api/delete-file", "borrado por propiedad", {
+      requestId,
+      userId: user.id,
+      solicitados: candidateKeys.length,
+      borrados: deleted.length,
+      omitidos: skipped.length,
+      resultado: "ok",
+    })
     return NextResponse.json({ deleted, skipped })
-  } catch (error: any) {
-    console.error("[api/delete-file]", error)
+  } catch (error) {
+    logError("api/delete-file", "error inesperado al borrar", error, { requestId })
     return NextResponse.json({ error: "No se pudo borrar el archivo" }, { status: 500 })
   }
 }

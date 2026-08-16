@@ -1,4 +1,3 @@
-import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Geist_Mono, Plus_Jakarta_Sans, Unbounded } from 'next/font/google'
 import './globals.css'
@@ -6,6 +5,8 @@ import { SITE_URL } from '@/lib/site'
 import { ThemeScript } from '@/components/theme-script'
 import { LocaleProvider } from '@/components/locale-provider'
 import { ToastProvider } from '@/components/toast-provider'
+import { ConsentimientoCookies } from '@/components/legal/consentimiento-cookies'
+import { headers } from 'next/headers'
 
 const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta' })
 const unbounded = Unbounded({ subsets: ['latin'], variable: '--font-unbounded' })
@@ -47,11 +48,13 @@ export const viewport: Viewport = {
   themeColor: '#0a0a0a',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined
+
   return (
     <html
       lang="es"
@@ -59,13 +62,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <ThemeScript />
+        <ThemeScript nonce={nonce} />
       </head>
       <body className="font-sans antialiased">
         <LocaleProvider>
           <ToastProvider>{children}</ToastProvider>
         </LocaleProvider>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {/* La analítica ya no se monta sola: la monta el consentimiento, y
+            sólo tras un sí explícito (P-31). Ver components/legal/. */}
+        <ConsentimientoCookies />
       </body>
     </html>
   )

@@ -96,7 +96,13 @@ export function FeedSidebar({
       <div className="pointer-events-none absolute inset-x-0 top-20 z-40 sm:top-24 lg:hidden">
         <div
           ref={mobileRowRef}
-          role="tablist"
+          // `group`, no `tablist`: sus hijos son botones de alternancia
+          // (`aria-pressed`), no pestañas (`role="tab"` + `aria-selected`), y
+          // no controlan paneles. Con `tablist`, un lector de pantalla anuncia
+          // "pestaña 1 de 7" sobre controles que no son pestañas y axe lo marca
+          // como violación crítica (aria-required-children). Cambia lo que se
+          // ANUNCIA, no lo que se ve: cero píxeles de diferencia.
+          role="group"
           aria-label="Filtrar el feed"
           onPointerDown={() => setAutoScrollPaused(true)}
           onPointerUp={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { SITE_URL } from "@/lib/site"
+import { logError } from "@/lib/log"
 
 // Sitemap dinámico: lista los perfiles públicos para que Google los descubra
 // sin tener que rastrear enlace por enlace. Se regenera cada hora.
@@ -22,9 +23,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // Solo perfiles que de verdad tienen contenido publicado: un perfil vacío
     // indexado es una página de error para Google y perjudica al dominio.
+    //
+    // `is_suspended` se pide y se filtra en el código (P-34): un perfil
+    // suspendido listado en el sitemap es una invitación a que Google lo
+    // rastree justo después de haberlo bajado. Si la columna no estuviera
+    // disponible, el `select` falla entero y se cae al `catch` de abajo, que
+    // sirve las rutas estáticas — nunca perfiles sin filtrar.
     const { data: perfiles } = await supabase
       .from("profiles")
-      .select("username, profile_blocks!inner(id)")
+      .select("username, is_suspended, profile_blocks!inner(id)")
       .not("username", "is", null)
       .limit(5000)
 
@@ -32,8 +39,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const dinamicas: MetadataRoute.Sitemap = []
 
     for (const fila of perfiles ?? []) {
-      const username = (fila as { username?: string }).username
-      if (!username || vistos.has(username)) continue
+      const { username, is_suspended: suspendido } = fila as { username?: string; is_suspended?: boolean }
+      if (!username || vistos.has(username) || suspendido === true) continue
       vistos.add(username)
 
       dinamicas.push({
@@ -47,7 +54,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   } catch (error) {
     // Un sitemap parcial es mucho mejor que un 500: si Supabase no responde,
     // se sirven al menos las rutas estáticas.
-    console.error("[sitemap] No se pudieron listar los perfiles:", error)
+    logError("sitemap", "no se pudieron listar los perfiles", error)
     return estaticas
   }
 }

@@ -1,28 +1,65 @@
 name: CI
 
-# Puerta de calidad de cada cambio. Antes no existía ninguna: el proyecto
-# tenía "lint" declarado pero ESLint sin instalar, TypeScript apagado en el
-# build (ignoreBuildErrors) y cero pruebas. Un error de tipos o una política
-# de RLS reabierta llegaban a producción sin que nada avisara.
+# Puerta de calidad de cada cambio (F9 del PLAN_VIBE_EMPRESARIAL.md).
+#
+# Antes esto era un solo job (tipos/lint/test/build). Ahora es una puerta
+# empresarial: permisos mínimos, cancelación de corridas obsoletas, timeouts
+# por job, escaneo de secretos y auditoría de dependencias.
+#
+# Lo que este archivo AÚN no activa como gate bloqueante, y por qué:
+#   • base-de-datos (pnpm db:verify + test:db): necesita Docker + el baseline
+#     0000 (acción humana #8 del plan). Documentado en docs/migraciones.md.
+#   • visual de píxeles: necesita las capturas de referencia aprobadas por una
+#     persona (acción humana #9). La capa ARIA determinista sí corre en e2e.
+# Ambos están escritos como scaffolding y se activarán cuando su prerrequisito
+# humano exista, sin reescribir este archivo (sólo quitar el `if: false`).
 
 on:
   push:
     branches: [main]
   pull_request:
 
+# Fail-closed también en permisos: el token de Actions sólo puede leer el
+# repo. Ningún job de este flujo escribe en el repo, publica paquetes ni toca
+# despliegues, así que no necesita más.
+permissions:
+  contents: read
+
+# Una corrida por rama: si llega un push nuevo, la corrida anterior se cancela
+# en vez de gastar minutos en un commit que ya quedó viejo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  calidad:
-    name: Tipos, lint y build
+  secretos:
+    name: Escaneo de secretos
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # gitleaks necesita todo el historial para revisar cada commit, no
+          # sólo el diff de la punta.
+          fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+  calidad:
+    name: Tipos, lint, pruebas y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -30,20 +67,128 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
+      # Auditoría de dependencias — BLOQUEANTE. Las 8 altas que quedaban eran
+      # transitivas y se cerraron con los `overrides` de pnpm-workspace.yaml
+      # (ver ahí el detalle de cada bump). Con el arreglo hecho, esta puerta ya
+      # puede cerrarse: `--audit-level=high` sale 0 hoy, así que un rojo aquí
+      # significa una vulnerabilidad NUEVA, no deuda heredada.
+      #
+      # Se deja en `high` y no en `moderate` a propósito: quedan 5 moderadas y 1
+      # baja, todas transitivas y sin parche disponible. Poner la puerta donde
+      # nadie puede pasarla es la forma más rápida de que se aprenda a ignorar.
+      - name: Auditoría de dependencias
+        run: pnpm audit --audit-level=high
+
       - name: Comprobar tipos
-        run: pnpm exec tsc --noEmit
+        run: pnpm typecheck
 
-      - name: Lint
-        run: pnpm exec eslint .
+      # `pnpm lint` corre con el trinquete `--max-warnings=22` definido en
+      # package.json. Un PR que añade un warning falla aquí.
+      - name: Lint (con trinquete de warnings)
+        run: pnpm lint
 
-      - name: Pruebas
+      - name: Pruebas unitarias
         run: pnpm test
 
       - name: Build
-        # Las variables públicas son necesarias para que el build resuelva;
-        # en CI van valores de relleno porque no se conecta a nada real.
+        # Variables públicas de relleno: el build las necesita para resolver,
+        # pero en CI no se conecta a nada real.
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://ejemplo.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: clave-de-relleno-para-ci
           NEXT_PUBLIC_R2_PUBLIC_URL: https://ejemplo.r2.dev
         run: pnpm build
+
+      # Espacios en blanco al final de línea, conflictos sin resolver: los
+      # detecta git mismo, sin Prettier (decisión deliberada de F1).
+      - name: Higiene del diff
+        run: git diff --check HEAD
+
+  e2e:
+    name: E2E + accesibilidad
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Instalar navegador de Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Las specs E2E no tocan Supabase ni R2 reales: `NEXT_PUBLIC_SUPABASE_URL`
+      # apunta a un PostgREST de mentira que sirve tests/e2e/fixtures/datos.json
+      # (lo arranca el propio playwright.config.ts). Por eso corren en CI sin
+      # credenciales, sin Docker y sin un solo dato real.
+      - name: E2E (Playwright + axe)
+        run: pnpm test:e2e
+
+      - name: Guardar reporte de Playwright
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  visual:
+    name: Regresión visual (capa ARIA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Instalar navegador de Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Aquí corre de verdad la capa ARIA (determinista, misma referencia en
+      # todo sistema operativo). La capa de PÍXELES se omite sola mientras no
+      # exista una referencia `-linux.png` aprobada por una persona (acción
+      # humana #9): ver tests/visual/capture.spec.ts. Así este job es verde y
+      # útil desde hoy, en vez de rojo esperando una aprobación.
+      - name: Instantáneas ARIA en 4 anchos
+        run: pnpm test:visual
+
+  # ── Jobs con prerrequisito humano (scaffolding, aún no activos) ──────────────
+  # Se dejan escritos para que activarlos sea quitar `if: false`, no redactar el
+  # job desde cero bajo presión el día que Docker o el baseline existan.
+
+  base-de-datos:
+    name: Base de datos y RLS (requiere baseline 0000)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: false # bloqueado por acción humana #8: Docker + supabase link + 0000_baseline.sql
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:verify
+      - run: pnpm test:db

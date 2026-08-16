@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { expresionKeyset, type CursorFeed } from "@/lib/feed/keyset";
 import { parseMusicianRoles, type MusicianRole } from "@/lib/musician-roles";
 
 export interface FeedTrack {
@@ -32,6 +33,7 @@ export interface FeedTrackRow {
     musician_roles?: unknown;
     musician_category?: string | null;
     profile_type?: string | null;
+    is_suspended?: boolean | null;
   } | null;
 }
 
@@ -79,27 +81,53 @@ export async function fetchMusicFeed(profileId: string): Promise<FeedTrack[]> {
   return (data as unknown as FeedTrackRow[]).map(mapRowToTrack);
 }
 
-export async function fetchAllPublicFeed(limit: number = 50): Promise<FeedTrack[]> {
+/**
+ * Página del feed público de pistas.
+ *
+ * `cursor` habilita la paginación keyset (P-17): en vez de "saltea N", se pide
+ * "lo que va después de esta fila", así el contenido que entra entre página y
+ * página no provoca repeticiones ni saltos. Sin cursor devuelve la primera
+ * página, que es exactamente lo que hacía antes.
+ */
+export async function fetchAllPublicFeed(limit: number = 50, cursor?: CursorFeed): Promise<FeedTrack[]> {
   // Se intenta con las columnas más nuevas primero; si alguna migración no
   // corrió todavía en Supabase, el select falla y se degrada al siguiente
   // intento — el feed nunca se cae por una columna faltante.
   const selects = [
     `id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-     profiles ( display_name, musician_roles, profile_type )`,
+     profiles ( display_name, musician_roles, profile_type, is_suspended )`,
     `id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-     profiles ( display_name, musician_category, profile_type )`,
+     profiles ( display_name, musician_category, profile_type, is_suspended )`,
     `id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
      profiles ( display_name )`,
   ];
 
   let lastError: unknown = null;
   for (const select of selects) {
-    const { data, error } = await supabase
+    // El segundo criterio de orden (`id desc`) no es decorativo: sin un orden
+    // TOTAL, dos filas con el mismo `created_at` pueden salir en cualquier
+    // orden entre consultas, y la paginación por cursor se cuelga repitiendo
+    // el mismo bloque.
+    let consulta = supabase
       .from("music_feed")
       .select(select)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(limit);
-    if (!error) return (data as unknown as FeedTrackRow[]).map(mapRowToTrack);
+    if (cursor) consulta = consulta.or(expresionKeyset(cursor));
+
+    const { data, error } = await consulta;
+    if (!error) {
+      // Segunda capa de la suspensión (P-34). La RLS de 0008 sólo oculta el
+      // contenido de profile_blocks; music_feed es una tabla aparte que esa
+      // política no cubre, así que las pistas de un perfil suspendido seguirían
+      // apareciendo en el feed si confiáramos únicamente en la base. Se filtra
+      // también aquí — sin efecto para los perfiles no suspendidos.
+      const filas = (data as unknown as FeedTrackRow[]).filter(
+        (fila) => fila.profiles?.is_suspended !== true
+      );
+      return filas.map(mapRowToTrack);
+    }
     lastError = error;
   }
   throw lastError;

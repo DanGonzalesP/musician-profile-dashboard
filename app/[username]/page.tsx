@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
-import { fetchProfileMeta } from "@/lib/supabase-server"
+import { notFound, redirect } from "next/navigation"
+import { fetchProfileMeta, fetchPublicProfilePage } from "@/lib/supabase-server"
 import { SITE_NAME } from "@/lib/site"
 import { PerfilPublicoClient } from "./profile-client"
 
@@ -74,6 +75,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default function PerfilPublicoPage() {
-  return <PerfilPublicoClient />
+export default async function PerfilPublicoPage({ params }: Props) {
+  const { username } = await params
+  const resultado = await fetchPublicProfilePage(username)
+
+  // Username antiguo: se redirige al actual, igual que hacía el cliente, pero
+  // ahora con un 307 real en vez de un router.replace() después de pintar.
+  if (resultado.estado === "redirigir") redirect(`/${resultado.username}`)
+
+  // No existe, o está suspendido. Para el visitante son lo mismo: una página
+  // que no está. Antes esto era un 200 con el texto "Artista no encontrado"
+  // (un soft 404 que Google indexa igual); ahora es un 404 de verdad.
+  if (resultado.estado === "no-encontrado") notFound()
+
+  // `sin-servidor`: Supabase no respondió en el servidor. No se convierte un
+  // corte transitorio en un 404 cacheado — se cae al comportamiento de
+  // siempre y el navegador carga el perfil como lo hacía antes de F10.
+  if (resultado.estado === "sin-servidor") return <PerfilPublicoClient />
+
+  return <PerfilPublicoClient datosIniciales={resultado.datos} />
 }

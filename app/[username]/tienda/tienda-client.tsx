@@ -21,7 +21,10 @@ import {
   priceUnitLabel,
   serviceDurationLabel,
   formatMoney,
+  rowToProduct,
+  rowToService,
 } from "@/lib/catalog";
+import type { PerfilPublicoInicial } from "@/lib/supabase-server";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
@@ -47,20 +50,39 @@ import {
 type LoadingState = "loading" | "error" | "success";
 type MobileView = "productos" | "servicios";
 
-export function TiendaClient() {
+// Mismo criterio que el perfil público (F10): el servidor resuelve el
+// catálogo y lo pasa como filas crudas; acá se mapean con las mismas
+// funciones que se aplicaban a la respuesta de PostgREST. `datosIniciales`
+// es opcional: sin él, la tienda carga como antes.
+export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublicoInicial }) {
   const params = useParams();
   const router = useRouter();
-  const username = (params?.username as string)?.trim().toLowerCase();
+  const username = datosIniciales?.profile.username ?? (params?.username as string)?.trim().toLowerCase();
 
-  const [displayName, setDisplayName] = useState("");
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [services, setServices] = useState<CatalogService[]>([]);
-  const [accent, setAccent] = useState<AccentColor>("rojo");
-  const [state, setState] = useState<LoadingState>("loading");
+  const [iniciales] = useState(() =>
+    datosIniciales
+      ? {
+          products: datosIniciales.productRows.map(rowToProduct).filter((p) => p.isActive !== false),
+          services: datosIniciales.serviceRows.map(rowToService).filter((s) => s.isActive !== false),
+        }
+      : null
+  );
+
+  const acentoInicial = datosIniciales?.profile.accentColor;
+  const [displayName, setDisplayName] = useState(
+    datosIniciales ? datosIniciales.profile.displayName || datosIniciales.profile.username : ""
+  );
+  const [products, setProducts] = useState<CatalogProduct[]>(iniciales?.products ?? []);
+  const [services, setServices] = useState<CatalogService[]>(iniciales?.services ?? []);
+  const [accent, setAccent] = useState<AccentColor>(isAccentColor(acentoInicial) ? acentoInicial : "rojo");
+  const [state, setState] = useState<LoadingState>(datosIniciales ? "success" : "loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [view, setView] = useState<MobileView>("productos");
 
   useEffect(() => {
+    // El servidor ya resolvió la tienda: nada que pedir desde el navegador.
+    if (datosIniciales) return;
+
     if (!username) {
       setState("error");
       setErrorMessage("Perfil no especificado");
@@ -111,7 +133,7 @@ export function TiendaClient() {
 
     cargar();
     return () => controller.abort();
-  }, [username, router]);
+  }, [username, router, datosIniciales]);
 
   const backButton = (
     <Link

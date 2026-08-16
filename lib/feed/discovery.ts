@@ -20,7 +20,7 @@ export type DiscoveryProfile = {
   categories: string[]
 }
 
-type JoinRow = {
+export type JoinRow = {
   category?: unknown
   is_active?: unknown
   profiles: {
@@ -29,17 +29,25 @@ type JoinRow = {
     musician_roles?: unknown
     musician_category?: string | null
     profile_type?: string | null
+    is_suspended?: boolean | null
   } | null
 }
 
 // Agrupa filas producto/servicio (con su perfil embebido) por perfil, contando
 // cuántas tiene cada uno y juntando sus categorías. Descarta las inactivas.
-function aggregate(rows: JoinRow[], keyName: string): DiscoveryProfile[] {
+export function aggregate(rows: JoinRow[], keyName: string): DiscoveryProfile[] {
   const byName = new Map<string, DiscoveryProfile>()
 
   for (const row of rows) {
     if (row.is_active === false) continue
     const profile = row.profiles
+    // Segunda capa de la suspensión (P-34). La primera vive en RLS: la política
+    // de profile_blocks oculta el contenido de un perfil suspendido. Pero el
+    // descubrimiento sale de products/services, que esa política no cubre, así
+    // que un perfil suspendido con productos podría reaparecer en la tienda si
+    // sólo confiáramos en la base. Aquí se filtra también en el código —defensa
+    // en profundidad, sin cambio visible para los perfiles no suspendidos.
+    if (profile?.is_suspended === true) continue
     const username = (profile?.username ?? "").trim()
     const displayName = (profile?.display_name ?? "").trim()
     // Se agrupa por username, no por nombre visible: dos artistas pueden
@@ -70,20 +78,85 @@ function aggregate(rows: JoinRow[], keyName: string): DiscoveryProfile[] {
   return [...byName.values()].sort((a, b) => b.count - a.count)
 }
 
-// Techo de filas que se traen para armar el descubrimiento.
+// ─── Camino preferido: la agregación la hace Postgres (P-16) ───────────────
 //
-// DEUDA CONOCIDA: la agregación por perfil se hace en el cliente, así que
-// esto es una muestra de las N más recientes, no el conjunto completo. Con
-// pocos miles de productos alcanza; pasado ese punto hay que mover el
-// group by a una vista materializada o un RPC en Postgres (ver PLAN.md §1.4).
-// Lo que sí queda arreglado acá es que la muestra sea DETERMINISTA.
+// `descubrimiento_perfiles` (migración 0012) devuelve UNA fila por perfil, con
+// su conteo real y sus categorías, sin traer una sola fila de producto al
+// proceso. Reemplaza la agregación sobre una muestra de 500 filas, que con
+// volumen simplemente mentía: un artista cuyos productos quedaban fuera de esa
+// muestra desaparecía del carrusel.
+//
+// Si la función todavía no existe (migración sin aplicar), se cae al camino
+// anterior sin que el usuario note nada. Es la regla de despliegue del plan
+// (§6.4): el código nuevo tolera el esquema viejo durante el intervalo.
+
+/** Filas tal como las devuelve el RPC de 0012. */
+export type FilaDescubrimiento = {
+  username?: string | null
+  display_name?: string | null
+  profile_type?: string | null
+  musician_roles?: unknown
+  categorias?: unknown
+  total?: number | string | null
+}
+
+export function mapearFilasRpc(filas: FilaDescubrimiento[], keyName: string): DiscoveryProfile[] {
+  const salida: DiscoveryProfile[] = []
+
+  for (const fila of filas) {
+    const username = (fila.username ?? "").trim()
+    if (!username) continue
+
+    const categorias = Array.isArray(fila.categorias)
+      ? fila.categorias.filter((c): c is string => typeof c === "string" && c.length > 0)
+      : []
+
+    salida.push({
+      profileId: `${keyName}-${username}`,
+      displayName: (fila.display_name ?? "").trim() || username,
+      slug: username,
+      roles: parseMusicianRoles(fila.musician_roles),
+      isGroup: fila.profile_type === "band",
+      count: Number(fila.total ?? 0) || 0,
+      categories: categorias,
+    })
+  }
+
+  // El RPC ya ordena por conteo; se reordena igual para no depender de eso y
+  // para que las dos rutas (RPC y respaldo) devuelvan exactamente lo mismo.
+  return salida.sort((a, b) => b.count - a.count)
+}
+
+/** Cuántos perfiles se muestran en el carrusel de descubrimiento. */
+const DISCOVERY_PROFILE_LIMIT = 60
+
+async function fetchDesdeRpc(
+  tipo: "productos" | "servicios",
+  keyName: string
+): Promise<DiscoveryProfile[] | null> {
+  const { data, error } = await supabase.rpc("descubrimiento_perfiles", {
+    p_tipo: tipo,
+    p_limite: DISCOVERY_PROFILE_LIMIT,
+  })
+  // Cualquier error —función inexistente, permiso, tipo— cae al respaldo. No se
+  // rompe una pantalla pública por una migración que todavía no corrió.
+  if (error || !Array.isArray(data)) return null
+  return mapearFilasRpc(data as FilaDescubrimiento[], keyName)
+}
+
+// Techo de filas del camino de respaldo (sin la migración 0012).
+//
+// DEUDA CONOCIDA, y por eso existe el RPC de arriba: acá la agregación se hace
+// en JavaScript sobre una muestra de las N más recientes, no sobre el conjunto
+// completo. Con pocos miles de productos alcanza. Lo que sí está arreglado es
+// que la muestra sea DETERMINISTA.
 const DISCOVERY_ROW_LIMIT = 500
 
 async function fetchJoined(table: "products" | "services"): Promise<JoinRow[]> {
   const selects = [
-    `category, is_active, profiles ( username, display_name, musician_roles, profile_type )`,
-    `category, is_active, profiles ( username, display_name, musician_category, profile_type )`,
-    `is_active, profiles ( username, display_name, profile_type )`,
+    `category, is_active, profiles ( username, display_name, musician_roles, profile_type, is_suspended )`,
+    `category, is_active, profiles ( username, display_name, musician_category, profile_type, is_suspended )`,
+    `is_active, profiles ( username, display_name, profile_type, is_suspended )`,
     `profiles ( username, display_name )`,
   ]
 
@@ -102,9 +175,9 @@ async function fetchJoined(table: "products" | "services"): Promise<JoinRow[]> {
 }
 
 export async function fetchProductSellers(): Promise<DiscoveryProfile[]> {
-  return aggregate(await fetchJoined("products"), "prod")
+  return (await fetchDesdeRpc("productos", "prod")) ?? aggregate(await fetchJoined("products"), "prod")
 }
 
 export async function fetchServiceProviders(): Promise<DiscoveryProfile[]> {
-  return aggregate(await fetchJoined("services"), "serv")
+  return (await fetchDesdeRpc("servicios", "serv")) ?? aggregate(await fetchJoined("services"), "serv")
 }

@@ -5,6 +5,7 @@ import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
 import { checkAuthenticatedRateLimit, checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
 import { validateUploadRequest } from "@/lib/upload-validation"
+import { idDePeticion, logError, logInfo } from "@/lib/log"
 
 // Genera una URL firmada de subida directa a R2. El archivo NUNCA pasa por
 // este servidor/función serverless — el navegador hace el PUT directo a R2
@@ -16,6 +17,8 @@ import { validateUploadRequest } from "@/lib/upload-validation"
 // lib/upload-validation.ts para poder probarla sin red — ver su test.
 
 export async function POST(request: Request) {
+  const requestId = idDePeticion(request)
+  const inicio = Date.now()
   try {
     // Solo usuarios autenticados pueden pedir URLs de subida. Se usa el
     // contexto autenticado (no solo el user) porque hay que registrar la
@@ -63,7 +66,11 @@ export async function POST(request: Request) {
       // Si no se puede registrar la propiedad, no se entrega la URL: un
       // archivo sin dueño registrado es un archivo que después nadie puede
       // borrar de forma segura.
-      console.error("[api/upload-url] No se pudo registrar el archivo", assetError)
+      logError("api/upload-url", "no se pudo registrar el archivo en media_assets", assetError, {
+        requestId,
+        userId: user.id,
+        folder,
+      })
       return NextResponse.json(
         { error: "No se pudo registrar la subida. ¿Falta correr la migración 0002_media_assets.sql?" },
         { status: 500 }
@@ -80,9 +87,17 @@ export async function POST(request: Request) {
     const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 })
     const publicUrl = `${R2_PUBLIC_URL}/${key}`
 
+    logInfo("api/upload-url", "url de subida firmada", {
+      requestId,
+      userId: user.id,
+      folder,
+      bytes,
+      duracionMs: Date.now() - inicio,
+      resultado: "ok",
+    })
     return NextResponse.json({ uploadUrl, publicUrl })
-  } catch (error: any) {
-    console.error("[api/upload-url]", error)
+  } catch (error) {
+    logError("api/upload-url", "error inesperado al firmar la subida", error, { requestId })
     // Nunca se devuelve error.message crudo: puede filtrar detalles internos
     // (nombres de bucket, credenciales mal configuradas, rutas del servidor).
     return NextResponse.json({ error: "No se pudo generar la URL de subida" }, { status: 500 })

@@ -3,6 +3,8 @@
 import { Suspense, useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, defaultData, isKnownBlockType, mergePublicacionesEmbeds, SINGLETON_BLOCK_TYPES } from "@/lib/blocks"
+import { evaluarLoteSegunModo } from "@/lib/blocks-schema"
+import { revalidarPerfilPublico } from "@/app/acciones/revalidar-perfil"
 import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog"
 import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
@@ -690,6 +692,18 @@ function ProfileEditorInner() {
         content: sanitizeUrlFields(b.data),
       }))
 
+      // Validación de forma en runtime (P-08). TypeScript describe estos
+      // objetos pero desaparece al compilar: sin esto, cualquier cosa llega a
+      // profile_blocks.content. La capa gemela vive en la base (migración
+      // 0010) — si una falla, la otra sostiene.
+      //
+      // Arranca en MODO OBSERVACIÓN: registra lo que habría rechazado y deja
+      // publicar igual. Se activa el rechazo con
+      // NEXT_PUBLIC_VALIDACION_BLOQUES=rechazar, después de revisar los
+      // registros contra los perfiles reales. Ver lib/blocks-schema.ts.
+      const errorDeValidacion = evaluarLoteSegunModo(profileBlocksPayload)
+      if (errorDeValidacion) throw new Error(errorDeValidacion)
+
       const { data: nuevaVersion, error: blocksError } = await supabase.rpc("publish_profile", {
         p_profile_id: profileId,
         p_blocks: profileBlocksPayload,
@@ -703,6 +717,16 @@ function ProfileEditorInner() {
         if (blocksError.message?.includes("conflicto_de_version")) {
           throw new Error(
             "Alguien más publicó cambios en este perfil desde otra sesión. Recarga la página para traer la versión más reciente y vuelve a aplicar lo tuyo."
+          )
+        }
+        // La base también valida la forma de los bloques (migración 0010).
+        // Si llega hasta aquí es que la capa del editor no lo detectó: se
+        // traduce a un mensaje entendible en vez de mostrar el texto de
+        // Postgres, y el detalle queda en el registro para investigarlo.
+        if (blocksError.message?.includes("bloques_invalidos")) {
+          console.warn("[handlePublish] la base rechazo la forma de los bloques", blocksError.message)
+          throw new Error(
+            "No se pudo publicar: uno de los bloques tiene un formato que el sistema no reconoce. Recarga la página e inténtalo de nuevo."
           )
         }
         throw blocksError
@@ -784,6 +808,17 @@ function ProfileEditorInner() {
       // siguiente ciclo de React vuelva a escribir el borrador que se acaba
       // de limpiar.
       skipNextAutosaveRef.current = true
+
+      // El perfil público se sirve desde una caché etiquetada (F10). Sin este
+      // aviso, el artista publicaría y seguiría viendo lo viejo hasta cinco
+      // minutos. Es best-effort a propósito: la publicación ya terminó bien, y
+      // un fallo acá sólo significa que el cambio se verá cuando venza la
+      // caché — nunca debe convertirse en un error de publicación.
+      if (publicSlug) {
+        revalidarPerfilPublico(publicSlug).catch((err) =>
+          console.error("[handlePublish] No se pudo invalidar la caché del perfil público:", err)
+        )
+      }
 
       showToast("¡Cambios publicados con éxito en tu perfil!", "success")
     } catch (err: unknown) {

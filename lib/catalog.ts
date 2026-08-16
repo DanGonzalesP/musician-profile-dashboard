@@ -257,7 +257,11 @@ export function normalizeDraftService(raw: unknown): CatalogService {
 
 type Row = Record<string, unknown>
 
-function rowToProduct(p: Row): CatalogProduct {
+// `rowToProduct`/`rowToService` se exportan para que el perfil público mapee
+// las filas que ya vienen resueltas del servidor (F10) con EXACTAMENTE la
+// misma función que usaba al pedirlas desde el navegador. Dos mapeos distintos
+// para la misma fila es la forma más silenciosa de cambiar la UX sin querer.
+export function rowToProduct(p: Row): CatalogProduct {
   const images = Array.isArray(p.images_urls) ? (p.images_urls as unknown[]).map(String).filter(Boolean) : []
   return {
     id: String(p.id),
@@ -277,7 +281,7 @@ function rowToProduct(p: Row): CatalogProduct {
   }
 }
 
-function rowToService(s: Row): CatalogService {
+export function rowToService(s: Row): CatalogService {
   return {
     id: String(s.id),
     title: String(s.title ?? ""),

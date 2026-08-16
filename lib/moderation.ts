@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
 
 // Moderación y cumplimiento legal.
 //
@@ -79,9 +80,13 @@ export async function crearReporte(reporte: NuevoReporte): Promise<void> {
 
   if (error) {
     throw new Error(
-      error.message.includes("content_reports")
-        ? "Los reportes aún no están activados: falta correr supabase/migrations/0008_moderacion_y_cumplimiento.sql."
-        : error.message
+      traducirErrorDeEscritura(
+        error,
+        "reporte",
+        error.message.includes("content_reports")
+          ? "Los reportes aún no están activados: falta correr supabase/migrations/0008_moderacion_y_cumplimiento.sql."
+          : error.message
+      )
     )
   }
 }
@@ -96,7 +101,7 @@ export async function bloquearPerfil(profileId: string): Promise<void> {
     .from("user_blocks")
     .upsert({ blocker_user_id: user.id, blocked_profile_id: profileId })
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(traducirErrorDeEscritura(error, "bloqueo", error.message))
 }
 
 export async function desbloquearPerfil(profileId: string): Promise<void> {

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
 
 // Comentarios de las publicaciones del feed (fotos/videos) — tabla
 // feed_post_comments (ver supabase/feed_post_comments_table.sql). Hermana de
@@ -80,10 +81,16 @@ export async function addPostComment(postId: string, content: string): Promise<P
     .single()
 
   if (error) {
+    // El trigger de limite (migracion 0011) se traduce a un mensaje amable;
+    // el resto de errores conserva el manejo de siempre.
     throw new Error(
-      error.message.includes("feed_post_comments")
-        ? "Los comentarios aún no están activados: falta correr supabase/feed_post_comments_table.sql."
-        : error.message
+      traducirErrorDeEscritura(
+        error,
+        "comentario",
+        error.message.includes("feed_post_comments")
+          ? "Los comentarios aún no están activados: falta correr supabase/feed_post_comments_table.sql."
+          : error.message
+      )
     )
   }
   return mapRow(data as CommentRow)

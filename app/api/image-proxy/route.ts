@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { R2_PUBLIC_URL } from "@/lib/r2"
+import { leerConTope } from "@/lib/stream-limit"
 
 // Reenvía imágenes públicas de R2 mismo-origen para el navegador. Necesario
 // porque <canvas>.toDataURL() sobre una imagen cross-origin sin cabeceras
@@ -77,17 +78,42 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "El recurso no es una imagen" }, { status: 415 })
   }
 
+  // Atajo barato: si el upstream declara un tamaño que ya supera el techo, no
+  // hace falta descargar nada.
   const declaredLength = Number(upstream.headers.get("content-length") ?? 0)
   if (declaredLength > MAX_BYTES) {
+    await upstream.body.cancel().catch(() => {})
     return NextResponse.json({ error: "La imagen es demasiado grande" }, { status: 413 })
   }
 
-  return new NextResponse(upstream.body, {
+  // P-06 — el Content-Length es una DECLARACIÓN del upstream, no una medida:
+  // puede faltar (respuesta troceada), venir en 0 o venir mentida. Antes el
+  // cuerpo se reenviaba como stream sin contar un solo byte, así que el techo
+  // de 10 MB no lo aplicaba nadie. Ahora se cuenta de verdad. Ver
+  // lib/stream-limit.ts para por qué se bufferiza en vez de encadenar un
+  // TransformStream (resumen: sin buffer no se puede devolver un 413 honesto).
+  let lectura
+  try {
+    lectura = await leerConTope(upstream.body, MAX_BYTES)
+  } catch {
+    return NextResponse.json({ error: "No se pudo cargar la imagen" }, { status: 502 })
+  }
+
+  if (lectura.excedido) {
+    return NextResponse.json({ error: "La imagen es demasiado grande" }, { status: 413 })
+  }
+
+  return new NextResponse(lectura.bytes, {
     headers: {
       "Content-Type": contentType,
+      "Content-Length": String(lectura.bytes.byteLength),
       "Cache-Control": "public, max-age=31536000, immutable",
       // El navegador nunca debe reinterpretar esto como otra cosa.
       "X-Content-Type-Options": "nosniff",
+      // `Cross-Origin-Resource-Policy` NO se pone acá: la regla general de
+      // next.config.mjs ya cubre esta ruta con `same-site`, y declararla
+      // también aquí haría que la respuesta saliera con la cabecera dos veces,
+      // que es un valor inválido y el navegador puede descartar entero.
     },
   })
 }

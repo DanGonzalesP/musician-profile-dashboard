@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import LayoutAdmin from "@/components/LayoutAdmin";
+import { mensajeDeErrorDeConsulta } from "@/lib/errores-de-consulta";
 import { Loader2 } from "lucide-react";
 
 interface OrderItemRow {
@@ -40,7 +41,8 @@ export default function DashboardPage() {
         .maybeSingle();
 
       if (profileError) {
-        setErrorMensaje(profileError.message);
+        // Nunca el texto de Postgres en pantalla: ver lib/errores-de-consulta.ts.
+        setErrorMensaje(mensajeDeErrorDeConsulta(profileError, "tu perfil"));
         setLoading(false);
         return;
       }
@@ -60,16 +62,19 @@ export default function DashboardPage() {
         .eq("products.seller_id", profileId);
 
       if (error) {
-        setErrorMensaje(error.message);
-        setLoading(false);
-        return;
+        // `order_items` no existe en esta base (P-03). En vez de cortar el
+        // dashboard entero con un error de Postgres en pantalla, se avisa en
+        // la voz del producto y se siguen mostrando el resto de las cifras.
+        setErrorMensaje(mensajeDeErrorDeConsulta(error, "el resumen de ventas"));
+        setVentas(0);
+        setTotalPedidos(0);
+      } else {
+        const rows = (data ?? []) as unknown as OrderItemRow[];
+        const totalVentas = rows.reduce((sum, r) => sum + Number(r.price_at_purchase) * r.quantity, 0);
+
+        setVentas(totalVentas);
+        setTotalPedidos(rows.length);
       }
-
-      const rows = (data ?? []) as unknown as OrderItemRow[];
-      const totalVentas = rows.reduce((sum, r) => sum + Number(r.price_at_purchase) * r.quantity, 0);
-
-      setVentas(totalVentas);
-      setTotalPedidos(rows.length);
 
       const { data: donationRows, error: donationsError } = await supabase
         .from("donations")

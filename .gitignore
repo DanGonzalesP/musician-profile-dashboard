@@ -15,6 +15,20 @@ node_modules
 .DS_Store
 .vercel
 .env*
+# Excepción: la plantilla SIN valores sí se versiona (la exige F1 del plan).
+!.env.example
 
 # Cache incremental de TypeScript: se regenera, no va al repo
 *.tsbuildinfo
+
+# Salidas de Playwright: se regeneran en cada corrida y pueden llevar capturas
+# con datos de la sesión. Las referencias visuales aprobadas viven en
+# tests/visual/referencias/ y ésas sí se versionan.
+/playwright-report/
+/test-results/
+/blob-report/
+/.playwright/
+
+# Supabase CLI local (contenedores, temporales)
+/supabase/.branches/
+/supabase/.temp/

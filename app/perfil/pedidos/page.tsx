@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import LayoutAdmin from "@/components/LayoutAdmin";
+import { mensajeDeErrorDeConsulta } from "@/lib/errores-de-consulta";
 import { Loader2 } from "lucide-react";
 
 interface PedidoItem {
@@ -45,7 +46,8 @@ export default function HistorialPedidosPage() {
         .maybeSingle();
 
       if (profileError) {
-        setErrorMensaje(profileError.message);
+        // Nunca el texto de Postgres en pantalla: ver lib/errores-de-consulta.ts.
+        setErrorMensaje(mensajeDeErrorDeConsulta(profileError, "tu perfil"));
         setLoading(false);
         return;
       }
@@ -66,7 +68,10 @@ export default function HistorialPedidosPage() {
         .order("id", { ascending: false });
 
       if (error) {
-        setErrorMensaje(error.message);
+        // `order_items` no existe en esta base (P-03): hasta que se decida si
+        // el modelo de pedidos se implementa o la pantalla se retira, el
+        // artista ve una frase honesta y no `relation ... does not exist`.
+        setErrorMensaje(mensajeDeErrorDeConsulta(error, "el historial de pedidos"));
         setLoading(false);
         return;
       }

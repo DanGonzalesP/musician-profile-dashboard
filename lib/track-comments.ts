@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
 
 // Comentarios de las canciones del feed principal — tabla feed_comments
 // (ver supabase/setup_vibra.sql). Lectura pública; escribir requiere
@@ -80,10 +81,16 @@ export async function addTrackComment(trackId: string, content: string): Promise
     .single()
 
   if (error) {
+    // El trigger de limite (migracion 0011) se traduce a un mensaje amable;
+    // el resto de errores conserva el manejo de siempre.
     throw new Error(
-      error.message.includes("feed_comments")
-        ? "Los comentarios aún no están activados: falta correr supabase/setup_vibra.sql."
-        : error.message
+      traducirErrorDeEscritura(
+        error,
+        "comentario",
+        error.message.includes("feed_comments")
+          ? "Los comentarios aún no están activados: falta correr supabase/setup_vibra.sql."
+          : error.message
+      )
     )
   }
   return mapRow(data as CommentRow)

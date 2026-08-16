@@ -1,0 +1,39 @@
+# Actualizaciones automáticas de dependencias (F9). Sin esto, el gate de
+# `pnpm audit` se vuelve ruido de fondo: aparecen vulnerabilidades y nadie las
+# sube. Con Dependabot llegan como PRs agrupados que el CI valida antes de
+# mergear.
+#
+# Agrupadas a propósito: 30 PRs sueltos de parches de patch se ignoran; uno
+# semanal con "todos los parches menores" se revisa.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Parches y menores de todo lo que no sea un salto mayor: un solo PR.
+      dependencias-menores:
+        update-types:
+          - minor
+          - patch
+    # Los saltos mayores (Next, React) van en su propio PR: rompen cosas y
+    # merecen una revisión dedicada con el CI completo, no agruparse.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Las propias acciones del CI también se actualizan: una acción vieja fijada
+  # por tag es una superficie de supply chain.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
