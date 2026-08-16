@@ -7,9 +7,8 @@ import { supabase } from "@/lib/supabase"
 // cualquier cosa que un músico ofrezca: clases, producción, mezcla/máster,
 // composición, sesiones, shows en vivo, alquiler de equipo...
 //
-// El esquema vigente vive en supabase/migrations/0000_baseline.sql. Los
-// fallbacks conservan compatibilidad defensiva con un deployment atrasado,
-// pero los SQL históricos de supabase/legacy/ no se vuelven a ejecutar.
+// El esquema vigente vive en supabase/migrations/0000_baseline.sql y es la
+// única fuente operativa; los SQL de supabase/legacy/ son sólo trazabilidad.
 
 export type ProductKind = "fisico" | "digital"
 
@@ -359,19 +358,6 @@ function productFullPayload(p: CatalogProduct, profileId: string, i: number) {
   }
 }
 
-function productLegacyPayload(p: CatalogProduct, profileId: string, i: number) {
-  const images = productImages(p)
-  return {
-    seller_id: profileId,
-    type: "merch",
-    title: p.name,
-    price: toPriceNumber(p.price),
-    images_urls: images,
-    stock_quantity: p.stock,
-    position_index: i,
-  }
-}
-
 function serviceFullPayload(s: CatalogService, profileId: string, i: number) {
   return {
     profile_id: profileId,
@@ -394,22 +380,6 @@ function serviceFullPayload(s: CatalogService, profileId: string, i: number) {
   }
 }
 
-function serviceLegacyPayload(s: CatalogService, profileId: string, i: number) {
-  return {
-    profile_id: profileId,
-    title: s.title,
-    price: toPriceNumber(s.price),
-    description: s.description || null,
-    position_index: i,
-  }
-}
-
-function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false
-  // 42703 = undefined_column; PGRST204 = columna desconocida vía PostgREST.
-  return error.code === "42703" || error.code === "PGRST204" || /column/i.test(error.message ?? "")
-}
-
 export async function publishCatalog(profileId: string, products: CatalogProduct[], services: CatalogService[]) {
   const { error: deleteProductsError } = await supabase.from("products").delete().eq("seller_id", profileId)
   if (deleteProductsError) throw deleteProductsError
@@ -419,25 +389,11 @@ export async function publishCatalog(profileId: string, products: CatalogProduct
 
   if (products.length > 0) {
     const { error } = await supabase.from("products").insert(products.map((p, i) => productFullPayload(p, profileId, i)))
-    if (error) {
-      // Migración pendiente: reintenta con el payload legacy para no perder
-      // la publicación (los campos nuevos quedan en el borrador del editor).
-      if (!isMissingColumnError(error)) throw error
-      const { error: legacyError } = await supabase
-        .from("products")
-        .insert(products.map((p, i) => productLegacyPayload(p, profileId, i)))
-      if (legacyError) throw legacyError
-    }
+    if (error) throw error
   }
 
   if (services.length > 0) {
     const { error } = await supabase.from("services").insert(services.map((s, i) => serviceFullPayload(s, profileId, i)))
-    if (error) {
-      if (!isMissingColumnError(error)) throw error
-      const { error: legacyError } = await supabase
-        .from("services")
-        .insert(services.map((s, i) => serviceLegacyPayload(s, profileId, i)))
-      if (legacyError) throw legacyError
-    }
+    if (error) throw error
   }
 }
