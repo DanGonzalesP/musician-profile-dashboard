@@ -119,9 +119,10 @@ se resuelve renumerando **la que no se haya aplicado todavía**.
 | **0013** | `endurecer_advisors_supabase` | Advisors, funciones privilegiadas y respaldo privado | ✅ producción 2026-08-16 |
 | **0014** | `explicitar_rls_respaldo_privado` | Política deny-all explícita sobre el respaldo privado | ✅ producción 2026-08-16 |
 | **0015** | `relacion_bloques_perfiles` | FK necesaria para el join PostgREST de la portada | ✅ producción 2026-08-16 |
-| **0016** | `refrescar_cache_postgrest` | Recarga versionada de la caché tras la FK | 🟡 escrita; pendiente de producción |
-| 0017 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
-| 0018 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
+| **0016** | `refrescar_cache_postgrest` | Recarga versionada de la caché tras la FK | ✅ producción 2026-08-16 |
+| **0017** | `marca_tiempo_profile_blocks` | `created_at` + índice keyset para publicaciones | 🟡 escrita; pendiente de producción |
+| 0018 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
+| 0019 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
 
 El estado de `0001`–`0014` se verificó directamente contra producción el
 2026-08-16 y quedó registrado en [`estado-desplegado.md`](estado-desplegado.md).
