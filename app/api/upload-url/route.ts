@@ -3,7 +3,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
-import { checkAuthenticatedRateLimit, checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
+import { checkAuthenticatedRateLimit, respuesta429 } from "@/lib/rate-limit"
 import { validateUploadRequest } from "@/lib/upload-validation"
 import { idDePeticion, logError, logInfo } from "@/lib/log"
 
@@ -31,9 +31,7 @@ export async function POST(request: Request) {
 
     // 120 subidas por hora: publicar un álbum con portadas y pistas entra
     // holgado, pero frena un script que quiera llenar el bucket.
-    const limite =
-      (await checkAuthenticatedRateLimit(supabase, "upload", 120, 3600)) ??
-      checkRateLimit(identificarSolicitante(request, user.id), 120, 3600)
+    const limite = await checkAuthenticatedRateLimit(supabase, "upload")
     if (!limite.permitido) return respuesta429(limite.reintentarEn)
 
     const { folder, extension, contentType, bytes, profileId } = await request.json()

@@ -52,8 +52,9 @@ de forma independiente**): las migraciones `0002`…`0009` se aplicaron ese día
 | **0010_validar_bloques** (F3) | ✅ | 2026-08-16 | constraints de tipo, tamaño, objeto y posición verificadas |
 | **0011_limites_de_escritura** (F5) | ✅ | 2026-08-16 | tabla, función, 5 triggers y revocación de `execute` verificadas |
 | **0012_descubrimiento_y_feed** (F11) | ✅ | 2026-08-16 | RPC e índices keyset disponibles; índice opcional de `profile_blocks` omitido al no existir `created_at` |
-| **0013_cuotas** (F11) | ⬜ ni escrita — necesita la decisión de cuota (§8 #19) | | |
-| **0014_moderacion_operativa** (F14) | ⬜ ni escrita — necesita decidir cómo se representa un administrador **en la base** (hoy `ADMIN_USER_IDS` sólo existe en el entorno de la app) | | |
+| **0013_endurecer_advisors_supabase** (F0/F5/F14) | 🟡 verificada localmente; pendiente de producción | Funciones privilegiadas fuera del esquema expuesto, rate limit fail-closed, tablas internas deny-all y respaldo privado |
+| **0014_cuotas** (F11) | ⬜ ni escrita — necesita la decisión de cuota (§8 #19) | | |
+| **0015_moderacion_operativa** (F14) | ⬜ ni escrita — necesita decidir cómo se representa un administrador **en la base** (hoy `ADMIN_USER_IDS` sólo existe en el entorno de la app) | | |
 
 ---
 
