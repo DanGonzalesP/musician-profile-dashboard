@@ -118,8 +118,9 @@ se resuelve renumerando **la que no se haya aplicado todavía**.
 | **0012** | `descubrimiento_y_feed` | RPC de descubrimiento + índices keyset | ✅ producción 2026-08-16 |
 | **0013** | `endurecer_advisors_supabase` | Advisors, funciones privilegiadas y respaldo privado | ✅ producción 2026-08-16 |
 | **0014** | `explicitar_rls_respaldo_privado` | Política deny-all explícita sobre el respaldo privado | ✅ producción 2026-08-16 |
-| 0015 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
-| 0016 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
+| **0015** | `relacion_bloques_perfiles` | FK necesaria para el join PostgREST de la portada | 🟡 escrita y verificada localmente; pendiente de producción |
+| 0016 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
+| 0017 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
 
 El estado de `0001`–`0014` se verificó directamente contra producción el
 2026-08-16 y quedó registrado en [`estado-desplegado.md`](estado-desplegado.md).
