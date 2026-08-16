@@ -56,7 +56,7 @@ de forma independiente**): las migraciones `0002`…`0009` se aplicaron ese día
 | **0014_explicitar_rls_respaldo_privado** (F0) | ✅ | 2026-08-16 | Política deny-all explícita para el respaldo ya privado; Security Advisor en 0 infos |
 | **0015_relacion_bloques_perfiles** (F0/F11) | ✅ | 2026-08-16 | FK `NOT VALID` necesaria para el join del feed |
 | **0016_refrescar_cache_postgrest** (F0/F11) | ✅ | 2026-08-16 | La Data API reconoció la FK; reveló la ausencia histórica de `created_at` |
-| **0017_marca_tiempo_profile_blocks** (F0/F11) | 🟡 verificada localmente; pendiente de producción | Columna e índice keyset que exige la consulta canónica de publicaciones |
+| **0017_marca_tiempo_profile_blocks** (F0/F11) | ✅ | 2026-08-16 | Columna e índice keyset que exige la consulta canónica de publicaciones; portada `200` y smoke `6/6` |
 | **0018_cuotas** (F11) | ⬜ ni escrita — necesita la decisión de cuota (§8 #19) | | |
 | **0019_moderacion_operativa** (F14) | ⬜ ni escrita — necesita decidir cómo se representa un administrador **en la base** (hoy `ADMIN_USER_IDS` sólo existe en el entorno de la app) | | |
 
