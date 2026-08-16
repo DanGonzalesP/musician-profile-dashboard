@@ -116,11 +116,12 @@ se resuelve renumerando **la que no se haya aplicado todavía**.
 | **0010** | `validar_bloques` | Restricciones del JSONB + `publish_profile` v3 | ✅ producción 2026-08-16 |
 | **0011** | `limites_de_escritura` | Triggers anti-spam en las 5 tablas de escritura | ✅ producción 2026-08-16 |
 | **0012** | `descubrimiento_y_feed` | RPC de descubrimiento + índices keyset | ✅ producción 2026-08-16 |
-| **0013** | `endurecer_advisors_supabase` | Advisors, funciones privilegiadas y respaldo privado | 🟡 escrita y verificada localmente; pendiente de producción |
-| 0014 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
-| 0015 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
+| **0013** | `endurecer_advisors_supabase` | Advisors, funciones privilegiadas y respaldo privado | ✅ producción 2026-08-16 |
+| **0014** | `explicitar_rls_respaldo_privado` | Política deny-all explícita sobre el respaldo privado | 🟡 escrita; pendiente de producción |
+| 0015 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
+| 0016 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
 
-El estado de `0001`–`0012` se verificó directamente contra producción el
+El estado de `0001`–`0013` se verificó directamente contra producción el
 2026-08-16 y quedó registrado en [`estado-desplegado.md`](estado-desplegado.md).
 
 ### Correcciones aplicadas a `0010`–`0012` el 2026-08-16
