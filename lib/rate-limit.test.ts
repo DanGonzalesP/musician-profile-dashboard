@@ -127,33 +127,42 @@ function fakeSupabase(rpcResult: { data: unknown; error: unknown }): SupabaseCli
 
 describe("checkAuthenticatedRateLimit — contador compartido en Postgres", () => {
   it("mapea una fila permitida", async () => {
-    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: [{ is_allowed: true, retry_after: 0 }], error: null }), "upload", 120, 3600)
+    const cliente = fakeSupabase({ data: [{ is_allowed: true, retry_after: 0 }], error: null })
+    const r = await checkAuthenticatedRateLimit(cliente, "upload")
     expect(r).toEqual({ permitido: true, restantes: 0, reintentarEn: 0 })
+    expect(cliente.rpc).toHaveBeenCalledWith("consume_authenticated_rate_limit", { p_bucket: "upload" })
   })
 
   it("mapea una fila bloqueada con su retry_after (redondeado hacia arriba)", async () => {
-    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: [{ is_allowed: false, retry_after: 29 }], error: null }), "upload", 120, 3600)
+    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: [{ is_allowed: false, retry_after: 29 }], error: null }), "upload")
     expect(r).toEqual({ permitido: false, restantes: 0, reintentarEn: 29 })
   })
 
   it("acepta la fila como objeto suelto además de como arreglo", async () => {
-    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: { is_allowed: true, retry_after: 0 }, error: null }), "upload", 120, 3600)
+    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: { is_allowed: true, retry_after: 0 }, error: null }), "upload")
     expect(r?.permitido).toBe(true)
   })
 
-  it("devuelve null (para caer al límite local) cuando la migración no existe", async () => {
-    // PGRST202 = la función RPC no está en el esquema todavía.
-    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: null, error: { code: "PGRST202" } }), "upload", 120, 3600)
-    expect(r).toBeNull()
+  it("bloquea si la migración no existe", async () => {
+    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: null, error: { code: "PGRST202" } }), "upload")
+    expect(r).toEqual({ permitido: false, restantes: 0, reintentarEn: 60 })
   })
 
-  it("devuelve null ante cualquier otro error (no rompe la subida)", async () => {
-    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: null, error: { code: "XX000", message: "boom" } }), "upload", 120, 3600)
-    expect(r).toBeNull()
+  it("bloquea ante cualquier otro error", async () => {
+    const r = await checkAuthenticatedRateLimit(fakeSupabase({ data: null, error: { code: "XX000", message: "boom" } }), "upload")
+    expect(r).toEqual({ permitido: false, restantes: 0, reintentarEn: 60 })
   })
 
-  it("devuelve null si la fila viene malformada", async () => {
-    expect(await checkAuthenticatedRateLimit(fakeSupabase({ data: [], error: null }), "upload", 120, 3600)).toBeNull()
-    expect(await checkAuthenticatedRateLimit(fakeSupabase({ data: [{ is_allowed: "yes" }], error: null }), "upload", 120, 3600)).toBeNull()
+  it("bloquea si la fila viene malformada", async () => {
+    expect(await checkAuthenticatedRateLimit(fakeSupabase({ data: [], error: null }), "upload")).toEqual({
+      permitido: false,
+      restantes: 0,
+      reintentarEn: 60,
+    })
+    expect(await checkAuthenticatedRateLimit(fakeSupabase({ data: [{ is_allowed: "yes" }], error: null }), "upload")).toEqual({
+      permitido: false,
+      restantes: 0,
+      reintentarEn: 60,
+    })
   })
 })

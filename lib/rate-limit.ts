@@ -68,35 +68,35 @@ export function checkRateLimit(
 }
 
 /**
- * Límite compartido para rutas autenticadas. Cuando la migración 0009 está
- * aplicada, el contador vive en Postgres y por tanto se mantiene entre
- * instancias serverless. `null` conserva el límite local en despliegues que
- * todavía no hayan aplicado la migración.
+ * Límite compartido para rutas autenticadas. El contador vive en Postgres y
+ * por tanto se mantiene entre instancias serverless. La base fija el cupo y la
+ * ventana de cada bucket; el cliente sólo puede escoger un bucket aprobado.
+ * Ante cualquier fallo se bloquea la operación sensible durante 60 segundos.
  */
 export async function checkAuthenticatedRateLimit(
   supabase: SupabaseClient,
-  bucket: string,
-  maxPeticiones: number,
-  ventanaSegundos: number
-): Promise<ResultadoRateLimit | null> {
+  bucket: "upload" | "image-generation"
+): Promise<ResultadoRateLimit> {
   const { data, error } = await supabase.rpc("consume_authenticated_rate_limit", {
     p_bucket: bucket,
-    p_limit: maxPeticiones,
-    p_window_seconds: ventanaSegundos,
   })
 
   if (error) {
-    // Una instalación anterior a la migración no debe perder la capacidad de
-    // subir archivos; usa el control local hasta que se despliegue el esquema.
-    if (error.code === "PGRST202") return null
     logError("rate-limit", "no se pudo consultar el límite compartido", error, {
       resultado: "error",
     })
-    return null
+    // Fail-closed: si el contador distribuido no responde, una ruta que
+    // entrega almacenamiento o consume créditos no cae a un Map por instancia.
+    return { permitido: false, restantes: 0, reintentarEn: 60 }
   }
 
   const row = Array.isArray(data) ? data[0] : data
-  if (!row || typeof row.is_allowed !== "boolean" || typeof row.retry_after !== "number") return null
+  if (!row || typeof row.is_allowed !== "boolean" || typeof row.retry_after !== "number") {
+    logError("rate-limit", "el límite compartido devolvió una respuesta inválida", undefined, {
+      resultado: "error",
+    })
+    return { permitido: false, restantes: 0, reintentarEn: 60 }
+  }
   return {
     permitido: row.is_allowed,
     restantes: row.is_allowed ? 0 : 0,

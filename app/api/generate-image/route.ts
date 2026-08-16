@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedContext } from "@/lib/server-auth";
-import { checkAuthenticatedRateLimit, checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit";
+import { checkAuthenticatedRateLimit, respuesta429 } from "@/lib/rate-limit";
 import { idDePeticion, logError, logInfo, logWarn } from "@/lib/log";
 
 export async function POST(request: Request) {
@@ -32,9 +32,7 @@ export async function POST(request: Request) {
 
     // 10 imagenes por hora y por usuario: generoso para un artista armando su
     // perfil, inútil para agotar los créditos de la API.
-    const limite =
-      (await checkAuthenticatedRateLimit(supabase, "image-generation", 10, 3600)) ??
-      checkRateLimit(identificarSolicitante(request, user.id), 10, 3600);
+    const limite = await checkAuthenticatedRateLimit(supabase, "image-generation");
     if (!limite.permitido) return respuesta429(limite.reintentarEn);
 
     const { prompt } = await request.json();
