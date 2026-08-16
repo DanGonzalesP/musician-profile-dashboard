@@ -60,6 +60,17 @@ describe("Security Advisor · fronteras explícitas", () => {
     expect(error).toBeTruthy()
   })
 
+  it("PostgREST reconoce la relación profile_blocks → profiles usada por la portada", async () => {
+    const { error } = await clienteAnonimo()
+      .from("profile_blocks")
+      .select("id, created_at, profiles(display_name)")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+
+    expect(error).toBeNull()
+  })
+
   it("una cuenta no puede inventar entradas de auditoría", async () => {
     const { error } = await ana.supabase.rpc("registrar_auditoria", {
       p_action: "accion_inventada",

@@ -7,7 +7,7 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 
 - **Fecha:** 16 de agosto de 2026
 - **Base al iniciar el bloque de cierre de base:** `6fb43b8`.
-- **Producción verificada:** Supabase `0000`–`0014` y Vercel, 16 de agosto de 2026.
+- **Producción verificada:** Supabase `0000`–`0017` y Vercel, 16 de agosto de 2026.
 - **Entorno:** Windows 11 (26200) · Node v24.16.0 · pnpm 11.10.0 · Next 16.2.12 ·
   TypeScript 5.7.3 · Vitest 4.1.10 · Playwright 1.62.
 
@@ -32,8 +32,8 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 | **E2E + axe** | `pnpm test:e2e` | ✅ **88 pruebas verdes** (chromium escritorio + móvil) |
 | **Regresión visual** | `pnpm test:visual` | ✅ **20 instantáneas ARIA verdes**, 20 capturas de píxeles omitidas (esperan aprobación humana) |
 | **Smoke** | `node scripts/smoke-staging.mjs` | ✅ **7 de 7 en verde** contra un servidor local (§2.11) |
-| **Reconstrucción DB** | `pnpm db:verify` | ✅ `0000`–`0014` desde cero; `db lint` sin errores |
-| **Pruebas DB** | `pnpm test:db` | ✅ **20 de 20** |
+| **Reconstrucción DB** | `pnpm db:verify` | ✅ `0000`–`0017` desde cero; `db lint` sin errores |
+| **Pruebas DB** | `pnpm test:db` | ✅ **21 de 21** |
 | **Paridad producción** | `supabase db diff --linked --schema public,private` | ✅ sin diferencias |
 
 **Cambio en el número de pruebas:** de **68 en 7 archivos** (línea base `6ffa555`)
@@ -283,6 +283,17 @@ usuario mientras tanto.
 - Queda **1 warning externo**: protección de contraseñas filtradas. La
   organización figura como Free y Supabase ofrece esta función desde Pro; no
   se activó un gasto ni se fingió que el aviso estaba resuelto.
+
+### 2.17 F0/F11 · Portada y contrato PostgREST — desplegada
+
+- `0015` restaura la relación declarativa entre `profile_blocks` y `profiles`
+  que exige el feed público; la clave foránea queda `NOT VALID` para proteger
+  las escrituras nuevas sin bloquear el despliegue por datos históricos.
+- `0016` recarga de forma versionada la caché de esquema de PostgREST.
+- `0017` añade la marca temporal que la consulta canónica ya ordenaba, junto
+  con el índice keyset de publicaciones, y vuelve a recargar la caché.
+- La prueba de base ejecuta el mismo join y orden de la portada. Producción
+  responde `200` en `/` y el smoke posterior quedó **6 de 6 en verde**.
 
 ---
 

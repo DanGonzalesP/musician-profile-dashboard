@@ -1,7 +1,7 @@
 # Guía de despliegue — cambios de la auditoría
 
 > **Estado vigente (2026-08-16):** producción ya tiene aplicadas y verificadas
-> las migraciones `0000`–`0012`. **No vuelvas a ejecutar manualmente** los pasos
+> las migraciones `0000`–`0017`. **No vuelvas a ejecutar manualmente** los pasos
 > históricos de `0002`–`0009` que aparecen debajo.
 >
 > Para una migración futura: backup manual fuera del repositorio, `pnpm
