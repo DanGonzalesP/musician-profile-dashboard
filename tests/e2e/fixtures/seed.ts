@@ -43,6 +43,52 @@ export const PERFIL_SUSPENDIDO = fila("profiles", (f) => f.username === "suspend
   is_suspended: boolean
 }
 
+/**
+ * El artista con contenido de TikTok: existe para ejercitar las dos superficies
+ * públicas que pintan una miniatura de un clip de TikTok. Es un perfil aparte y
+ * no `artista_prueba` a propósito, para no mover las instantáneas ARIA y las
+ * capturas aprobadas del perfil público, que congelan otra cosa.
+ */
+export const PERFIL_EMBEDS = fila("profiles", (f) => f.username === "embeds_prueba") as {
+  id: string
+  username: string
+  display_name: string
+}
+
+const BLOQUE_CREDITOS_EMBEDS = fila(
+  "profile_blocks",
+  (f) => f.profile_id === PERFIL_EMBEDS.id && f.block_type === "credits"
+) as { content: { credits: { title: string; image: string }[] } }
+
+const BLOQUE_PUBLICACIONES_EMBEDS = fila(
+  "profile_blocks",
+  (f) => f.profile_id === PERFIL_EMBEDS.id && f.block_type === "publicaciones"
+) as { content: { embeds: { title: string; thumbnail: string }[] } }
+
+/**
+ * Créditos externos de TikTok — la ÚNICA ruta por la que una URL del CDN de
+ * TikTok entra al contenido de un perfil: `app/api/oembed/route.ts` devuelve el
+ * `thumbnail_url` del oEmbed, `block-inspector.tsx` lo guarda en `credit.image`
+ * y `credits-block.tsx` lo pinta en un <img>. Son dos porque el oEmbed responde
+ * con hosts de dos dominios distintos según la región que atienda, y la CSP
+ * admite los dos: uno por dominio, así ninguno de los dos queda sin prueba.
+ *
+ * Los hosts son los de verdad (no un dominio inventado) porque lo que se prueba
+ * es la decisión de la CSP sobre ellos; la imagen nunca sale a la red:
+ * `aislarRedExterna` la responde localmente.
+ */
+export const CREDITOS_TIKTOK = BLOQUE_CREDITOS_EMBEDS.content.credits
+
+/**
+ * La tarjeta de TikTok dentro de Publicaciones — la otra superficie que pinta
+ * un clip de TikTok, pero su miniatura NO viene del oEmbed: el editor solo
+ * ofrece ahí un `ImageUploader` (`components/inspector/embeds-fields.tsx`), así
+ * que en producción esa URL siempre es de R2. Se deja con esa forma a
+ * propósito: ponerle un host de tiktokcdn describiría un dato que la app nunca
+ * produce.
+ */
+export const EMBED_TIKTOK_PUBLICACION = BLOQUE_PUBLICACIONES_EMBEDS.content.embeds[0]
+
 export const HERO_FIXTURE = fila(
   "profile_blocks",
   (f) => f.profile_id === PERFIL_FIXTURE.id && f.block_type === "hero"

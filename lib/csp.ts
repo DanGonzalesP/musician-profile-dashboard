@@ -36,6 +36,17 @@ export function crearCsp(nonce: string, esDesarrollo: boolean): string {
     "https://*.sndcdn.com",
     "https://*.fbcdn.net",
     "https://*.cdninstagram.com",
+    // TikTok es el único proveedor admitido cuya miniatura quedaba fuera de
+    // esta lista: `app/api/oembed/route.ts` devuelve el `thumbnail_url` de su
+    // oEmbed, el editor lo guarda como portada del crédito y el perfil público
+    // lo pinta en un <img> que la CSP bloqueaba. El host cambia en cada
+    // respuesta según la región y el punto de presencia que atienda
+    // (p16-sign-va.tiktokcdn.com, p19-sign.tiktokcdn-us.com...), así que el
+    // comodín va en el subdominio de los dos dominios oficiales de su CDN.
+    // No se abre `https:` entero ni el apex: cualquier otro host sigue
+    // bloqueado.
+    "https://*.tiktokcdn.com",
+    "https://*.tiktokcdn-us.com",
     // Activos de muestra que conserva el feed cuando no hay catálogo.
     "https://picsum.photos",
   ])
