@@ -26,10 +26,10 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 |---|---|---|
 | Tipos | `pnpm typecheck` | ✅ **0 errores** |
 | Lint | `pnpm lint` (`--max-warnings=22`) | ✅ **0 errores, 22 warnings** (exit 0) |
-| Pruebas unitarias | `pnpm test` | ✅ **18 archivos, 217 pruebas** |
+| Pruebas unitarias | `pnpm test` | ✅ **18 archivos, 221 pruebas** |
 | QA agregado | `pnpm qa` | ✅ verde de punta a punta |
 | Build | `pnpm build` | ✅ **exit 0**, 34 rutas |
-| **E2E + axe** | `pnpm test:e2e` | ✅ **88 pruebas verdes** (chromium escritorio + móvil) |
+| **E2E + axe** | `pnpm test:e2e` | ✅ **92 pruebas verdes** (chromium escritorio + móvil) |
 | **Regresión visual** | `pnpm test:visual` | ✅ **20 instantáneas ARIA verdes**, 20 capturas de píxeles omitidas (esperan aprobación humana) |
 | **Smoke** | `node scripts/smoke-staging.mjs` | ✅ **7 de 7 en verde** contra un servidor local (§2.11) |
 | **Reconstrucción DB** | `pnpm db:verify` | ✅ `0000`–`0017` desde cero; `db lint` sin errores |
@@ -37,7 +37,7 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 | **Paridad producción** | `supabase db diff --linked --schema public,private` | ✅ sin diferencias |
 
 **Cambio en el número de pruebas:** de **68 en 7 archivos** (línea base `6ffa555`)
-a **217 unitarias en 18 archivos + 88 E2E + 20 visuales** = **325 pruebas
+a **221 unitarias en 18 archivos + 92 E2E + 20 visuales** = **333 pruebas
 ejecutables**, todas verdes.
 
 **Los gates de base de datos ya están cerrados.** Docker, el baseline y las
@@ -89,6 +89,10 @@ aplicada y sus cinco triggers se verificaron en producción.
   violaciones CSP** en legal, feed y perfil, escritorio y móvil. La auditoría
   detectó y corrigió una primera versión que activaba el overlay de Next y
   bloqueaba un botón móvil.
+- La política permite de forma acotada los dos CDN regionales que devuelve el
+  oEmbed de TikTok para las portadas de créditos. Una prueba conductual carga
+  ambas imágenes y abre la pestaña Publicaciones; hosts imitadores, HTTP y un
+  comodín global siguen bloqueados.
 
 ### 2.6 F8 · E2E, accesibilidad y regresión visual — **cerrada localmente**
 

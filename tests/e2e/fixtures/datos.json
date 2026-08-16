@@ -33,6 +33,22 @@
       "musician_category": "guitarrista",
       "content_version": 1,
       "created_at": "2026-01-11T12:00:00.000Z"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "user_id": "00000000-0000-0000-0000-0000000000cc",
+      "owner_user_id": null,
+      "username": "embeds_prueba",
+      "display_name": "Artista De Embeds De Prueba",
+      "bio": "Perfil de mentira que existe solo para ejercitar los embeds externos bajo la CSP.",
+      "profile_type": "artist",
+      "unified_profile": false,
+      "accent_color": "azul",
+      "is_suspended": false,
+      "musician_roles": ["cantante"],
+      "musician_category": "cantante",
+      "content_version": 1,
+      "created_at": "2026-01-12T12:00:00.000Z"
     }
   ],
 
@@ -90,6 +106,72 @@
         "image": "",
         "banner": "",
         "socials": []
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000013",
+      "profile_id": "00000000-0000-0000-0000-000000000003",
+      "block_type": "hero",
+      "position_index": 0,
+      "is_visible": true,
+      "content": {
+        "name": "Artista De Embeds De Prueba",
+        "tagline": "Clips externos bajo la CSP",
+        "location": "Lima, Peru",
+        "image": "",
+        "banner": "",
+        "socials": []
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000014",
+      "profile_id": "00000000-0000-0000-0000-000000000003",
+      "block_type": "credits",
+      "position_index": 1,
+      "is_visible": true,
+      "content": {
+        "credits": [
+          {
+            "id": "credito-tiktok-va",
+            "sourceType": "external",
+            "status": "accepted",
+            "role": "M",
+            "title": "Colaboracion De Prueba En TikTok (VA)",
+            "mainArtist": "Artista De Embeds De Prueba",
+            "externalUrl": "https://www.tiktok.com/@artista_prueba/video/7000000000000000000",
+            "image": "https://p16-sign-va.tiktokcdn.com/obj/tos-maliva-p-0068/miniatura-de-prueba~c5_300x400.jpeg"
+          },
+          {
+            "id": "credito-tiktok-us",
+            "sourceType": "external",
+            "status": "accepted",
+            "role": "M",
+            "title": "Colaboracion De Prueba En TikTok (US)",
+            "mainArtist": "Artista De Embeds De Prueba",
+            "externalUrl": "https://www.tiktok.com/@artista_prueba/video/7000000000000000001",
+            "image": "https://p19-sign.tiktokcdn-us.com/obj/tos-useast5-p-0068/miniatura-de-prueba~tplv-photomode.jpeg"
+          }
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000015",
+      "profile_id": "00000000-0000-0000-0000-000000000003",
+      "block_type": "publicaciones",
+      "position_index": 2,
+      "is_visible": true,
+      "content": {
+        "items": [],
+        "rowTitles": ["Destacados", "En vivo", "Detras de camaras"],
+        "embeds": [
+          {
+            "id": "embed-tiktok-prueba",
+            "platform": "tiktok",
+            "url": "https://www.tiktok.com/@artista_prueba/video/7000000000000000002",
+            "title": "Clip De Prueba En TikTok",
+            "thumbnail": "https://ejemplo.r2.dev/images/clip-tiktok-prueba.png"
+          }
+        ]
       }
     }
   ],
