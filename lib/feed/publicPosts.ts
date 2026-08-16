@@ -46,37 +46,25 @@ type PublicacionesRow = {
  * (P-17); sin él devuelve la primera página, igual que antes.
  */
 export async function fetchPublicPosts(limit: number = 60, cursor?: CursorFeed): Promise<FeedPost[]> {
-  // Igual que fetchAllPublicFeed: se degrada si faltan columnas nuevas.
-  const selects = [
-    `id, profile_id, content, created_at, profiles ( display_name, musician_roles, profile_type, is_suspended )`,
-    `id, profile_id, content, created_at, profiles ( display_name, musician_category, profile_type, is_suspended )`,
-    `id, profile_id, content, created_at, profiles ( display_name )`,
-  ]
+  // .order() explícito: sin ORDER BY, Postgres no garantiza ningún orden,
+  // así que este .limit() devolvía filas ARBITRARIAS. No eran "las 60
+  // publicaciones más recientes" sino 60 cualesquiera, y el contenido nuevo
+  // podía no aparecer nunca en el feed. El `id desc` completa el orden para
+  // que el cursor no se cuelgue con dos filas de la misma marca de tiempo.
+  let consulta = supabase
+    .from("profile_blocks")
+    .select(`id, profile_id, content, created_at,
+      profiles ( display_name, musician_roles, profile_type, is_suspended )`)
+    .eq("block_type", "publicaciones")
+    .eq("is_visible", true)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit)
+  if (cursor) consulta = consulta.or(expresionKeyset(cursor))
 
-  let rows: PublicacionesRow[] | null = null
-  for (const select of selects) {
-    // .order() explícito: sin ORDER BY, Postgres no garantiza ningún orden,
-    // así que este .limit() devolvía filas ARBITRARIAS. No eran "las 60
-    // publicaciones más recientes" sino 60 cualesquiera, y el contenido nuevo
-    // podía no aparecer nunca en el feed. El `id desc` completa el orden para
-    // que el cursor no se cuelgue con dos filas de la misma marca de tiempo.
-    let consulta = supabase
-      .from("profile_blocks")
-      .select(select)
-      .eq("block_type", "publicaciones")
-      .eq("is_visible", true)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(limit)
-    if (cursor) consulta = consulta.or(expresionKeyset(cursor))
-
-    const { data, error } = await consulta
-    if (!error) {
-      rows = data as unknown as PublicacionesRow[]
-      break
-    }
-  }
-  if (!rows) return []
+  const { data, error } = await consulta
+  if (error) throw error
+  const rows = data as unknown as PublicacionesRow[]
 
   const posts: FeedPost[] = []
   for (const row of rows) {
