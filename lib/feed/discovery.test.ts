@@ -63,4 +63,34 @@ describe("mapearFilasRpc — descubrimiento agregado en la base", () => {
     expect(out.find((p) => p.slug === "banda")?.isGroup).toBe(true)
     expect(out.find((p) => p.slug === "solista")?.isGroup).toBe(false)
   })
+
+  it("usa el username cuando el nombre visible está vacío", () => {
+    const [perfil] = mapearFilasRpc(
+      [{ username: "luna", display_name: "  ", total: 1, categorias: [] }],
+      "prod"
+    )
+    expect(perfil.displayName).toBe("luna")
+  })
+
+  it("convierte el conteo numérico devuelto por Postgres", () => {
+    const [perfil] = mapearFilasRpc(
+      [{ username: "luna", total: "12", categorias: [] }],
+      "serv"
+    )
+    expect(perfil.count).toBe(12)
+  })
+
+  it("descarta roles desconocidos y conserva el orden canónico", () => {
+    const [perfil] = mapearFilasRpc(
+      [{ username: "luna", musician_roles: ["musicos", "inventado", "autores"], total: 1 }],
+      "prod"
+    )
+    expect(perfil.roles).toEqual(["autores", "musicos"])
+  })
+
+  it("genera claves distintas para productos y servicios", () => {
+    const fila = [{ username: "luna", total: 1, categorias: [] }]
+    expect(mapearFilasRpc(fila, "prod")[0].profileId).toBe("prod-luna")
+    expect(mapearFilasRpc(fila, "serv")[0].profileId).toBe("serv-luna")
+  })
 })
