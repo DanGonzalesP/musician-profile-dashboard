@@ -52,17 +52,18 @@ histórico. La validación retroactiva es un segundo paso, en su propia migraci�
 
 ### 4. Orden de despliegue: migración primero, código después
 
-El código nuevo debe tolerar el esquema viejo durante el intervalo.
+El código nuevo debe tolerar el esquema viejo durante el intervalo. Esa
+compatibilidad es deliberada y temporal: se retira en cuanto `db:verify`
+demuestra que el esquema es conocido y producción ya tiene la migración.
 
-Eso es exactamente lo que hoy hacen los fallbacks en cascada de
-`lib/musicFeed.ts`, `lib/catalog.ts`, `lib/feed/discovery.ts` y
-`lib/feed/publicPosts.ts` (P-15). La diferencia que introduce esta política es
-que pasan a ser **deliberados y temporales**, no permanentes: se retiran en
-cuanto `db:verify` demuestra que el esquema es conocido.
+Los fallbacks en cascada de `lib/musicFeed.ts`, `lib/catalog.ts`,
+`lib/feed/discovery.ts` y `lib/feed/publicPosts.ts` (P-15) se retiraron el
+2026-08-16 después de verificar `0000`–`0012`. Las rutas hacen una sola consulta
+al esquema canónico y propagan el error real en vez de ocultarlo como contenido
+vacío o guardar sólo una parte de los datos.
 
-También es lo que hace `checkAuthenticatedRateLimit` cuando la RPC de `0009` no
-existe (`PGRST202` → cae al contador local) y lo que hace el "modo observación"
-de `lib/blocks-schema.ts` mientras `0010` no está aplicada.
+Los periodos de compatibilidad de `checkAuthenticatedRateLimit` y del modo de
+observación de `lib/blocks-schema.ts` se cierran por separado en F5 y F3.
 
 ### 5. Toda migración se prueba en tres lugares antes de producción
 
