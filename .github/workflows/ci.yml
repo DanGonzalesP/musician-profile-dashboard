@@ -7,12 +7,8 @@ name: CI
 # por job, escaneo de secretos y auditoría de dependencias.
 #
 # Lo que este archivo AÚN no activa como gate bloqueante, y por qué:
-#   • base-de-datos (pnpm db:verify + test:db): necesita Docker + el baseline
-#     0000 (acción humana #8 del plan). Documentado en docs/migraciones.md.
 #   • visual de píxeles: necesita las capturas de referencia aprobadas por una
 #     persona (acción humana #9). La capa ARIA determinista sí corre en e2e.
-# Ambos están escritos como scaffolding y se activarán cuando su prerrequisito
-# humano exista, sin reescribir este archivo (sólo quitar el `if: false`).
 
 on:
   push:
@@ -24,6 +20,7 @@ on:
 # despliegues, así que no necesita más.
 permissions:
   contents: read
+  pull-requests: read
 
 # Una corrida por rama: si llega un push nuevo, la corrida anterior se cancela
 # en vez de gastar minutos en un commit que ya quedó viejo.
@@ -46,6 +43,7 @@ jobs:
       - name: gitleaks
         uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
 
   calidad:
@@ -56,8 +54,6 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -112,8 +108,6 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -149,8 +143,6 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -171,24 +163,31 @@ jobs:
       - name: Instantáneas ARIA en 4 anchos
         run: pnpm test:visual
 
-  # ── Jobs con prerrequisito humano (scaffolding, aún no activos) ──────────────
-  # Se dejan escritos para que activarlos sea quitar `if: false`, no redactar el
-  # job desde cero bajo presión el día que Docker o el baseline existan.
-
   base-de-datos:
     name: Base de datos y RLS (requiere baseline 0000)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: false # bloqueado por acción humana #8: Docker + supabase link + 0000_baseline.sql
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 11
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:verify
+
+      # `db:verify` ya dejó Supabase local listo. Se toman sus credenciales
+      # efímeras sin imprimirlas y se exponen sólo al siguiente paso.
+      - name: Configurar credenciales del Supabase local
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(pnpm exec supabase status -o env)"
+          {
+            echo "SUPABASE_TEST_URL=$API_URL"
+            echo "SUPABASE_TEST_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_TEST_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
       - run: pnpm test:db

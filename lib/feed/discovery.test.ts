@@ -1,81 +1,16 @@
 import { describe, it, expect } from "vitest"
-import { aggregate, mapearFilasRpc, type JoinRow } from "./discovery"
+import { mapearFilasRpc } from "./discovery"
 
-// Fila mínima de producto/servicio con su perfil embebido.
-function fila(over: Partial<JoinRow["profiles"]> & { is_active?: boolean; category?: string }): JoinRow {
-  const { is_active, category, ...profile } = over
-  return {
-    is_active: is_active ?? true,
-    category,
-    profiles: {
-      username: profile.username ?? "artista",
-      display_name: profile.display_name ?? "Artista",
-      profile_type: profile.profile_type ?? "artist",
-      is_suspended: profile.is_suspended ?? false,
-      ...profile,
-    },
-  }
-}
-
-describe("aggregate — descubrimiento por perfil", () => {
-  it("agrupa varias filas del mismo username en una tarjeta con su conteo", () => {
-    const out = aggregate(
-      [
-        fila({ username: "luna", category: "Guitarra" }),
-        fila({ username: "luna", category: "Voz" }),
-      ],
-      "serv"
-    )
-    expect(out).toHaveLength(1)
-    expect(out[0].slug).toBe("luna")
-    expect(out[0].count).toBe(2)
-    expect(out[0].categories.sort()).toEqual(["Guitarra", "Voz"])
-  })
-
-  it("descarta las filas inactivas", () => {
-    const out = aggregate([fila({ username: "luna", is_active: false })], "prod")
-    expect(out).toHaveLength(0)
-  })
-
-  // P-34, segunda capa: la suspensión debe respetarse también en el código, no
-  // sólo en RLS, porque products/services no están cubiertos por la política de
-  // profile_blocks de 0008.
-  it("excluye del descubrimiento a un perfil suspendido aunque tenga productos", () => {
-    const out = aggregate(
-      [
-        fila({ username: "luna" }),
-        fila({ username: "sombra", is_suspended: true }),
-      ],
-      "prod"
-    )
-    expect(out.map((p) => p.slug)).toEqual(["luna"])
-  })
-
-  it("no filtra a los perfiles no suspendidos (sin cambio de comportamiento)", () => {
-    const out = aggregate(
-      [
-        fila({ username: "luna", is_suspended: false }),
-        fila({ username: "sol", is_suspended: false }),
-      ],
-      "serv"
-    )
-    expect(out.map((p) => p.slug).sort()).toEqual(["luna", "sol"])
-  })
-})
-
-// El camino preferido (P-16): la agregación la hace Postgres y acá sólo se
-// traduce la fila. Lo que estas pruebas fijan es que las DOS rutas —el RPC de
-// la migración 0012 y el respaldo en JavaScript— producen la misma forma, que
-// es lo único que impide que activar la migración cambie lo que se ve.
+// La agregación (P-16) la hace Postgres y acá sólo se traduce la fila.
 describe("mapearFilasRpc — descubrimiento agregado en la base", () => {
-  it("traduce una fila agregada a la misma forma que `aggregate`", () => {
+  it("traduce una fila agregada al contrato de la tarjeta", () => {
     const [perfil] = mapearFilasRpc(
       [
         {
           username: "luna",
           display_name: "Luna",
           profile_type: "artist",
-          musician_roles: ["cantante"],
+          musician_roles: ["musicos"],
           categorias: ["Guitarra", "Voz"],
           total: 2,
         },
@@ -83,18 +18,15 @@ describe("mapearFilasRpc — descubrimiento agregado en la base", () => {
       "serv"
     )
 
-    const equivalente = aggregate(
-      [fila({ username: "luna", display_name: "Luna", category: "Guitarra" }),
-       fila({ username: "luna", display_name: "Luna", category: "Voz" })],
-      "serv"
-    )[0]
-
-    expect(perfil.slug).toBe(equivalente.slug)
-    expect(perfil.profileId).toBe(equivalente.profileId)
-    expect(perfil.displayName).toBe(equivalente.displayName)
-    expect(perfil.count).toBe(equivalente.count)
-    expect(perfil.categories.sort()).toEqual(equivalente.categories.sort())
-    expect(perfil.isGroup).toBe(equivalente.isGroup)
+    expect(perfil).toEqual({
+      profileId: "serv-luna",
+      displayName: "Luna",
+      slug: "luna",
+      roles: ["musicos"],
+      isGroup: false,
+      count: 2,
+      categories: ["Guitarra", "Voz"],
+    })
   })
 
   it("ordena por conteo, de mayor a menor", () => {
@@ -130,5 +62,35 @@ describe("mapearFilasRpc — descubrimiento agregado en la base", () => {
     )
     expect(out.find((p) => p.slug === "banda")?.isGroup).toBe(true)
     expect(out.find((p) => p.slug === "solista")?.isGroup).toBe(false)
+  })
+
+  it("usa el username cuando el nombre visible está vacío", () => {
+    const [perfil] = mapearFilasRpc(
+      [{ username: "luna", display_name: "  ", total: 1, categorias: [] }],
+      "prod"
+    )
+    expect(perfil.displayName).toBe("luna")
+  })
+
+  it("convierte el conteo numérico devuelto por Postgres", () => {
+    const [perfil] = mapearFilasRpc(
+      [{ username: "luna", total: "12", categorias: [] }],
+      "serv"
+    )
+    expect(perfil.count).toBe(12)
+  })
+
+  it("descarta roles desconocidos y conserva el orden canónico", () => {
+    const [perfil] = mapearFilasRpc(
+      [{ username: "luna", musician_roles: ["musicos", "inventado", "autores"], total: 1 }],
+      "prod"
+    )
+    expect(perfil.roles).toEqual(["autores", "musicos"])
+  })
+
+  it("genera claves distintas para productos y servicios", () => {
+    const fila = [{ username: "luna", total: 1, categorias: [] }]
+    expect(mapearFilasRpc(fila, "prod")[0].profileId).toBe("prod-luna")
+    expect(mapearFilasRpc(fila, "serv")[0].profileId).toBe("serv-luna")
   })
 })

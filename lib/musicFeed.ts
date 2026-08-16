@@ -90,47 +90,31 @@ export async function fetchMusicFeed(profileId: string): Promise<FeedTrack[]> {
  * página, que es exactamente lo que hacía antes.
  */
 export async function fetchAllPublicFeed(limit: number = 50, cursor?: CursorFeed): Promise<FeedTrack[]> {
-  // Se intenta con las columnas más nuevas primero; si alguna migración no
-  // corrió todavía en Supabase, el select falla y se degrada al siguiente
-  // intento — el feed nunca se cae por una columna faltante.
-  const selects = [
-    `id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-     profiles ( display_name, musician_roles, profile_type, is_suspended )`,
-    `id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-     profiles ( display_name, musician_category, profile_type, is_suspended )`,
-    `id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-     profiles ( display_name )`,
-  ];
+  // El segundo criterio de orden (`id desc`) no es decorativo: sin un orden
+  // TOTAL, dos filas con el mismo `created_at` pueden salir en cualquier
+  // orden entre consultas, y la paginación por cursor se cuelga repitiendo
+  // el mismo bloque.
+  let consulta = supabase
+    .from("music_feed")
+    .select(`id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
+      profiles ( display_name, musician_roles, profile_type, is_suspended )`)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+  if (cursor) consulta = consulta.or(expresionKeyset(cursor));
 
-  let lastError: unknown = null;
-  for (const select of selects) {
-    // El segundo criterio de orden (`id desc`) no es decorativo: sin un orden
-    // TOTAL, dos filas con el mismo `created_at` pueden salir en cualquier
-    // orden entre consultas, y la paginación por cursor se cuelga repitiendo
-    // el mismo bloque.
-    let consulta = supabase
-      .from("music_feed")
-      .select(select)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(limit);
-    if (cursor) consulta = consulta.or(expresionKeyset(cursor));
+  const { data, error } = await consulta;
+  if (error) throw error;
 
-    const { data, error } = await consulta;
-    if (!error) {
-      // Segunda capa de la suspensión (P-34). La RLS de 0008 sólo oculta el
-      // contenido de profile_blocks; music_feed es una tabla aparte que esa
-      // política no cubre, así que las pistas de un perfil suspendido seguirían
-      // apareciendo en el feed si confiáramos únicamente en la base. Se filtra
-      // también aquí — sin efecto para los perfiles no suspendidos.
-      const filas = (data as unknown as FeedTrackRow[]).filter(
-        (fila) => fila.profiles?.is_suspended !== true
-      );
-      return filas.map(mapRowToTrack);
-    }
-    lastError = error;
-  }
-  throw lastError;
+  // Segunda capa de la suspensión (P-34). La RLS de 0008 sólo oculta el
+  // contenido de profile_blocks; music_feed es una tabla aparte que esa
+  // política no cubre, así que las pistas de un perfil suspendido seguirían
+  // apareciendo en el feed si confiáramos únicamente en la base. Se filtra
+  // también aquí — sin efecto para los perfiles no suspendidos.
+  const filas = (data as unknown as FeedTrackRow[]).filter(
+    (fila) => fila.profiles?.is_suspended !== true
+  );
+  return filas.map(mapRowToTrack);
 }
 
 export async function addTrackToFeed(

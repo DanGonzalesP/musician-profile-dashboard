@@ -254,7 +254,19 @@ usuario mientras tanto.
 - El panel `/admin/reportes` no se improvisó: `ADMIN_USER_IDS` sólo existe en
   el entorno de Vercel y no puede convertirse honestamente en una política RLS.
   F14 se cierra cuando se apruebe cómo representar administradores en Postgres,
-  junto con el correo y los plazos institucionales del takedown.
+   junto con el correo y los plazos institucionales del takedown.
+
+### 2.15 F6 · Compatibilidad temporal de esquema — retirada
+
+- `musicFeed`, `publicPosts`, `discovery` y `catalog` ya no encadenan consultas
+  contra columnas antiguas ni reintentan escrituras con payloads incompletos.
+- El descubrimiento usa exclusivamente el RPC agregado de `0012`; desapareció
+  la agregación limitada a 500 filas en JavaScript.
+- Las pantallas directas de productos y servicios escriben el esquema canónico
+  completo o muestran el error real: nunca informan éxito después de guardar
+  sólo una parte.
+- El contrato del RPC conserva 8 pruebas unitarias. Feed, tienda y perfil
+  conservaron sus 88 pruebas E2E y sus 20 instantáneas ARIA.
 
 ---
 
@@ -307,7 +319,9 @@ Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
   real de los seis embeds y ffmpeg.wasm; las superficies públicas y la consola
   CSP sí están automatizadas en escritorio y móvil.
 - **F6 está cerrada:** existe `0000`, los SQL históricos están en `legacy/`, la
-  base se reconstruye desde cero y no difiere de producción.
+  base se reconstruye desde cero y los fallbacks temporales fueron retirados.
+  La comparación con producción no muestra diferencias estructurales ni de
+  permisos; el ruido textual heredado está documentado en `docs/migraciones.md`.
 - **F7 tiene su gate técnico cerrado:** las 13 pruebas de base pasan. Las
   decisiones de producto sobre tablas heredadas siguen separadas en F0/F13.
 - **F13/F14:** staging, backups, restauración probada y panel de moderación.
