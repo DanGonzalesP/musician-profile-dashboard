@@ -84,7 +84,7 @@ export async function crearReporte(reporte: NuevoReporte): Promise<void> {
         error,
         "reporte",
         error.message.includes("content_reports")
-          ? "Los reportes aún no están activados: falta correr supabase/migrations/0008_moderacion_y_cumplimiento.sql."
+          ? "Los reportes aún no están activados. Verifica las migraciones versionadas de Supabase."
           : error.message
       )
     )

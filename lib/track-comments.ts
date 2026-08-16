@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase"
 import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
 
 // Comentarios de las canciones del feed principal — tabla feed_comments
-// (ver supabase/setup_vibra.sql). Lectura pública; escribir requiere
+// (origen: supabase/legacy/setup_vibra.sql). Lectura pública; escribir requiere
 // sesión. Si la tabla todavía no existe en Supabase, todo degrada a listas
 // vacías para no romper el feed.
 
@@ -88,7 +88,7 @@ export async function addTrackComment(trackId: string, content: string): Promise
         error,
         "comentario",
         error.message.includes("feed_comments")
-          ? "Los comentarios aún no están activados: falta correr supabase/setup_vibra.sql."
+          ? "Los comentarios aún no están activados. Verifica las migraciones versionadas de Supabase."
           : error.message
       )
     )

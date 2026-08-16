@@ -6,7 +6,7 @@
 // tiene categoría, modalidad (presencial/online), duración, tiempo de
 // entrega, lista de qué incluye, precio con unidad (por hora/proyecto/...),
 // enlace de reserva y flags de activo/destacado. Escribe directo en la
-// tabla `services` (columnas nuevas en supabase/setup_vibra.sql).
+// tabla `services` (esquema vigente en supabase/migrations/0000_baseline.sql).
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -233,7 +233,7 @@ export default function AdminServiciosPage() {
         {avisoMigracion && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-500">
             Se guardó lo básico, pero los campos avanzados (categoría, modalidad, qué incluye...)
-            necesitan que corras <code className="font-mono">supabase/setup_vibra.sql</code> una vez en el SQL Editor de Supabase.
+            necesitan que las migraciones versionadas estén aplicadas en Supabase.
           </div>
         )}
 

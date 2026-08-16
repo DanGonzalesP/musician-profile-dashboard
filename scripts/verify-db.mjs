@@ -1,10 +1,9 @@
 // Gate de base de datos: reconstruye el esquema DESDE CERO y lo audita.
 //
 // Qué demuestra: que `supabase/migrations/` es suficiente por sí solo para
-// levantar la base de Vibe. Mientras el esquema viva a medias en migraciones y
-// a medias en SQL corrido a mano en el editor de producción (P-14), nadie
-// puede afirmar eso — y sin poder afirmarlo, las pruebas de RLS de F7 estarían
-// verificando una base que no se parece a la real.
+// levantar la base de Vibe. P-14 quedó cerrado con el baseline 0000; este gate
+// impide que el esquema vuelva a quedar repartido entre migraciones y SQL
+// ejecutado a mano.
 //
 // Adaptado de `Bancary/scripts/verify-db.mjs`, que ya lleva 34 migraciones
 // funcionando con este patrón.
@@ -93,8 +92,7 @@ console.log(
     "",
     "✅ La base se reconstruye desde cero solo con supabase/migrations/.",
     "",
-    "Lo que esto NO demuestra todavía: que el esquema local sea igual al de",
-    "producción. Eso lo prueba `supabase db diff --linked`, que exige `supabase link`",
-    "y es criterio de aceptación de F6 (§8, acción humana #8).",
+    "Este gate demuestra la reconstrucción local. La igualdad con producción se",
+    "verifica por separado con `supabase db diff --linked --schema public`.",
   ].join("\n")
 )

@@ -5,7 +5,7 @@
 // entradas... Cada producto tiene categoría, tipo (físico/digital), fotos,
 // variantes (tallas/colores/formatos), precio con moneda, stock, enlace de
 // compra externo, y flags de activo/destacado. Todo escribe directo en la
-// tabla `products` (las columnas nuevas vienen de supabase/setup_vibra.sql;
+// tabla `products` (el esquema vigente viene del baseline versionado;
 // si la migración no corrió, se guarda lo básico y se avisa).
 
 import { useEffect, useRef, useState } from "react";
@@ -239,7 +239,7 @@ export default function AdminMerchPage() {
         {avisoMigracion && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-500">
             Se guardó lo básico, pero los campos avanzados (categoría, variantes, enlace de compra...)
-            necesitan que corras <code className="font-mono">supabase/setup_vibra.sql</code> una vez en el SQL Editor de Supabase.
+            necesitan que las migraciones versionadas estén aplicadas en Supabase.
           </div>
         )}
 

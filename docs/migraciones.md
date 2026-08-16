@@ -103,37 +103,30 @@ se resuelve renumerando **la que no se haya aplicado todavía**.
 
 | # | Archivo | Qué hace | Aplicada |
 |---|---|---|---|
-| 0001 | `catalog_schema_fix` | Esquema del catálogo | ✅ *(por confirmar en F0)* |
-| 0002 | `media_assets` | Propiedad de archivos de R2 | ✅ *(por confirmar)* |
-| 0003 | `profile_private` | Saca DNI y borradores de la tabla pública | ✅ *(por confirmar)* |
-| 0004 | `lock_remaining_rls` | RLS en todo lo que faltaba | ✅ *(por confirmar)* |
-| 0005 | `publish_profile_rpc` | Publicación atómica | ✅ *(por confirmar)* |
-| 0006 | `username` | Identidad real, única, con historial | ✅ *(por confirmar)* |
-| 0007 | `optimistic_concurrency` | Versión optimista de la publicación | ✅ *(por confirmar)* |
-| 0008 | `moderacion_y_cumplimiento` | Reportes, bloqueos, export, borrado | ✅ *(por confirmar)* |
-| 0009 | `shared_rate_limits` | Contador compartido en Postgres | ✅ *(por confirmar)* |
-| **0010** | `validar_bloques` | Restricciones del JSONB + `publish_profile` v3 | ✍️ escrita, ❌ sin aplicar |
-| **0011** | `limites_de_escritura` | Triggers anti-spam en las 5 tablas de escritura | ✍️ escrita, ❌ sin aplicar |
-| **0012** | `descubrimiento_y_feed` | RPC de descubrimiento + índices keyset | ✍️ escrita, ❌ sin aplicar |
+| 0001 | `catalog_schema_fix` | Esquema del catálogo | ✅ producción |
+| 0002 | `media_assets` | Propiedad de archivos de R2 | ✅ producción |
+| 0003 | `profile_private` | Saca DNI y borradores de la tabla pública | ✅ producción |
+| 0004 | `lock_remaining_rls` | RLS en todo lo que faltaba | ✅ producción |
+| 0005 | `publish_profile_rpc` | Publicación atómica | ✅ producción |
+| 0006 | `username` | Identidad real, única, con historial | ✅ producción |
+| 0007 | `optimistic_concurrency` | Versión optimista de la publicación | ✅ producción |
+| 0008 | `moderacion_y_cumplimiento` | Reportes, bloqueos, export, borrado | ✅ producción |
+| 0009 | `shared_rate_limits` | Contador compartido en Postgres | ✅ producción |
+| **0010** | `validar_bloques` | Restricciones del JSONB + `publish_profile` v3 | ✅ producción 2026-08-16 |
+| **0011** | `limites_de_escritura` | Triggers anti-spam en las 5 tablas de escritura | ✅ producción 2026-08-16 |
+| **0012** | `descubrimiento_y_feed` | RPC de descubrimiento + índices keyset | ✅ producción 2026-08-16 |
 | 0013 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
 | 0014 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
 
-Las marcas "por confirmar" se resuelven ejecutando `supabase/_diagnostico_estado.sql`
-y pegando el resultado en [`estado-desplegado.md`](estado-desplegado.md).
-
-**Las tres migraciones escritas y sin aplicar (`0010`–`0012`) no rompen nada
-mientras esperan.** El código que las acompaña detecta su ausencia y sigue
-funcionando como antes: el validador de bloques corre en modo observación, y
-`fetchProductSellers`/`fetchServiceProviders` caen a la agregación en
-JavaScript si `descubrimiento_perfiles` no existe. Es la regla 4 de arriba
-aplicada a conciencia — el orden de despliegue (migración primero, código
-después) es el recomendado, pero acá el inverso también es seguro.
+El estado de `0001`–`0012` se verificó directamente contra producción el
+2026-08-16 y quedó registrado en [`estado-desplegado.md`](estado-desplegado.md).
 
 ### Correcciones aplicadas a `0010`–`0012` el 2026-08-16
 
-Las tres siguen **sin aplicar**, así que corregirlas en su sitio no viola la
-regla forward-only: no hay ninguna base en la que ya hayan corrido. Los tres
-cambios salieron de la auditoría adversarial:
+Estas correcciones se hicieron antes de su primera aplicación. Desde el
+2026-08-16, `0010`–`0012` ya están aplicadas y son inmutables; cualquier arreglo
+posterior debe ir en una migración nueva. Los tres cambios salieron de la
+auditoría adversarial:
 
 - **`0011`** — `aplicar_limite_de_escritura()` es `security definer` y se
   quedaba con el `execute` que Postgres concede a `PUBLIC` por defecto. Se le
@@ -162,20 +155,16 @@ cambios salieron de la auditoría adversarial:
 
 ## El baseline
 
-`supabase/migrations/0000_baseline.sql` **todavía no existe**. Es el esquema
-completo tal como quedó tras `0009`, y es lo que permite que `db reset`
-reconstruya todo desde cero.
+`supabase/migrations/0000_baseline.sql` existe y representa el esquema real
+después de `0009`, sin datos de producción. El 2026-08-16 se comprobó que
+`pnpm db:verify` reconstruye desde cero `0000`–`0012` y que las 13 pruebas de
+base pasan. La comparación enlazada no encuentra diferencias estructurales ni
+de permisos: sólo formato textual en tres cuerpos de función heredados. El
+motor `migra` muestra además cuatro recreaciones de políticas idénticas, que no
+se convirtieron en DDL por ser ruido del comparador.
 
-Se genera con `supabase db diff` contra la base real, así que requiere
-`supabase link` y credenciales. Ver
-[`../supabase/legacy/README.md`](../supabase/legacy/README.md) para el
-procedimiento exacto y para por qué los 23 `.sql` históricos no se archivaron
-todavía.
-
-**Hasta que el baseline exista, `pnpm db:verify` no puede pasar**: las
-migraciones numeradas dan por existentes tablas que solo crean los `.sql`
-sueltos (`feed_comments`, `music_feed`, `profile_questions`,
-`author_certificates`, `licenses`, `credit_requests`).
+Los SQL manuales que dieron origen al baseline están archivados, sin capacidad
+operativa, en [`../supabase/legacy/`](../supabase/legacy/).
 
 ---
 
@@ -201,7 +190,8 @@ sueltos (`feed_comments`, `music_feed`, `profile_questions`,
 
 Ver `DESPLIEGUE.md` y [`runbooks/rollback.md`](runbooks/rollback.md). Resumen:
 
-1. Backup de producción (Supabase → Database → Backups). **Antes**, no después.
+1. Backup de producción **antes**, no después. En el plan Free se usa un dump
+   manual de `schema`, `data` y `roles`, guardado fuera del repositorio.
 2. Aplicar la migración, **una sola**, y correr su bloque de verificación.
 3. Recién entonces la siguiente.
 4. Promover el despliegue de código en Vercel.

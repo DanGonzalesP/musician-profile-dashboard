@@ -6,7 +6,8 @@ import type { CreditStatus } from "@/lib/blocks"
 // una fila "pending" acá. El dueño de la canción la ve en su panel de
 // notificaciones (app/perfil/notificaciones) y decide aceptar/rechazar —
 // solo entonces el crédito aparece en el perfil público del solicitante.
-// Ver supabase/credit_requests_table.sql para el esquema y las políticas RLS.
+// El origen histórico está en supabase/legacy/credit_requests_table.sql; el
+// esquema vigente vive en supabase/migrations/0000_baseline.sql.
 
 export type CreditRequest = {
   id: string

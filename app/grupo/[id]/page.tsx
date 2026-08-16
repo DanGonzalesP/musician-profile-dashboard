@@ -134,7 +134,7 @@ export default function GrupoPanelPage() {
       const raw = err instanceof Error ? err.message : ""
       setErrorMessage(
         raw.includes("row-level security") || raw === ""
-          ? "Supabase rechazó el cambio. Si acabas de actualizar la app, corre supabase/fix_group_creation_rls.sql."
+          ? "Supabase rechazó el cambio. Verifica que las migraciones versionadas estén aplicadas."
           : raw
       )
     } finally {

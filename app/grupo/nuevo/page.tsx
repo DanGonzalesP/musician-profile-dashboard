@@ -120,7 +120,7 @@ export default function NuevoGrupoPage() {
       // El error típico de RLS de Supabase es críptico — se traduce a algo accionable.
       setErrorMessage(
         raw.includes("row-level security")
-          ? "Supabase rechazó la creación del grupo. Falta correr supabase/setup_vibra.sql en el proyecto (una sola vez, desde el SQL Editor)."
+          ? "Supabase rechazó la creación del grupo. Verifica que las migraciones versionadas estén aplicadas."
           : raw || "No se pudo crear el grupo musical. Intenta de nuevo."
       )
     } finally {

@@ -162,7 +162,7 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
         setIsBand(profile.profileType === "band");
 
         // Acento elegido por el artista para SU página. Consulta aparte y
-        // tolerante: si la columna no existe (setup_vibra.sql sin correr),
+        // tolerante: si un deployment atrasado todavía no tiene la columna,
         // simplemente queda el rojo por defecto.
         supabase
           .from("profiles")

@@ -1,7 +1,15 @@
 # Guía de despliegue — cambios de la auditoría
 
-Todo el código está en la rama `fase-0-seguridad`. **Nada de esto tiene efecto
-hasta que corras las migraciones SQL.** Esta guía es el orden exacto.
+> **Estado vigente (2026-08-16):** producción ya tiene aplicadas y verificadas
+> las migraciones `0000`–`0012`. **No vuelvas a ejecutar manualmente** los pasos
+> históricos de `0002`–`0009` que aparecen debajo.
+>
+> Para una migración futura: backup manual fuera del repositorio, `pnpm
+> db:verify`, `pnpm test:db`, `supabase db push --linked --dry-run`, aplicación
+> de una sola migración, verificación, despliegue de Vercel y `pnpm smoke`.
+
+Lo que sigue documenta el despliegue histórico original y se conserva como
+trazabilidad.
 
 > ⚠️ **Antes de empezar: haz un backup.** En Supabase → Database → Backups.
 > Las migraciones 0003 y 0006 modifican y eliminan columnas.

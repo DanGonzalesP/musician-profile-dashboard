@@ -4,7 +4,7 @@ import { slugifyUsername } from "@/lib/username"
 // Punto 4: perfiles de banda + roles de gestión. Una banda es otra fila de
 // `profiles` (profile_type = "band"); quién puede editarla se resuelve acá y
 // se refleja también en RLS vía get_profile_role() — ver
-// supabase/band_profiles.sql. "owner" es el creador de la banda (o el dueño
+// supabase/legacy/band_profiles.sql. "owner" es el creador de la banda (o el dueño
 // de un perfil personal); "admin"/"editor" son roles de band_members.
 export type BandRole = "owner" | "admin" | "editor"
 
@@ -194,7 +194,7 @@ export async function inviteMember(bandProfileId: string, username: string, role
     }
     if (error.message.includes("row-level security")) {
       throw new Error(
-        "Supabase rechazó la invitación: falta correr supabase/setup_vibra.sql en el proyecto."
+        "Supabase rechazó la invitación. Verifica que las migraciones versionadas estén aplicadas."
       )
     }
     throw error

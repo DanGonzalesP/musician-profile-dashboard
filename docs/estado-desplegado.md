@@ -1,12 +1,11 @@
 # Estado desplegado — F0
 
-> **ESTADO: ABIERTO / BLOQUEADO POR CREDENCIALES.**
-> Este documento es la plantilla que F0 exige rellenar. La sesión que lo creó **no tiene acceso a
-> la base de datos de producción, al panel de Vercel ni a Cloudflare**, así que ninguna casilla
-> puede marcarse desde el repositorio. Todo lo demás del plan se ejecutó igualmente, declarando la
-> suposición: ver `IMPLEMENTACION_VIBE_EMPRESARIAL.md`.
+> **ESTADO: ABIERTO / BASE DE DATOS SINCRONIZADA.**
+> Supabase y Vercel se verificaron directamente el 2026-08-16. El backup manual, el baseline
+> `0000` y el despliegue de `0010`–`0012` están completos. Quedan pendientes las decisiones sobre
+> las tablas heredadas y el inventario de Cloudflare/variables.
 
-Última actualización: 15 de agosto de 2026 · Firmado por: **(pendiente)**
+Última actualización: 16 de agosto de 2026 · Evidencia recopilada por: **Codex**
 
 ---
 
@@ -30,7 +29,9 @@ externas son peticiones HTTP que deben **fallar**.
 Salida de la consulta 1 de `_diagnostico_estado.sql`:
 
 ```
-(pegar aquí)
+0001=true; 0002=true; 0003=true; 0004=true; 0005+0007=true;
+0006=true; 0007=true; 0008=true; 0009=true;
+0010=true; 0011=true; 0012=true; 0013=false; 0014=false.
 ```
 
 Lo que el diagnóstico del 2026-08-05 dejó anotado (fuente: memoria del proyecto, **no verificado
@@ -39,18 +40,18 @@ de forma independiente**): las migraciones `0002`…`0009` se aplicaron ese día
 
 | Migración | ¿Aplicada? | Fecha | Evidencia |
 |---|---|---|---|
-| 0001_catalog_schema_fix | | | |
-| 0002_media_assets | | | |
-| 0003_profile_private | | | |
-| 0004_lock_remaining_rls | | | |
-| 0005_publish_profile_rpc | | | |
-| 0006_username | | | |
-| 0007_optimistic_concurrency | | | |
-| 0008_moderacion_y_cumplimiento | | | |
-| 0009_shared_rate_limits | | | |
-| **0010_validar_bloques** (F3) | ❌ escrita, sin aplicar | | |
-| **0011_limites_de_escritura** (F5) | ❌ escrita, sin aplicar | | |
-| **0012_descubrimiento_y_feed** (F11) | ❌ escrita, sin aplicar | | |
+| 0001_catalog_schema_fix | ✅ | 2026-08-16 | `services.profile_id` y ambos `position_index` existen; se corrigió el diagnóstico que buscaba una columna equivocada |
+| 0002_media_assets | ✅ | 2026-08-16 | `media_assets` existe |
+| 0003_profile_private | ✅ | 2026-08-16 | `profile_private` existe; no hay `legal_settings` público |
+| 0004_lock_remaining_rls | ✅ | 2026-08-16 | 24/24 tablas de `public` con RLS activo |
+| 0005_publish_profile_rpc | ✅ | 2026-08-16 | `publish_profile` de 3 argumentos existe |
+| 0006_username | ✅ | 2026-08-16 | `username` existe y es único |
+| 0007_optimistic_concurrency | ✅ | 2026-08-16 | `content_version` existe |
+| 0008_moderacion_y_cumplimiento | ✅ | 2026-08-16 | existen `content_reports`, `user_blocks`, `audit_log` |
+| 0009_shared_rate_limits | ✅ | 2026-08-16 | existen tabla y RPC del rate limit |
+| **0010_validar_bloques** (F3) | ✅ | 2026-08-16 | constraints de tipo, tamaño, objeto y posición verificadas |
+| **0011_limites_de_escritura** (F5) | ✅ | 2026-08-16 | tabla, función, 5 triggers y revocación de `execute` verificadas |
+| **0012_descubrimiento_y_feed** (F11) | ✅ | 2026-08-16 | RPC e índices keyset disponibles; índice opcional de `profile_blocks` omitido al no existir `created_at` |
 | **0013_cuotas** (F11) | ⬜ ni escrita — necesita la decisión de cuota (§8 #19) | | |
 | **0014_moderacion_operativa** (F14) | ⬜ ni escrita — necesita decidir cómo se representa un administrador **en la base** (hoy `ADMIN_USER_IDS` sólo existe en el entorno de la app) | | |
 
@@ -61,12 +62,14 @@ de forma independiente**): las migraciones `0002`…`0009` se aplicaron ese día
 Salida de las consultas B y C de `_diagnostico_parte2.sql`:
 
 ```
-(pegar aquí)
+B: 24 tablas; todas con `relrowsecurity=true`.
+C: 9 SELECT públicos con `qual=true`. Fuera de la lista esperada aparecen
+`artist`, `merch`, `music_feed` y `username_history`; requieren decisión explícita.
 ```
 
 Criterios de aceptación de F0:
 
-- [ ] Ninguna tabla de `public` con `relrowsecurity = false`.
+- [x] Ninguna tabla de `public` con `relrowsecurity = false`.
 - [ ] Ninguna política con `qual = true` fuera de los SELECT públicos intencionales
       (`profiles`, `profile_blocks`, `products`, `services`, `feed_comments`, `feed_post_comments`).
 
@@ -75,7 +78,10 @@ Criterios de aceptación de F0:
 Salida de la consulta 2:
 
 ```
-(pegar aquí)
+Definer detectadas: `consume_authenticated_rate_limit`, `eliminar_mi_cuenta`,
+`handle_new_user`, `record_username_change`, `registrar_auditoria`,
+`set_comment_author_name` y `set_question_asker_name`.
+Todas tienen `search_path` fijo; ninguna concede ejecución a `anon`.
 ```
 
 Lista blanca esperada (todo lo que aparezca fuera de esta lista es superficie sin dueño):
@@ -94,11 +100,14 @@ Lista blanca esperada (todo lo que aparezca fuera de esta lista es superficie si
 Salidas de las consultas 3, 4 y 5:
 
 ```
-(pegar aquí)
+No existen `legal_settings` ni `draft_content` en `profiles`.
+`user_id` y `owner_user_id` siguen físicamente presentes, pero `anon` no tiene SELECT.
+`orders` y `order_items` no existen. `donations` sí existe: 8 columnas, RLS activo y 0 políticas.
+Deuda heredada: `_backup_profiles_20260805`, `artist`, `donations` y `merch`.
 ```
 
-- [ ] `profiles` **no** tiene `legal_settings` ni `draft_content` (P-01).
-- [ ] `orders` / `order_items`: confirmar que no existen (P-03).
+- [x] `profiles` **no** tiene `legal_settings` ni `draft_content` (P-01).
+- [x] `orders` / `order_items`: confirmado que no existen (P-03).
 - [ ] `donations`: confirmar el esquema y decidir política (P-03).
 - [ ] `artist` / `merch` / `donations` con `qual = true`: decidir retiro (P-03b).
 - [ ] `_backup_profiles_20260805`: decidir archivo y borrado (P-03b).
@@ -120,8 +129,8 @@ key pública, contra el dominio real. Todas deben **fallar**; el éxito de cualq
 |---|---|---|---|
 | 1 | `curl "$SUPABASE_URL/rest/v1/profiles?select=*" -H "apikey: $ANON"` | sin `legal_settings`, `draft_content`, `user_id`, `owner_user_id` | |
 | 2 | `curl "$SUPABASE_URL/rest/v1/profile_private?select=*" -H "apikey: $ANON"` | 0 filas o 401 | |
-| 3 | `curl -X POST https://<dominio>/api/cleanup-orphaned-files -H "Content-Type: application/json" -d '{"folder":"audio"}'` | **401** | |
-| 4 | `curl "https://<dominio>/api/image-proxy?url=https://pub-XXX.r2.dev.ejemplo.com/x"` | **400** | |
+| 3 | `curl -X POST https://<dominio>/api/cleanup-orphaned-files -H "Content-Type: application/json" -d '{"folder":"audio"}'` | **401** | ✅ 401 (`pnpm smoke`) |
+| 4 | `curl "https://<dominio>/api/image-proxy?url=https://pub-XXX.r2.dev.ejemplo.com/x"` | **400** | ✅ 400 (`pnpm smoke`) |
 | 5 | Guardar un enlace `javascript:alert(1)` en un bloque y abrir el perfil público | el enlace queda inerte | |
 | 6 | Pegar `https://<dominio>/<username>` en WhatsApp | tarjeta con nombre y foto del artista | |
 
@@ -159,13 +168,12 @@ Salida de la consulta 7. La necesita `supabase/config.toml` (F6) para que el ent
 reproduzca producción.
 
 ```
-(pegar aquí)
+PostgreSQL 17.6 on aarch64-unknown-linux-gnu
+version_mayor = 17
 ```
 
-`supabase/config.toml` quedó escrito con `major_version = 15`, que es el valor por defecto de
-Supabase. **Si la consulta devuelve otra cosa, corregir ese archivo antes de correr `db:verify`**;
-con la versión equivocada, el entorno local no reproduce producción y `db:verify` da una falsa
-tranquilidad.
+`supabase/config.toml` se corrigió a `major_version = 17` el 2026-08-16, antes de correr
+`db:verify`.
 
 ---
 

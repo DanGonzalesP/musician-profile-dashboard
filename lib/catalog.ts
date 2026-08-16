@@ -7,9 +7,9 @@ import { supabase } from "@/lib/supabase"
 // cualquier cosa que un músico ofrezca: clases, producción, mezcla/máster,
 // composición, sesiones, shows en vivo, alquiler de equipo...
 //
-// Los campos nuevos viven en columnas agregadas por supabase/setup_vibra.sql.
-// Mientras esa migración no corra, fetchCatalog degrada con valores por
-// defecto y publishCatalog reintenta con el payload mínimo legacy.
+// El esquema vigente vive en supabase/migrations/0000_baseline.sql. Los
+// fallbacks conservan compatibilidad defensiva con un deployment atrasado,
+// pero los SQL históricos de supabase/legacy/ no se vuelven a ejecutar.
 
 export type ProductKind = "fisico" | "digital"
 

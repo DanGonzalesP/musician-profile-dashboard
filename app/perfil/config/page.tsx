@@ -84,8 +84,8 @@ export default function ConfigPerfilPage() {
       setDisplayName(profile.displayName);
       setUnifiedProfile(profile.unifiedProfile);
 
-      // Los roles se consultan aparte: si la migración setup_vibra.sql no
-      // corrió todavía, este select falla sin arrastrar al resto.
+      // Los roles se consultan aparte: un deployment atrasado no debe hacer
+      // fallar la carga del resto del perfil.
       const { data: rolesRow } = await supabase
         .from("profiles")
         .select("musician_roles, musician_category")
@@ -95,8 +95,8 @@ export default function ConfigPerfilPage() {
         setRoles(parseMusicianRoles(rolesRow.musician_roles ?? rolesRow.musician_category));
       }
 
-      // Igual que los roles: consulta aparte para que una columna faltante
-      // (migración setup_vibra.sql sin correr) no rompa el resto.
+      // Igual que los roles: una columna ausente en un deployment atrasado no
+      // debe romper el resto.
       const { data: accentRow } = await supabase
         .from("profiles")
         .select("accent_color")
@@ -171,7 +171,7 @@ export default function ConfigPerfilPage() {
       .eq("id", profileId);
     if (rolesError) {
       setErrorMensaje(
-        "El perfil se guardó, pero los roles no: falta correr supabase/setup_vibra.sql."
+        "El perfil se guardó, pero los roles no. Verifica las migraciones versionadas de Supabase."
       );
       return;
     }
@@ -182,7 +182,7 @@ export default function ConfigPerfilPage() {
       .eq("id", profileId);
     if (accentError) {
       setErrorMensaje(
-        "El perfil se guardó, pero el color no: falta correr supabase/setup_vibra.sql."
+        "El perfil se guardó, pero el color no. Verifica las migraciones versionadas de Supabase."
       );
       return;
     }

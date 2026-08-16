@@ -29,12 +29,10 @@ port = 54322
 shadow_port = 54320
 health_timeout = "2m"
 # ⚠️ TIENE QUE COINCIDIR CON PRODUCCIÓN.
-# 15 es el valor por defecto de Supabase y el que se asume hasta que F0 lo
-# confirme. La consulta 7 de `supabase/_diagnostico_estado.sql` devuelve el
-# número real; si no es 15, corregir AQUÍ antes de correr `db:verify`. Con la
-# versión equivocada el entorno local no reproduce producción y el gate da una
-# falsa tranquilidad.
-major_version = 15
+# Confirmado en producción por `_diagnostico_estado.sql` el 2026-08-16.
+# Mantener este valor sincronizado evita que el gate local dé una falsa
+# tranquilidad al probar contra una versión distinta de PostgreSQL.
+major_version = 17
 
 [db.migrations]
 enabled = true
@@ -53,7 +51,7 @@ enabled = true
 enabled = true
 port = 54323
 
-[inbucket]
+[local_smtp]
 # Buzón local para los correos de Auth (confirmación de cuenta). Lo necesitan
 # las pruebas que crean usuarios.
 enabled = true

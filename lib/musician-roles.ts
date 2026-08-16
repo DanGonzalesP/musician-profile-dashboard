@@ -2,7 +2,7 @@
 // antiguas (autores/productores/directores/interpretes/tecnicos): ahora un
 // músico puede tener VARIOS roles a la vez (profiles.musician_roles text[])
 // y el feed se filtra por cualquiera de ellos desde la barra lateral.
-// Los ids coinciden con el check de supabase/setup_vibra.sql.
+// Los ids coinciden con el check histórico de supabase/legacy/setup_vibra.sql.
 
 export type MusicianRole =
   | "autores"

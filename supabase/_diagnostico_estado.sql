@@ -25,10 +25,16 @@ select
 from (
   values
     ('0001_catalog_schema_fix',
-     'products.profile_id existe',
+     'services.profile_id + position_index y products.position_index existen',
      exists (select 1 from information_schema.columns
-             where table_schema = 'public' and table_name = 'products'
-               and column_name = 'profile_id')),
+             where table_schema = 'public' and table_name = 'services'
+               and column_name = 'profile_id')
+     and exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'services'
+                   and column_name = 'position_index')
+     and exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'products'
+                   and column_name = 'position_index')),
 
     ('0002_media_assets',
      'tabla public.media_assets existe',

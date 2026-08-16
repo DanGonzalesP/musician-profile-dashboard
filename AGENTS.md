@@ -58,7 +58,7 @@ pnpm test:visual   # instantáneas ARIA en 4 anchos
 ```
 
 Cuando la fase toca **la base de datos**, además (sí necesitan Docker Desktop y
-el baseline `0000`, que todavía no existe — ver `docs/migraciones.md`):
+el baseline `0000` — ver `docs/migraciones.md`):
 
 ```powershell
 pnpm db:verify

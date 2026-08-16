@@ -6,17 +6,17 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 [`PLAN_VIBE_EMPRESARIAL.md`](PLAN_VIBE_EMPRESARIAL.md).
 
 - **Fecha:** 16 de agosto de 2026
-- **HEAD:** `6ffa555` (`chore: eliminar componentes muertos AccionPublica y FormularioDonacion`)
-- **Índice:** vacío — **no se ha hecho ningún commit** (así lo pidió la consigna).
-  Todo el trabajo vive en el árbol de trabajo.
+- **Base al iniciar el bloque de cierre de base:** `6fb43b8`.
+- **Producción verificada:** Supabase `0000`–`0012` y Vercel, 16 de agosto de 2026.
 - **Entorno:** Windows 11 (26200) · Node v24.16.0 · pnpm 11.10.0 · Next 16.2.12 ·
   TypeScript 5.7.3 · Vitest 4.1.10 · Playwright 1.62.
 
 > Esta sesión **retomó** el árbol no commiteado que dejó una auditoría
 > interrumpida. Se revisó pieza por pieza, se corrigió lo que estaba roto, se
 > borraron los artefactos que no debían versionarse, y se llevó hasta el final
-> todo lo que se podía terminar sin credenciales, sin Docker y sin mutar nada
-> externo (ver §3 y §4).
+> todo lo que se podía terminar. En el bloque posterior se autorizó la CLI,
+> se levantó Docker y se cerraron también el baseline, las pruebas de base y el
+> despliegue de `0010`–`0012`.
 
 ---
 
@@ -32,13 +32,16 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 | **E2E + axe** | `pnpm test:e2e` | ✅ **88 pruebas verdes** (chromium escritorio + móvil) |
 | **Regresión visual** | `pnpm test:visual` | ✅ **20 instantáneas ARIA verdes**, 20 capturas de píxeles omitidas (esperan aprobación humana) |
 | **Smoke** | `node scripts/smoke-staging.mjs` | ✅ **7 de 7 en verde** contra un servidor local (§2.11) |
+| **Reconstrucción DB** | `pnpm db:verify` | ✅ `0000`–`0012` desde cero; `db lint` sin errores |
+| **Pruebas DB** | `pnpm test:db` | ✅ **13 de 13** |
+| **Paridad producción** | `supabase db diff --linked --schema public` + `--use-pg-delta` | ✅ sin diferencias estructurales ni de permisos; sólo formato textual de 3 funciones heredadas |
 
 **Cambio en el número de pruebas:** de **68 en 7 archivos** (línea base `6ffa555`)
 a **217 unitarias en 18 archivos + 88 E2E + 20 visuales** = **325 pruebas
 ejecutables**, todas verdes.
 
-**Gates de base de datos (`pnpm db:verify`, `pnpm test:db`): siguen
-BLOQUEADOS.** Son los únicos. Ver §4.
+**Los gates de base de datos ya están cerrados.** Docker, el baseline y las
+credenciales dejaron de ser bloqueos el 2026-08-16.
 
 ---
 
@@ -59,13 +62,15 @@ BLOQUEADOS.** Son los únicos. Ver §4.
 - **P-07** `identificarSolicitante()` sólo confía en `x-forwarded-for` con proxy
   de confianza.
 
-### 2.3 F3 · Validación de esquema del contenido — capa de código y migración listas
+### 2.3 F3 · Validación de esquema del contenido — desplegada
 `lib/blocks-schema.ts` (valida forma, no contenido) + modo observación por
-defecto + `supabase/migrations/0010_validar_bloques.sql`.
+defecto + `supabase/migrations/0010_validar_bloques.sql`, aplicada y verificada
+en producción.
 
-### 2.4 F5 · Anti-abuso en las escrituras del navegador — capa de código y migración listas
+### 2.4 F5 · Anti-abuso en las escrituras del navegador — desplegada
 `supabase/migrations/0011_limites_de_escritura.sql` + `lib/rate-limit-errors.ts`
-adoptado en comentarios, preguntas, reportes y bloqueos.
+adoptado en comentarios, preguntas, reportes y bloqueos. La migración está
+aplicada y sus cinco triggers se verificaron en producción.
 
 ### 2.5 F4 · CSP con nonce y aislamiento — cerrada localmente
 
@@ -281,17 +286,13 @@ usuario mientras tanto.
 
 ## 4. Bloqueos estrictamente humanos (con evidencia)
 
-Sólo quedan estos. Todo lo demás que antes figuraba como bloqueo resultó
-resoluble con fixtures.
+Sólo quedan estos. Docker, el baseline, la CLI y las migraciones pendientes ya
+no son bloqueos.
 
 | # | Bloqueo | Evidencia exacta | Fase |
 |---|---|---|---|
-| A | **Docker daemon apagado.** Sin daemon, `supabase start` no levanta nada. | `docker info` → `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine` | F6/F7 |
-| B | **No existe `0000_baseline.sql`.** Ninguna migración crea `profiles` ni `profile_blocks`, pero `0002`/`0003` las referencian → `supabase db reset` fallaría aunque Docker estuviera vivo. El baseline se genera con `supabase db diff` **contra producción**: requiere `supabase link` y credenciales. | `docs/migraciones.md`, sección "El baseline" | F6 |
-| C | **`pnpm db:verify` y `pnpm test:db` bloqueados.** Ambos se ejecutaron: el primero salió 1 porque Docker no responde; el segundo salió 1 antes de las 13 pruebas por ausencia de `SUPABASE_TEST_URL`/claves locales. | salida de ambos comandos del 16-08-2026 | F6/F7 |
 | D | **Aprobar las capturas de píxeles de referencia.** Definen oficialmente cómo se ve Vibe; no las fabrica un agente. Un comando: `pnpm test:visual:update`, revisar cada PNG, versionar. Mientras tanto la capa ARIA sí corre y bloquea. | `tests/visual/referencias/` sólo tiene `.aria.yml` | F8 |
 | E | **Verificación externa del estado desplegado (F0)**: anon key sin DNIs, `cleanup` 401 en producción, etc. Requiere tu base y tus variables de Vercel. *(El equivalente local ya corre en `invariantes-publicas.spec.ts` y en el smoke.)* | — | F0 |
-| F | **Aplicar `0010`, `0011` y `0012`.** Forward-only, escritas, idempotentes, sin aplicar. Ninguna rompe nada mientras espera: el código detecta su ausencia y sigue como antes. | `docs/migraciones.md`, tabla de estado | F3/F5/F11 |
 | G | **Accesibilidad del editor con teclado.** Exige una sesión autenticada real; el servidor de fixtures es de sólo lectura y sin auth **a propósito**, porque simular un JWT válido significaría falsificar Supabase Auth entero o meter una credencial en el repositorio. | `docs/accesibilidad.md` | F8 |
 | H | **Decisiones de proveedor y de negocio:** Sentry vs. log drains (F12), captcha vs. confirmación de correo (F5), staging y backups (F13), correo institucional y plazos de DMCA (F14), cuota por perfil (F11), política de `orders`/`donations` (F0 #6). | §8 del plan | varias |
 
@@ -305,10 +306,10 @@ Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
 - **F4 está cerrada localmente.** Queda la comprobación humana en navegador
   real de los seis embeds y ffmpeg.wasm; las superficies públicas y la consola
   CSP sí están automatizadas en escritorio y móvil.
-- **F6 (más allá del andamiaje):** los 23 `.sql` históricos **no** se movieron a
-  `legacy/` — hacerlo antes del baseline es perder la única descripción del
-  esquema que existe.
-- **F7 (más allá de `helpers.ts` + `rls-perfiles.test.ts`):** necesita A y B.
+- **F6 está cerrada:** existe `0000`, los SQL históricos están en `legacy/`, la
+  base se reconstruye desde cero y no difiere de producción.
+- **F7 tiene su gate técnico cerrado:** las 13 pruebas de base pasan. Las
+  decisiones de producto sobre tablas heredadas siguen separadas en F0/F13.
 - **F13/F14:** staging, backups, restauración probada y panel de moderación.
   El banner de consentimiento, la exportación y el borrado de datos ya están
   conectados. Los **runbooks y la documentación ya están escritos**
@@ -320,18 +321,10 @@ Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
 
 ## 6. Riesgos abiertos
 
-1. **`0010`/`0011`/`0012` sin aplicar ni probar contra una base real.** Escritas
-   con cuidado (idempotentes, `not valid`, mensajes estables), pero su
-   comportamiento sólo se verifica con `test:db`, hoy bloqueado. Las tres tienen
-   su contrapartida en código diseñada para funcionar **con y sin** ellas.
-2. **El equivalente en JavaScript de `descubrimiento_perfiles`** que usa el
-   servidor de fixtures puede divergir del SQL. Si diverge, las pruebas dejan de
-   describir lo que corre en producción. Está señalado en el propio archivo; la
-   verificación real llega con `test:db`.
-3. **La capa de píxeles no protege nada todavía.** Hasta que existan referencias
+1. **La capa de píxeles no protege nada todavía.** Hasta que existan referencias
    aprobadas, un cambio visual fino puede pasar: lo que hoy detecta la suite es
    un cambio de **estructura**, no de color o espaciado.
-4. **Cuotas y moderación administrativa siguen dependiendo de decisiones de
+2. **Cuotas y moderación administrativa siguen dependiendo de decisiones de
    producto/arquitectura.** No se creó una falsa capa: la cuota necesita el
    límite aprobado y el panel necesita una identidad de administrador también
    representada en Postgres para que RLS sea la segunda barrera.
@@ -340,13 +333,10 @@ Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
 
 ## 7. Acciones humanas pendientes (orden de urgencia)
 
-1. Encender **Docker Desktop** y generar `0000_baseline.sql` con
-   `supabase db diff` — desbloquea F6, F7 y el job de base de datos del CI.
-2. Aplicar **`0010`** (queda en modo observación), **`0011`** y **`0012`**.
-3. Correr la verificación externa de **F0** contra producción.
-4. `pnpm test:visual:update`, revisar las capturas y versionarlas.
-5. Definir dueños de **CODEOWNERS** y activar la protección de rama.
-6. `TOGETHER_API_KEY` y las decisiones de proveedor del punto H de §4.
+1. Completar las comprobaciones externas restantes de **F0** contra producción.
+2. `pnpm test:visual:update`, revisar las capturas y versionarlas.
+3. Definir dueños de **CODEOWNERS** y activar la protección de rama.
+4. `TOGETHER_API_KEY` y las decisiones de proveedor del punto H de §4.
 
 *(Lista completa y priorizada: §8 del `PLAN_VIBE_EMPRESARIAL.md`.)*
 

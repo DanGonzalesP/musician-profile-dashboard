@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase"
 import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
 
 // Preguntas de visitantes sobre un elemento puntual del perfil público —
-// tabla profile_questions (ver supabase/profile_questions_table.sql). El
+// tabla profile_questions (origen: supabase/legacy/profile_questions_table.sql). El
 // dueño las ve en su barra de notificaciones junto a las solicitudes de
 // crédito (lib/credit-requests.ts).
 
@@ -80,7 +80,7 @@ export async function createProfileQuestion(params: {
         error,
         "pregunta",
         error.message.includes("profile_questions")
-          ? "Las preguntas aún no están activadas: falta correr supabase/profile_questions_table.sql."
+          ? "Las preguntas aún no están activadas. Verifica las migraciones versionadas de Supabase."
           : error.message
       )
     )

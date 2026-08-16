@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase"
 import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
 
 // Comentarios de las publicaciones del feed (fotos/videos) — tabla
-// feed_post_comments (ver supabase/feed_post_comments_table.sql). Hermana de
+// feed_post_comments (origen: supabase/legacy/feed_post_comments_table.sql). Hermana de
 // lib/track-comments.ts; separada porque el id de una publicación es
 // compuesto y no referencia ninguna tabla real (ver lib/feed/publicPosts.ts).
 
@@ -88,7 +88,7 @@ export async function addPostComment(postId: string, content: string): Promise<P
         error,
         "comentario",
         error.message.includes("feed_post_comments")
-          ? "Los comentarios aún no están activados: falta correr supabase/feed_post_comments_table.sql."
+          ? "Los comentarios aún no están activados. Verifica las migraciones versionadas de Supabase."
           : error.message
       )
     )

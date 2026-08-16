@@ -31,7 +31,7 @@ export async function fetchDraft(profileId: string): Promise<DraftContent | null
     .maybeSingle()
 
   if (error) {
-    console.error("No se pudo leer el borrador (¿falta correr 0003_profile_private.sql?):", error)
+    console.error("No se pudo leer el borrador; verifica las migraciones versionadas:", error)
     return null
   }
 
