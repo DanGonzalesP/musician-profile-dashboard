@@ -54,9 +54,10 @@ de forma independiente**): las migraciones `0002`…`0009` se aplicaron ese día
 | **0012_descubrimiento_y_feed** (F11) | ✅ | 2026-08-16 | RPC e índices keyset disponibles; índice opcional de `profile_blocks` omitido al no existir `created_at` |
 | **0013_endurecer_advisors_supabase** (F0/F5/F14) | ✅ | 2026-08-16 | Funciones privilegiadas fuera del esquema expuesto, rate limit fail-closed, tablas internas deny-all y respaldo privado |
 | **0014_explicitar_rls_respaldo_privado** (F0) | ✅ | 2026-08-16 | Política deny-all explícita para el respaldo ya privado; Security Advisor en 0 infos |
-| **0015_relacion_bloques_perfiles** (F0/F11) | 🟡 verificada localmente; pendiente de producción | FK `NOT VALID` para que PostgREST resuelva el feed sin bloquear el despliegue por datos históricos |
-| **0016_cuotas** (F11) | ⬜ ni escrita — necesita la decisión de cuota (§8 #19) | | |
-| **0017_moderacion_operativa** (F14) | ⬜ ni escrita — necesita decidir cómo se representa un administrador **en la base** (hoy `ADMIN_USER_IDS` sólo existe en el entorno de la app) | | |
+| **0015_relacion_bloques_perfiles** (F0/F11) | ✅ | 2026-08-16 | FK `NOT VALID`; producción conserva pendiente el refresco de caché de 0016 |
+| **0016_refrescar_cache_postgrest** (F0/F11) | 🟡 verificada localmente; pendiente de producción | Publica en la Data API la FK de 0015 sin reiniciar la base |
+| **0017_cuotas** (F11) | ⬜ ni escrita — necesita la decisión de cuota (§8 #19) | | |
+| **0018_moderacion_operativa** (F14) | ⬜ ni escrita — necesita decidir cómo se representa un administrador **en la base** (hoy `ADMIN_USER_IDS` sólo existe en el entorno de la app) | | |
 
 ---
 
