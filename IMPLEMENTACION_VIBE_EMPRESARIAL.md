@@ -5,9 +5,10 @@ por una acción estrictamente humana**, y de la evidencia real de cada gate. Sig
 la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 [`PLAN_VIBE_EMPRESARIAL.md`](PLAN_VIBE_EMPRESARIAL.md).
 
-- **Fecha:** 16 de agosto de 2026
+- **Fecha:** 17 de agosto de 2026 (última sesión: cierre de **F7**).
 - **Base al iniciar el bloque de cierre de base:** `6fb43b8`.
 - **Producción verificada:** Supabase `0000`–`0017` y Vercel, 16 de agosto de 2026.
+  `0018` está escrita y verde en local; **todavía no aplicada en producción**.
 - **Entorno:** Windows 11 (26200) · Node v24.16.0 · pnpm 11.10.0 · Next 16.2.12 ·
   TypeScript 5.7.3 · Vitest 4.1.10 · Playwright 1.62.
 
@@ -32,13 +33,17 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 | **E2E + axe** | `pnpm test:e2e` | ✅ **92 pruebas verdes** (chromium escritorio + móvil) |
 | **Regresión visual** | `pnpm test:visual` | ✅ **20 instantáneas ARIA verdes**, 20 capturas de píxeles omitidas (esperan aprobación humana) |
 | **Smoke** | `node scripts/smoke-staging.mjs` | ✅ **7 de 7 en verde** contra un servidor local (§2.11) |
-| **Reconstrucción DB** | `pnpm db:verify` | ✅ `0000`–`0017` desde cero; `db lint` sin errores |
-| **Pruebas DB** | `pnpm test:db` | ✅ **21 de 21** |
-| **Paridad producción** | `supabase db diff --linked --schema public,private` | ✅ sin diferencias |
+| **Reconstrucción DB** | `pnpm db:verify` | ✅ `0000`–`0018` desde cero; `db lint` sin errores |
+| **Pruebas DB** | `pnpm test:db` | ✅ **110 de 110**, sin ningún `todo`, en 7 archivos (2026-08-17) |
+| **Paridad producción** | `supabase db diff --linked --schema public,private` | ✅ sin diferencias (2026-08-16, antes de `0018`) |
 
 **Cambio en el número de pruebas:** de **68 en 7 archivos** (línea base `6ffa555`)
-a **221 unitarias en 18 archivos + 92 E2E + 20 visuales** = **333 pruebas
-ejecutables**, todas verdes.
+a **221 unitarias en 18 archivos + 110 de base en 7 archivos + 92 E2E + 20
+visuales** = **443 pruebas ejecutables**, todas verdes.
+
+La cifra de base subió de **21 a 110** en la sesión del 2026-08-17: ver §2.18.
+Las menciones anteriores a "13" y "21 pruebas de base" quedaron obsoletas y se
+corrigieron en este documento.
 
 **Los gates de base de datos ya están cerrados.** Docker, el baseline y las
 credenciales dejaron de ser bloqueos el 2026-08-16.
@@ -299,6 +304,61 @@ usuario mientras tanto.
 - La prueba de base ejecuta el mismo join y orden de la portada. Producción
   responde `200` en `/` y el smoke posterior quedó **6 de 6 en verde**.
 
+### 2.18 F7 · Pruebas de RLS y de base — **cerrada** (2026-08-17)
+
+La suite de base pasó de **21 casos en 2 archivos** a **110 en 7**, sin ningún
+`todo`. Cinco archivos nuevos cubren lo que el plan pedía en §F7:
+`limites.test.ts`, `publicacion.test.ts`, `rls-feed-y-comentarios.test.ts`,
+`rls-media.test.ts` y `rls-moderacion.test.ts`.
+
+**Lo que valió la pena: la primera corrida real destapó tres defectos que
+ninguna lectura del SQL habría encontrado.** Los tres viven en migraciones ya
+aplicadas en producción, así que el arreglo va —forward-only— en
+`supabase/migrations/0018_corregir_concurrencia_y_suspension.sql`:
+
+| Defecto | Dónde estaba | Qué pasaba de verdad |
+|---|---|---|
+| `pg_catalog.greatest` no existe | `0013`, contador distribuido | `GREATEST` es una construcción del analizador, no una función: no se puede calificar por esquema. El error `42883` saltaba **sólo en la rama que rechaza la petición**. Dentro del cupo funcionaba; al topar el límite reventaba. |
+| Conflicto lógico marcado como reintentable | `0010`, `publish_profile` v3 | `conflicto_de_version` viajaba con `errcode = serialization_failure` (40001), que significa "reintenta". PostgREST reintentaba una y otra vez un conflicto **permanente**: 30 s de espera para la prueba y para el artista con una pestaña vieja. Ahora es `PT409` → **409 Conflict inmediato**. El texto que consume `profile-editor.tsx` no cambió. |
+| El dueño podía levantarse su propia suspensión | `profiles_update_owner` | RLS no distingue columnas y la política autoriza la fila entera: un perfil suspendido por takedown mandaba `is_suspended = false` por PostgREST. La moderación era decorativa. |
+
+**La corrección de la suspensión, en detalle.** Un trigger `before update` sobre
+`profiles` veta cambios en `is_suspended`, `suspended_reason` y `suspended_at`
+cuando el rol efectivo es `anon` o `authenticated`. Se eligió trigger y no
+privilegios por columna (`grant update (col, …)`) porque estos obligan a
+enumerar cada columna presente y futura: la primera que se olvide rompe el
+editor en silencio. Ninguna pantalla de Vibe escribe esas tres columnas
+—verificado en `app/`, `lib/` y `components/`—, así que la UX no cambia; una
+prueba lo fija editando el perfil y publicando **durante** la suspensión.
+
+**Sin service role en el runtime.** La excepción legítima no es "la app con más
+privilegios" sino "una sesión que no llegó por la Data API": el backoffice del
+runbook de takedown, la CLI, o el rol de moderación que llegue. El hueco de F14
+ya está escrito: `private.es_admin(uuid)` existe como talón que devuelve `false`
+y se reemplaza con `create or replace` sobre `private.admin_users` sin tocar el
+trigger ni una sola política.
+
+**Higiene de la suite.** La service role aparece exactamente en tres sitios:
+crear el usuario efímero, borrarlo, y montar/deshacer el escenario de takedown.
+**Ninguna aserción de permisos la usa** — todas van con el JWT del usuario o sin
+sesión, que es como habla la aplicación.
+
+**Evidencia real (2026-08-17):**
+
+```
+pnpm db:verify   → 0000–0018 desde cero, db lint sin errores
+pnpm test:db     → 7 archivos, 110 pruebas, 110 verdes, 0 todo   (9.73 s)
+pnpm test:db     → repetido: 110 verdes                          (8.14 s)
+pnpm qa          → typecheck 0 errores · lint 0 errores, 22 warnings · 221 unitarias
+pnpm build       → exit 0
+git diff --check → limpio
+```
+
+Las dos pruebas de publicación que antes agotaban los 30 s de timeout ahora
+resuelven junto al resto: la suite entera baja de "cuatro fallos y minuto y
+medio" a **menos de diez segundos en verde**. Ése es el efecto medible de quitar
+el `serialization_failure`.
+
 ---
 
 ## 3. Qué se corrigió del árbol que se retomó
@@ -353,8 +413,9 @@ Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
   base se reconstruye desde cero y los fallbacks temporales fueron retirados.
   La comparación con producción no muestra diferencias estructurales ni de
   permisos; el ruido textual heredado está documentado en `docs/migraciones.md`.
-- **F7 tiene su gate técnico cerrado:** las 13 pruebas de base pasan. Las
-  decisiones de producto sobre tablas heredadas siguen separadas en F0/F13.
+- **F7 está cerrada:** 110 pruebas de base en verde, dos corridas seguidas, sin
+  ningún `todo` (§2.18). Las decisiones de producto sobre tablas heredadas
+  siguen separadas en F0/F13.
 - **F13/F14:** staging, backups, restauración probada y panel de moderación.
   El banner de consentimiento, la exportación y el borrado de datos ya están
   conectados. Los **runbooks y la documentación ya están escritos**
@@ -391,11 +452,18 @@ Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
 
 ```powershell
 pnpm install --frozen-lockfile
-pnpm qa            # typecheck + lint + 217 unitarias
+pnpm qa            # typecheck + lint + 221 unitarias
 pnpm build
-pnpm test:e2e      # 88 pruebas: E2E + axe, escritorio y móvil
+pnpm test:e2e      # E2E + axe, escritorio y móvil
 pnpm test:visual   # 20 instantáneas ARIA en 4 anchos
 ```
 
 Ninguno de esos cuatro comandos necesita Docker, credenciales, ni red hacia
 Supabase, R2 o cualquier tercero.
+
+Las pruebas de base **sí** necesitan Docker Desktop y el Supabase local:
+
+```powershell
+pnpm db:verify     # reconstruye 0000–0018 desde cero + db lint
+pnpm test:db       # 110 pruebas de RLS, publicación, límites y moderación
+```

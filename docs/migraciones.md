@@ -121,8 +121,9 @@ se resuelve renumerando **la que no se haya aplicado todavía**.
 | **0015** | `relacion_bloques_perfiles` | FK necesaria para el join PostgREST de la portada | ✅ producción 2026-08-16 |
 | **0016** | `refrescar_cache_postgrest` | Recarga versionada de la caché tras la FK | ✅ producción 2026-08-16 |
 | **0017** | `marca_tiempo_profile_blocks` | `created_at` + índice keyset para publicaciones | ✅ producción 2026-08-16 |
-| 0018 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
-| 0019 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
+| **0018** | `corregir_concurrencia_y_suspension` | `GREATEST` sin calificar, conflicto de versión no reintentable, columnas de suspensión reservadas a moderación | ⬜ escrita, pendiente de producción |
+| 0019 | `cuotas` | Cuota de almacenamiento por perfil | ⬜ ni escrita |
+| 0020 | `moderacion_operativa` | Estados de takedown + panel de admin | ⬜ ni escrita |
 
 El estado de `0001`–`0017` se verificó directamente contra producción el
 2026-08-16 y quedó registrado en [`estado-desplegado.md`](estado-desplegado.md).
@@ -157,14 +158,51 @@ auditoría adversarial:
   borrador y los dos `grant`): la v3 conserva todo y sólo añade la validación
   **antes** del `delete`. Sin cambios.
 
+### Lo que `0018` corrige de `0010` y `0013`
+
+Las tres correcciones salieron de la **primera corrida real** de las pruebas de
+base de F7. Ninguna era visible leyendo el SQL: las tres necesitaban Postgres y
+PostgREST de verdad. `0010` y `0013` ya están aplicadas en producción y son
+inmutables (regla 1), así que el arreglo va en `0018`.
+
+- **`GREATEST` no es una función.** `0013` calificó cada función con
+  `pg_catalog.` al fijar `search_path = ''`. Correcto para todas menos para
+  `GREATEST`, que es una construcción del analizador sintáctico —como
+  `CURRENT_USER` o `EXTRACT`— y no vive en ningún esquema. El resultado era
+  `42883 function pg_catalog.greatest(integer, integer) does not exist` **sólo
+  en la rama que calcula `retry_after`**: dentro del cupo el contador respondía
+  bien y reventaba justo cuando debía rechazar. `0018` la usa sin calificar.
+
+- **`conflicto_de_version` viajaba como error transitorio.** `0010` lo levantaba
+  con `errcode = 'serialization_failure'` (40001), que para todo el ecosistema
+  significa "reintenta": PostgREST reintentaba en vez de devolver el error, y la
+  llamada se comía el timeout completo. El conflicto es permanente —la versión
+  esperada no vuelve— así que `0018` usa `PT409`, la convención de PostgREST
+  para fijar el estado HTTP, y la respuesta pasa a ser un **409 inmediato**. El
+  texto `conflicto_de_version` que consume `components/profile-editor.tsx` no
+  cambia.
+
+- **El dueño podía levantarse su propia suspensión.** RLS en Postgres no
+  distingue columnas y `profiles_update_owner` autoriza la fila entera, así que
+  un perfil suspendido por un takedown podía mandar `is_suspended = false` por
+  PostgREST. `0018` añade un trigger `before update` sobre `profiles` que veta
+  cambios en `is_suspended`, `suspended_reason` y `suspended_at` cuando el rol
+  efectivo es `anon` o `authenticated`. Se eligió un trigger y no privilegios
+  por columna (`grant update (col, …)`) porque estos obligan a enumerar todas
+  las columnas y a acordarse de cada columna futura: la primera que se olvide
+  rompe el editor en silencio. El hueco de **F14** ya está escrito:
+  `private.es_admin(uuid)` existe como talón que devuelve `false` y se reemplaza
+  con `create or replace` sobre `private.admin_users` sin tocar el trigger.
+
 ---
 
 ## El baseline
 
 `supabase/migrations/0000_baseline.sql` existe y representa el esquema real
-después de `0009`, sin datos de producción. El 2026-08-16 se comprobó que
-`pnpm db:verify` reconstruye desde cero `0000`–`0012` y que las 13 pruebas de
-base pasan. La comparación enlazada no encuentra diferencias estructurales ni
+después de `0009`, sin datos de producción. El 2026-08-17 se comprobó que
+`pnpm db:verify` reconstruye desde cero `0000`–`0018` y que las **110** pruebas
+de base pasan (dos corridas seguidas, sin ningún `todo`). La comparación
+enlazada del 2026-08-16 —anterior a `0018`— no encuentra diferencias estructurales ni
 de permisos: sólo formato textual en tres cuerpos de función heredados. El
 motor `migra` muestra además cuatro recreaciones de políticas idénticas, que no
 se convirtieron en DDL por ser ruido del comparador.
