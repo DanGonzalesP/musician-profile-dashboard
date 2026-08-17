@@ -148,11 +148,17 @@ una decisión humana porque definen oficialmente cómo se ve Vibe.
 `.github/workflows/ci.yml`: `permissions: contents: read`, `concurrency`,
 `timeout-minutes`, job de **gitleaks**, job de **calidad** (audit bloqueante →
 typecheck → lint con trinquete → test → build → `git diff --check`), job de
-**E2E** y job de **regresión visual (capa ARIA)**. Los dos últimos corren de
-verdad, sin credenciales. El job de base de datos sigue con `if: false` y su
-motivo escrito al lado. Todas las acciones externas están fijadas a un commit
-SHA inmutable; `pnpm audit --audit-level=high` sale 0 (quedan 5 moderadas y 1
-baja).
+**E2E**, job de **regresión visual (capa ARIA)** y job de **base de datos y
+RLS**. Los cuatro corren de verdad, sin credenciales.
+
+> **Corrección (2026-08-17).** Este documento afirmaba que el job de base de
+> datos seguía con `if: false`. Era falso: `.github/workflows/ci.yml` no tiene
+> ese `if` en ninguna parte, y el PR de F7 lo demostró — el job levantó Supabase
+> en el runner, aplicó `0000`–`0018` y corrió las 110 pruebas de base en 1 m 48 s.
+> **Los cinco jobs ejecutan.**
+
+Todas las acciones externas están fijadas a un commit SHA inmutable;
+`pnpm audit --audit-level=high` sale 0 (quedan 5 moderadas y 1 baja).
 
 ### 2.8 F10 · Perfil público renderizado en el servidor — **cerrada localmente**
 
