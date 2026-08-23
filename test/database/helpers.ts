@@ -157,14 +157,55 @@ export async function crearPerfil(usuario: UsuarioDePrueba, nombre?: string): Pr
 }
 
 /**
- * Borra los usuarios efímeros. Todo lo demás cae por los ON DELETE CASCADE ya
- * declarados en el esquema — que es, de paso, otra cosa que estas pruebas
- * verifican de forma implícita.
+ * Crea una pista en el feed musical del perfil del usuario, con su propio
+ * cliente. Es el fixture de `rls-feed-y-comentarios`: sin una pista real no se
+ * puede probar que B no borra la música de A.
+ */
+export async function crearPista(usuario: UsuarioDePrueba, titulo = "Pista de prueba"): Promise<string> {
+  const { data, error } = await usuario.supabase
+    .from("music_feed")
+    .insert({
+      profile_id: usuario.profileId,
+      title: titulo,
+      audio_url: `https://ejemplo.local/audio/${crypto.randomUUID()}.mp3`,
+    })
+    .select("id")
+    .single()
+
+  if (error) throw new Error(`No se pudo crear la pista de prueba: ${error.message}`)
+  return data.id as string
+}
+
+/** Clave de R2 única por llamada: dos corridas seguidas nunca colisionan. */
+export function claveDeMedio(carpeta: "images" | "audio" | "video" = "images"): string {
+  return `${carpeta}/${crypto.randomUUID()}.bin`
+}
+
+/**
+ * Junta todo el texto que trae un error de PostgREST. `message` suele bastar,
+ * pero según de dónde venga el rechazo (excepción de plpgsql, restricción
+ * `check`, política de RLS) el texto útil cae en `details` o en `hint`.
+ */
+export function mensajeDeError(error: unknown): string {
+  if (!error) return ""
+  const e = error as { message?: string; details?: string; hint?: string; code?: string }
+  return [e.code, e.message, e.details, e.hint].filter(Boolean).join(" | ")
+}
+
+/**
+ * Borra los usuarios efímeros y los perfiles que cuelgan de ellos.
+ *
+ * El borrado del perfil es explícito y no una cascada: `profiles.user_id` no
+ * tiene clave foránea contra `auth.users` (sólo `owner_user_id` la tiene), así
+ * que borrar la cuenta dejaría el perfil individual huérfano. Es exactamente el
+ * desajuste que `0013` documenta en `eliminar_mi_cuenta_impl`. Todo lo demás
+ * —bloques, pistas, comentarios, archivos— sí cae por los ON DELETE CASCADE.
  */
 export async function limpiarUsuarios(...usuarios: (UsuarioDePrueba | undefined)[]): Promise<void> {
   const admin = clienteAdministrativo()
   for (const u of usuarios) {
     if (!u) continue
+    await admin.from("profiles").delete().or(`user_id.eq.${u.id},owner_user_id.eq.${u.id}`)
     await admin.auth.admin.deleteUser(u.id).catch(() => {})
   }
 }
