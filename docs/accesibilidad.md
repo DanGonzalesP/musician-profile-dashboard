@@ -95,13 +95,49 @@ axe queda activo y bloqueante, que es donde está la mayor parte del valor.
 3. Aprobar el cambio con la captura antes/después (afecta el look de la marca).
 4. Quitar `color-contrast` de los `.disableRules([...])` de las specs de axe.
 
-## Pendiente (necesita una sesión autenticada de verdad)
+## El editor — auditado desde el 2026-08-31
 
-- Recorrido completo del **editor** con teclado (arrastrar/soltar, pestañas,
-  modales, reproductor). El editor exige sesión, y el servidor de fixtures es
-  de sólo lectura y sin auth a propósito: simular un JWT válido significaría
-  o falsificar Supabase Auth entero, o meter una credencial en el repositorio.
-  Se cubre cuando exista el Supabase local de F6 (Docker + baseline `0000`).
+Estuvo mucho tiempo en "pendiente" con una razón buena: exige sesión, y la
+suite E2E pública corre contra un servidor de fixtures de sólo lectura y sin
+auth. Eso dejó **la superficie más interactiva de Vibe sin auditar** (P-33).
+
+Se cerró con un segundo arnés, `pnpm test:e2e:auth`, que corre contra el mismo
+Supabase local que las pruebas de base: sesión real por formulario, sin
+falsificar ningún JWT ni versionar ninguna credencial.
+
+**Tres violaciones críticas encontradas y corregidas** — todas de la misma
+familia, controles de formulario sin nombre accesible (WCAG 4.1.2):
+
+| Regla de axe | Dónde | Qué pasaba |
+|---|---|---|
+| `label` (crítica) | `Field` en `block-inspector.tsx` | La etiqueta se pintaba en un `<span>`, sin relación con el control. Un lector de pantalla anunciaba "cuadro de texto, en blanco" en **los 56 campos** del inspector. |
+| `select-name` (crítica) | Selectores de país y departamento | Dos `<select>` hermanos dentro del mismo `Field`, sin nombre propio. El texto de la `<option>` marcador no cuenta como nombre accesible. |
+| `label` (crítica) | Área de texto del inspector | `AutoGrowTextarea` no aceptaba `id`, así que quedaba fuera de la asociación. |
+
+**Cómo se corrigió `Field`, y por qué no con un `<label>` envolvente.** Lo
+obvio sería envolver etiqueta y control en un `<label>`, que asocia de forma
+implícita. No se hizo: de los 56 usos, **10 contienen botones o subidores de
+archivos**, y dentro de un `<label>` un clic en el texto activa el primer
+control anidado — tocar "Portada y audio" abriría el selector de archivos. Eso
+es un cambio de UX, y la UX se preserva tal cual. La etiqueta apunta por
+`htmlFor` a un id generado con `useId`, y ese id se inyecta en el control hijo.
+
+**Lo que el gate cubre hoy** (`tests/e2e-auth/`):
+
+- axe sobre el editor recién cargado y con el inspector abierto, en escritorio
+  y en móvil, con el mismo criterio del resto: cero violaciones críticas ni
+  serias.
+- Agregar un bloque, escribir en el inspector y **reordenar sin tocar el
+  ratón**. El reordenamiento tiene botones "Subir/Bajar" además del arrastre,
+  así que no depende de un gesto que el teclado no puede hacer.
+- Cero errores y cero advertencias de consola durante el recorrido. Ese
+  criterio destapó además un `<img src="">` en el single (React avisa de que
+  hace al navegador recargar la página entera).
+
+## Pendiente
+
 - Recorrido del **reproductor** con teclado y lector de pantalla: depende de
   poder reproducir audio real, que en un navegador headless sin salida de audio
-  no verifica nada honesto.
+  no verifica nada honesto. El contrato de "una sola fuente a la vez" sí quedó
+  fijado, con pruebas unitarias del motor (`lib/audio-engine.test.ts`).
+- El contraste del color de marca, arriba: sigue siendo una decisión de diseño.

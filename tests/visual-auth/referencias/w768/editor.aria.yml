@@ -1,0 +1,64 @@
+- banner:
+  - link "Ir al feed principal":
+    - /url: /
+    - img
+  - text: Editor (3 bloques)
+  - button "Más opciones"
+- main:
+  - text: Banner Principal
+  - button "Editar bloque"
+  - button "Vaciar contenido del banner principal"
+  - img "Nombre del Artista"
+  - heading "Nombre del Artista" [level=2]
+  - button "Compartir"
+  - button "Legado"
+  - button "Merch y servicios"
+  - text: Soltar aquí
+  - button "Arrastrar para reordenar bloque"
+  - text: Lista de Canciones
+  - button "Subir bloque" [disabled]
+  - button "Bajar bloque" [disabled]
+  - button "Editar bloque"
+  - button "Eliminar bloque"
+  - text: Discografía
+  - button "Digital Ethereal Ejemplo Digital Ethereal":
+    - img "Digital Ethereal"
+    - text: ""
+    - paragraph: Digital Ethereal
+  - button "Analog Sessions Ejemplo Analog Sessions":
+    - img "Analog Sessions"
+    - text: ""
+    - paragraph: Analog Sessions
+  - button "Midnight Frequencies Ejemplo Midnight Frequencies":
+    - img "Midnight Frequencies"
+    - text: ""
+    - paragraph: Midnight Frequencies
+  - button "Digital Ethereal Ejemplo Digital Ethereal":
+    - img "Digital Ethereal"
+    - text: ""
+    - paragraph: Digital Ethereal
+  - button "Analog Sessions Ejemplo Analog Sessions":
+    - img "Analog Sessions"
+    - text: ""
+    - paragraph: Analog Sessions
+  - button "Midnight Frequencies Ejemplo Midnight Frequencies":
+    - img "Midnight Frequencies"
+    - text: ""
+    - paragraph: Midnight Frequencies
+  - button "Digital Ethereal Ejemplo Digital Ethereal":
+    - img "Digital Ethereal"
+    - text: ""
+    - paragraph: Digital Ethereal
+  - button "Analog Sessions Ejemplo Analog Sessions":
+    - img "Analog Sessions"
+    - text: ""
+    - paragraph: Analog Sessions
+  - button "Midnight Frequencies Ejemplo Midnight Frequencies":
+    - img "Midnight Frequencies"
+    - text: ""
+    - paragraph: Midnight Frequencies
+  - text: Soltar aquí
+- navigation:
+  - button "Bloques"
+  - button "Publicar"
+- alert

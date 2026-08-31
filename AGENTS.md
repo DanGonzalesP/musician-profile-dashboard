@@ -65,6 +65,21 @@ pnpm db:verify
 pnpm test:db
 ```
 
+Cuando la fase toca **el editor, la autenticación o las subidas**, además (sí
+necesitan Docker: corren contra el mismo Supabase local que `pnpm test:db`):
+
+```powershell
+pnpm test:e2e:auth     # editor con sesión real: bloques, borrador, publicar,
+                       # subidas a R2, teclado y axe — escritorio y móvil
+pnpm test:visual:auth  # instantánea ARIA del editor en 4 anchos
+```
+
+Por qué existen aparte de `pnpm test:e2e`: la suite pública corre contra un
+PostgREST de mentira, sin auth y sin Docker, y eso es deliberado — es lo que la
+hace ejecutable en cualquier máquina. Pero el editor exige sesión, y falsificar
+un JWT significaría reimplementar GoTrue o meter una credencial en el
+repositorio. Ver `playwright.auth.config.ts`.
+
 La capa de píxeles de `pnpm test:visual` se omite mientras no exista una
 referencia aprobada para el sistema operativo actual. Para generarla:
 `pnpm test:visual:update`, y **revisar cada captura antes de versionarla**:

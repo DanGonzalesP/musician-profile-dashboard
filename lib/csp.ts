@@ -16,6 +16,53 @@ const unicos = (valores: Array<string | null>): string[] =>
   Array.from(new Set(valores.filter((valor): valor is string => Boolean(valor))))
 
 /**
+ * Los orígenes contra los que el navegador puede hacer el PUT firmado de una
+ * subida a R2. Son DOS, y omitir el segundo rompe todas las subidas.
+ *
+ * ─── POR QUÉ DOS ──────────────────────────────────────────────────────────
+ * `/api/upload-url` firma con el SDK de S3, que por defecto usa el estilo
+ * **virtual-hosted**: el bucket va como subdominio del endpoint. Con
+ * `R2_ENDPOINT=https://<cuenta>.r2.cloudflarestorage.com` y
+ * `R2_BUCKET_NAME=vibe`, la URL que recibe el navegador es
+ *
+ *     https://vibe.<cuenta>.r2.cloudflarestorage.com/images/....webp?X-Amz-...
+ *
+ * y ese host **no es** el origen de `R2_ENDPOINT`: es un subdominio suyo. Una
+ * CSP que sólo liste el endpoint desnudo bloquea el PUT con
+ * "Refused to connect", el editor lo reporta como `TypeError: Failed to fetch`
+ * y la publicación falla entera. Lo detectó `tests/e2e-auth/editor-teclado-y-subidas.spec.ts`
+ * en su primera corrida; antes de F8 no había forma automática de verlo,
+ * porque subir exige sesión.
+ *
+ * Se listan los dos orígenes **exactos** y no un comodín `https://*.r2...`:
+ * el nombre del bucket lo sabemos, así que no hay motivo para abrir la puerta
+ * a cualquier bucket de cualquier cuenta de Cloudflare. Si algún día se
+ * activara `forcePathStyle`, la URL volvería al endpoint desnudo — que también
+ * está en la lista, así que ese cambio no rompería nada.
+ *
+ * `R2_BUCKET_NAME` es una variable de servidor. Esto corre en `proxy.ts`, que
+ * es Edge middleware: la lee sin exponerla al navegador. Igual que
+ * `R2_ENDPOINT`, tiene que existir **en el entorno de build** de Vercel — ver
+ * `lib/r2-config.ts` y `docs/rotacion-de-credenciales.md`.
+ */
+const origenesDeSubidaR2 = (endpoint: string | null): string[] => {
+  if (!endpoint) return []
+
+  const bucket = (process.env.R2_BUCKET_NAME ?? "").trim()
+  if (!bucket) return [endpoint]
+
+  try {
+    const url = new URL(endpoint)
+    // Si el endpoint ya trae el bucket como subdominio (configuración también
+    // válida), no se duplica.
+    if (url.hostname.startsWith(`${bucket}.`)) return [endpoint]
+    return [endpoint, `${url.protocol}//${bucket}.${url.host}`]
+  } catch {
+    return [endpoint]
+  }
+}
+
+/**
  * CSP estricta de Vibe. Los orígenes configurables se aceptan únicamente si
  * son HTTPS válidos; una variable ausente o inválida no amplía la política.
  */
@@ -57,7 +104,7 @@ export function crearCsp(nonce: string, esDesarrollo: boolean): string {
     origenSupabase,
     origenSupabase ? origenSupabase.replace(/^https:/, "wss:").replace(/^http:/, "ws:") : null,
     origenR2Publico,
-    origenR2Subidas,
+    ...origenesDeSubidaR2(origenR2Subidas),
     "https://vitals.vercel-insights.com",
   ])
 

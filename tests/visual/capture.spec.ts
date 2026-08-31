@@ -28,6 +28,11 @@ const PAGINAS: { ruta: string; nombre: string }[] = [
   { ruta: "/legal", nombre: "legal-index" },
   { ruta: "/legal/terminos", nombre: "legal-terminos" },
   { ruta: "/login", nombre: "login" },
+  // La portada ES el feed: el carril de categorías, las pistas y el
+  // descubrimiento. Es la primera pantalla que ve cualquier visitante y la que
+  // más ha cambiado de forma (riel vertical, pestañas, comentarios), así que
+  // congelar su estructura vale al menos tanto como la del perfil.
+  { ruta: "/", nombre: "feed" },
   { ruta: `/${PERFIL_FIXTURE.username}`, nombre: "perfil-publico" },
   { ruta: `/${PERFIL_FIXTURE.username}/tienda`, nombre: "tienda" },
 ]

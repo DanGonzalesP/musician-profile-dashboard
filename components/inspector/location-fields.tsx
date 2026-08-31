@@ -114,10 +114,17 @@ export function LocationSelect({
 
   return (
     <div className="grid grid-cols-2 gap-2">
+      {/* Nombre accesible propio en cada selector, y no una etiqueta
+          compartida: son dos controles distintos, hermanos dentro del mismo
+          grid, así que el <label> del `Field` que los envuelve no puede
+          apuntar a los dos. Sin esto axe reporta `select-name` (crítica) —
+          lo destapó el gate autenticado de F8. El texto de la <option>
+          marcador de posición no cuenta como nombre accesible. */}
       <select
         value={countryCode}
         onChange={(e) => handleCountryChange(e.target.value)}
         disabled={loadingCountries}
+        aria-label="País"
         className={inputClass}
       >
         <option value="">{loadingCountries ? "Cargando países…" : "País"}</option>
@@ -131,6 +138,7 @@ export function LocationSelect({
         value={state}
         onChange={(e) => handleStateChange(e.target.value)}
         disabled={!countryCode || loadingStates}
+        aria-label="Departamento"
         className={inputClass}
       >
         <option value="">

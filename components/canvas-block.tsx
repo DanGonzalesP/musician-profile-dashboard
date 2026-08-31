@@ -67,6 +67,11 @@ export function CanvasBlock({
 
   return (
     <div
+      // Identificador estable para las pruebas conductuales del editor
+      // (tests/e2e-auth/editor.spec.ts): el orden de estos atributos en el DOM
+      // ES el orden de los bloques, que es justo lo que hay que poder afirmar
+      // al reordenar. No tiene efecto visual ni de comportamiento.
+      data-bloque-de-lienzo={block.type}
       onClick={locked ? undefined : onSelect}
       className={`group relative rounded-2xl border p-1.5 transition-all ${
         selected

@@ -16,7 +16,7 @@ import { supabase } from "@/lib/supabase"
 import { authedFetch } from "@/lib/authed-fetch"
 import { sanitizeUrlFields } from "@/lib/safe-url"
 import { fetchDraft, saveDraft } from "@/lib/draft"
-import { ensureOwnProfile } from "@/lib/ensure-profile"
+import { ensureOwnProfile, resolveOwnProfileId } from "@/lib/ensure-profile"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE } from "@/lib/audio-transcode"
 import { logSupabaseError } from "@/lib/log-supabase-error"
@@ -624,33 +624,30 @@ function ProfileEditorInner() {
         // escribir (antes se caía al perfil semilla compartido PROFILE_ID).
         if (!user) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión para publicar.")
 
-        // No pisar el nombre/bio reales: si el perfil ya existe, se conservan
-        // tal cual. Solo en la primera publicación (perfil nuevo) se usa un
-        // valor derivado de la cuenta autenticada, nunca uno inventado.
-        const { data: existingProfile } = await supabase
-          .from("profiles")
-          .select("display_name, bio")
-          .eq("user_id", user.id)
-          .maybeSingle()
-
-        const fallbackName =
-          user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || ""
-
-        const profilePayload = {
-          user_id: user.id,
-          display_name: existingProfile?.display_name || fallbackName,
-          bio: existingProfile?.bio || "",
-        }
-
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .upsert(profilePayload, { onConflict: "user_id" })
-          .select("id")
-          .single()
-
-        if (profileError) throw profileError
-
-        profileId = profile.id
+        // ─── POR QUÉ ACÁ NO HAY UN UPSERT ────────────────────────────────
+        // Hasta el 2026-08-17 esto hacía
+        // `upsert({ user_id, display_name, bio }, { onConflict: "user_id" })`,
+        // y **la publicación de todo perfil individual fallaba** con
+        // `23502 null value in column "username"`.
+        //
+        // El motivo: `0006` dejó `profiles.username` NOT NULL y sin valor por
+        // defecto. PostgREST traduce el upsert a
+        // `INSERT ... ON CONFLICT (user_id) DO UPDATE`, y Postgres valida los
+        // NOT NULL al ARMAR la fila candidata, antes de detectar el conflicto.
+        // Que la fila ya existiera no salvaba nada: el insert nunca llegaba a
+        // convertirse en update.
+        //
+        // Nadie lo había visto porque publicar exige sesión y hasta F8 no
+        // había ni una prueba automática autenticada; lo destapó
+        // `tests/e2e-auth/editor.spec.ts` en su primera corrida.
+        //
+        // El arreglo es además una escritura menos: para un perfil que ya
+        // existe, aquel upsert reescribía `display_name` y `bio` con sus
+        // propios valores — un no-op costoso. `resolveOwnProfileId` es el
+        // helper canónico del repositorio para "encuentra mi perfil, y si no
+        // existe créalo bien" (username incluido), y es el mismo que ya corre
+        // al iniciar sesión y al cargar el editor.
+        profileId = await resolveOwnProfileId(user)
       }
 
       // 3.5. Antes de sobrescribir lo publicado, guardar qué URLs de R2 usa

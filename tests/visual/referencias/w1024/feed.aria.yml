@@ -1,0 +1,49 @@
+- main:
+  - link "Ir al feed principal":
+    - /url: /
+    - text: Vibe
+  - link "Iniciar Sesión":
+    - /url: /login
+  - link "Registrarse":
+    - /url: /login?modo=registro
+  - button "Categorías" [pressed]
+  - button "Servicios"
+  - button "Productos"
+  - complementary "Filtrar el feed":
+    - navigation:
+      - paragraph: Explora
+      - button "Para ti Todo el feed, sin filtrar 1" [pressed]
+      - button "Autor Letrista y creador de la palabra"
+      - button "Compositor Creador de la música y la melodía"
+      - button "Arreglista Da forma y color a cada versión"
+      - button "Director Director de orquesta, coro o ensamble"
+      - button "Productor Producción musical, beatmaker o topliner"
+      - button "Mezcla Ingeniero de grabación y mezcla"
+      - button "Master Ingeniero de masterización"
+      - button "Músico Intérprete, vocalista o músico de sesión"
+      - button "Grupos musicales Páginas de bandas y ensambles"
+  - button "Reproducir"
+  - text: /Pista Publica de Prueba Artista de Prueba 0:\d+/
+  - slider "Progreso de la canción": "0"
+  - text: /0:\d+/
+  - button "Guardar canción"
+  - button "Reproducir"
+  - button "Ver comentarios"
+  - button "Contenido anterior" [disabled]
+  - button "Siguiente contenido" [disabled]
+  - button "Compartir"
+  - complementary "Comentarios":
+    - paragraph: Comentarios 0
+    - paragraph: Pista Publica de Prueba — Artista de Prueba
+    - paragraph: Nadie ha comentado todavía. Sé la primera persona en decir algo.
+    - link "Inicia sesión para comentar":
+      - /url: /login
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"

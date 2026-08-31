@@ -149,7 +149,12 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
             }}
           >
             <img
-              src={data.cover}
+              // `|| undefined` y no `data.cover` a secas: un single recién
+              // creado trae la portada vacía, y React avisa por consola de que
+              // `src=""` hace al navegador recargar la página entera. Con
+              // `undefined` el atributo no se emite y el <img> se queda igual
+              // de tamaño y con su borde, así que el disco se ve idéntico.
+              src={data.cover || undefined}
               alt={t("single_cover_alt")}
               className="size-20 rounded-full border-2 border-black/70 object-cover sm:size-24"
             />
