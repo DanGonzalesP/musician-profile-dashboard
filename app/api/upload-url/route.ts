@@ -5,7 +5,8 @@ import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
 import { checkAuthenticatedRateLimit, respuesta429 } from "@/lib/rate-limit"
 import { validateUploadRequest } from "@/lib/upload-validation"
-import { idDePeticion, logError, logInfo } from "@/lib/log"
+import { idDePeticion, logError, logInfo, logWarn } from "@/lib/log"
+import { subidasR2Configuradas, variablesDeSubidaAusentes } from "@/lib/r2-config"
 
 // Genera una URL firmada de subida directa a R2. El archivo NUNCA pasa por
 // este servidor/función serverless — el navegador hace el PUT directo a R2
@@ -28,6 +29,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Inicia sesión para subir archivos." }, { status: 401 })
     }
     const { user, supabase } = auth
+
+    // Fail-closed antes de tocar nada (F4). Sin la configuración completa de
+    // R2 la subida no puede terminar, y seguir adelante tiene un costo real:
+    // el rate limit consumiría cupo del usuario por un fallo nuestro, y el
+    // insert en `media_assets` dejaría inventariado un archivo que jamás se
+    // subió. El mensaje no nombra ninguna variable: al cliente se le dice qué
+    // pasa, no cómo está montado el servidor.
+    const ausentes = variablesDeSubidaAusentes()
+    if (!subidasR2Configuradas()) {
+      logWarn("api/upload-url", "configuración de R2 incompleta o inválida", {
+        requestId,
+        userId: user.id,
+        // Sólo los NOMBRES de las variables, nunca sus valores.
+        variablesAusentes: ausentes,
+      })
+      return NextResponse.json(
+        { error: "Las subidas de archivos no están disponibles en este momento." },
+        { status: 503 }
+      )
+    }
 
     // 120 subidas por hora: publicar un álbum con portadas y pistas entra
     // holgado, pero frena un script que quiera llenar el bucket.

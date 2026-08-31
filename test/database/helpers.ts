@@ -17,6 +17,7 @@
 //    service role sería probar que RLS se puede saltar, que ya lo sabemos.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { exigirBaseDeVibe } from "./identidad-de-la-base"
 
 const URL_LOCAL = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
 
@@ -100,6 +101,11 @@ let contador = 0
 export async function crearUsuario(opciones: { conPerfil?: boolean; nombre?: string } = {}): Promise<UsuarioDePrueba> {
   const { url, anonKey } = exigirEntornoLocal()
   const admin = clienteAdministrativo()
+
+  // "Es localhost" no alcanza: en esta máquina conviven varios Supabase
+  // locales y todos firman con el mismo secreto de demostración. Ver
+  // identidad-de-la-base.ts.
+  await exigirBaseDeVibe(admin, url)
 
   const email = `prueba-${Date.now()}-${contador++}@ejemplo.local`
   const password = `Prueba-${Math.random().toString(36).slice(2)}-9!`

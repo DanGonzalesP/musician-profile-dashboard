@@ -38,6 +38,42 @@ Para R2 (dos claves activas simultáneas):
 Para la anon key de Supabase: regenerarla invalida la vieja de inmediato, así
 que se actualiza en Vercel y se redepliega en la misma ventana. Coordinar.
 
+## ⚠️ `R2_ENDPOINT` es una variable de BUILD, no sólo de ejecución
+
+Es la trampa menos obvia de todo el inventario, y rompe las subidas sin dejar
+ni un error en el servidor.
+
+`R2_ENDPOINT` cumple **dos** funciones:
+
+1. Firma la URL de subida en `/api/upload-url` (runtime, servidor).
+2. Es el origen que `lib/csp.ts` mete en `connect-src` para que el navegador
+   pueda hacer el **PUT directo a R2**. El archivo nunca pasa por Vercel.
+
+La CSP se arma en `proxy.ts`, que es **Edge middleware**, y Next **incrusta**
+las variables de entorno del Edge durante el `build`. Consecuencia:
+
+> Si `R2_ENDPOINT` no está presente **en el momento del build**, la CSP se
+> despliega sin ese origen y el navegador bloquea todas las subidas — aunque la
+> variable esté correctamente configurada en runtime.
+
+El síntoma es engañoso: `/api/upload-url` responde 200 con una URL firmada
+válida, `media_assets` registra la fila, y el PUT muere en el navegador con una
+violación de CSP. Nada aparece en los logs del servidor.
+
+**Qué hacer al rotar o al crear un entorno nuevo:**
+
+1. En Vercel, marcar `R2_ENDPOINT` para **Production, Preview y Development**.
+2. Después de cambiarla, **redesplegar** (no basta con guardar la variable:
+   hay que reconstruir para que el Edge la incruste de nuevo).
+3. Verificar en el navegador que una subida real termina, o revisar la cabecera
+   `Content-Security-Policy` de cualquier página y comprobar que `connect-src`
+   contiene el origen de R2.
+
+La comprobación fail-closed de `lib/r2-config.ts` cubre la mitad de runtime
+(sin configuración, `/api/upload-url` responde 503 con un mensaje seguro en vez
+de firmar una subida imposible), pero **no puede cubrir la mitad de build**: en
+runtime la variable está y todo parece correcto. Por eso esta nota existe.
+
 ## Supply chain (acciones de CI)
 
 Las GitHub Actions del CI (`gitleaks`, `checkout`, `setup-node`) deberían

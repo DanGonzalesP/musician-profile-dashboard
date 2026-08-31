@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useId, cloneElement, isValidElement, Children } from "react"
 import Link from "next/link"
 import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, Album, Track, SocialLink, SocialPlatform, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
 import { BLOCK_LIBRARY, SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
@@ -251,11 +251,51 @@ export function BlockInspector({
 
 // ─── Shared UI primitives ──────────────────────────────────────────────────
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * Etiqueta + control del inspector.
+ *
+ * ─── POR QUÉ LA ASOCIACIÓN ES EXPLÍCITA Y NO UN <label> ENVOLVENTE ────────
+ * Hasta el 2026-08-17 el texto se pintaba en un <span>, así que los controles
+ * del inspector NO tenían nombre accesible: axe reportaba `label` y
+ * `select-name`, las dos **críticas**. Nadie lo había visto porque el editor
+ * exige sesión y la suite E2E pública corre sin autenticación; lo destapó el
+ * gate autenticado de F8 (tests/e2e-auth/editor-accesibilidad.spec.ts).
+ *
+ * La corrección obvia sería envolver todo en <label>, que asocia de forma
+ * implícita. No se hace: de los 56 `Field` del inspector, 10 contienen botones
+ * o subidores de archivos, y dentro de un <label> un clic en el texto activaría
+ * el primer control anidado — abriría el selector de archivos al tocar
+ * "Portada y audio", por ejemplo. Eso es un cambio de UX, y la UX se preserva
+ * tal cual.
+ *
+ * Así que la etiqueta apunta por `htmlFor` a un id generado, y ese id se
+ * inyecta en el control hijo. Cuando el hijo no es un control etiquetable
+ * (un subidor, un grupo de botones), el `htmlFor` no encuentra a nadie y no
+ * pasa nada: esos casos ya traen su propio nombre accesible.
+ */
+export function Field({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  const id = useId()
+
+  // Sólo se inyecta cuando hay exactamente un hijo elemento y no trae id
+  // propio. Con varios hijos no hay forma de adivinar cuál es el control.
+  const unico = Children.count(children) === 1 ? Children.only(children) : null
+  const contenido =
+    unico && isValidElement<{ id?: string }>(unico) && unico.props.id === undefined
+      ? cloneElement(unico, { id })
+      : children
+
   return (
     <div className="block space-y-1.5">
-      <span className="block text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
+      <label htmlFor={id} className="block text-xs font-medium text-muted-foreground">
+        {label}
+      </label>
+      {contenido}
     </div>
   )
 }
@@ -277,12 +317,16 @@ function AutoGrowTextarea({
   placeholder,
   minRows = 2,
   maxLength = 700,
+  // Lo inyecta `Field` para poder asociarle su <label>. Sin esto el textarea
+  // se quedaría sin nombre accesible, que es la violación que arregló F8.
+  id,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   minRows?: number
   maxLength?: number
+  id?: string
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -298,6 +342,7 @@ function AutoGrowTextarea({
     <div className="space-y-1">
       <textarea
         ref={ref}
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
         rows={minRows}

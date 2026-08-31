@@ -14,9 +14,25 @@
 
 project_id = "vibe"
 
+# ─── PUERTOS: bloque 544xx, propio de Vibe ─────────────────────────────────
+# El Supabase local del CLI usa 543xx por defecto, y ése es el bloque que ya
+# ocupa el stack local de Bancary en esta misma máquina. Con los dos en 543xx
+# pasan dos cosas, y la segunda es peor que la primera:
+#
+#   1. `supabase start` falla con "port is already allocated" — ruidoso, se ve.
+#   2. Si Bancary arranca primero, `SUPABASE_TEST_URL=http://127.0.0.1:54321`
+#      sigue respondiendo, pero es OTRA base. Las pruebas de Vibe crearían y
+#      borrarían usuarios en el proyecto equivocado sin decir una palabra.
+#
+# El bloque 544xx elimina las dos de raíz y deja convivir los dos proyectos.
+# La salvaguarda que cubre el caso 2 aunque alguien cambie esto vive en
+# `test/database/helpers.ts` y `tests/e2e-auth/fixtures/sesion.ts`: antes de
+# tocar nada comprueban que la base al otro lado sea de verdad la de Vibe.
+
 [api]
 enabled = true
-port = 54321
+# Bloque 544xx propio de Vibe. Ver la nota de puertos más abajo.
+port = 54421
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 # Mismo tope que PostgREST aplica en la nube. Es la razón por la que
@@ -25,8 +41,8 @@ extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
-port = 54322
-shadow_port = 54320
+port = 54422
+shadow_port = 54420
 health_timeout = "2m"
 # ⚠️ TIENE QUE COINCIDIR CON PRODUCCIÓN.
 # Confirmado en producción por `_diagnostico_estado.sql` el 2026-08-16.
@@ -49,13 +65,13 @@ enabled = true
 
 [studio]
 enabled = true
-port = 54323
+port = 54423
 
 [local_smtp]
 # Buzón local para los correos de Auth (confirmación de cuenta). Lo necesitan
 # las pruebas que crean usuarios.
 enabled = true
-port = 54324
+port = 54424
 
 [storage]
 # Vibe NO usa Supabase Storage: los archivos viven en Cloudflare R2 y se suben
