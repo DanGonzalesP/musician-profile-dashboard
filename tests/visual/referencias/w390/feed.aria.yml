@@ -1,0 +1,41 @@
+- main:
+  - link "Ir al feed principal":
+    - /url: /
+    - text: Vibe
+  - link "Iniciar Sesión":
+    - /url: /login
+  - link "Registrarse":
+    - /url: /login?modo=registro
+  - button "Categorías" [pressed]
+  - button "Servicios"
+  - button "Productos"
+  - group "Filtrar el feed":
+    - button "Para ti" [pressed]
+    - button "Autor"
+    - button "Compositor"
+    - button "Arreglista"
+    - button "Director"
+    - button "Productor"
+    - button "Mezcla"
+    - button "Master"
+    - button "Músico"
+    - button "Grupos"
+  - button "Reproducir"
+  - text: /Pista Publica de Prueba Artista de Prueba 0:\d+/
+  - slider "Progreso de la canción": "0"
+  - text: /0:\d+/
+  - button "Guardar canción"
+  - button "Reproducir"
+  - button "Ver comentarios"
+  - button "Contenido anterior" [disabled]
+  - button "Siguiente contenido" [disabled]
+  - button "Compartir"
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"

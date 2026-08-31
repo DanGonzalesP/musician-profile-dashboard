@@ -5,7 +5,7 @@ por una acción estrictamente humana**, y de la evidencia real de cada gate. Sig
 la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 [`PLAN_VIBE_EMPRESARIAL.md`](PLAN_VIBE_EMPRESARIAL.md).
 
-- **Fecha:** 17 de agosto de 2026 (última sesión: cierre de **F7**).
+- **Fecha:** 31 de agosto de 2026 (última sesión: cierre de **F8 autenticado** y de la mitad restante de **F4**).
 - **Base al iniciar el bloque de cierre de base:** `6fb43b8`.
 - **Producción verificada:** Supabase `0000`–`0017` y Vercel, 16 de agosto de 2026.
   `0018` está escrita y verde en local; **todavía no aplicada en producción**.
@@ -27,23 +27,27 @@ la precedencia de [`AGENTS.md`](AGENTS.md) y el orden de fases de
 |---|---|---|
 | Tipos | `pnpm typecheck` | ✅ **0 errores** |
 | Lint | `pnpm lint` (`--max-warnings=22`) | ✅ **0 errores, 22 warnings** (exit 0) |
-| Pruebas unitarias | `pnpm test` | ✅ **18 archivos, 221 pruebas** |
+| Pruebas unitarias | `pnpm test` | ✅ **20 archivos, 259 pruebas** |
 | QA agregado | `pnpm qa` | ✅ verde de punta a punta |
-| Build | `pnpm build` | ✅ **exit 0**, 34 rutas |
+| Build | `pnpm build` | ✅ **exit 0** |
 | **E2E + axe** | `pnpm test:e2e` | ✅ **92 pruebas verdes** (chromium escritorio + móvil) |
-| **Regresión visual** | `pnpm test:visual` | ✅ **20 instantáneas ARIA verdes**, 20 capturas de píxeles omitidas (esperan aprobación humana) |
+| **E2E autenticado** | `pnpm test:e2e:auth` | ✅ **26 pruebas verdes** contra Supabase local (escritorio + móvil) |
+| **Regresión visual** | `pnpm test:visual` | ✅ **24 instantáneas ARIA verdes** (el feed entró en esta sesión), 24 capturas de píxeles omitidas (esperan aprobación humana) |
+| **Visual del editor** | `pnpm test:visual:auth` | ✅ **4 instantáneas ARIA verdes** (390/768/1024/1440) |
 | **Smoke** | `node scripts/smoke-staging.mjs` | ✅ **7 de 7 en verde** contra un servidor local (§2.11) |
 | **Reconstrucción DB** | `pnpm db:verify` | ✅ `0000`–`0018` desde cero; `db lint` sin errores |
 | **Pruebas DB** | `pnpm test:db` | ✅ **110 de 110**, sin ningún `todo`, en 7 archivos (2026-08-17) |
 | **Paridad producción** | `supabase db diff --linked --schema public,private` | ✅ sin diferencias (2026-08-16, antes de `0018`) |
 
 **Cambio en el número de pruebas:** de **68 en 7 archivos** (línea base `6ffa555`)
-a **221 unitarias en 18 archivos + 110 de base en 7 archivos + 92 E2E + 20
-visuales** = **443 pruebas ejecutables**, todas verdes.
+a **259 unitarias en 20 archivos + 110 de base + 92 E2E públicas + 26 E2E
+autenticadas + 28 instantáneas ARIA** = **515 pruebas ejecutables**, todas
+verdes.
 
-La cifra de base subió de **21 a 110** en la sesión del 2026-08-17: ver §2.18.
-Las menciones anteriores a "13" y "21 pruebas de base" quedaron obsoletas y se
-corrigieron en este documento.
+La cifra de base subió de **21 a 110** el 2026-08-17 (§2.18); las 26
+autenticadas y las 4 del editor son del 2026-08-31 (§2.19). Las menciones
+anteriores a "13" y "21 pruebas de base" quedaron obsoletas y se corrigieron en
+este documento.
 
 **Los gates de base de datos ya están cerrados.** Docker, el baseline y las
 credenciales dejaron de ser bloqueos el 2026-08-16.
@@ -365,6 +369,77 @@ resuelven junto al resto: la suite entera baja de "cuatro fallos y minuto y
 medio" a **menos de diez segundos en verde**. Ése es el efecto medible de quitar
 el `serialization_failure`.
 
+### 2.19 F8 · E2E autenticado y F4 · la subida en la CSP — cerradas (2026-08-31)
+
+El bloqueo humano **G** del §4 decía que la accesibilidad del editor «exige una
+sesión autenticada real» y que el servidor de fixtures es de sólo lectura y sin
+auth *a propósito*. Las dos cosas eran ciertas; la conclusión no. La respuesta
+no era falsificar un JWT —eso sí habría exigido reimplementar GoTrue o
+versionar una credencial— sino **usar el Supabase local que `pnpm test:db` ya
+levanta**.
+
+`playwright.auth.config.ts` (nuevo) hace exactamente eso: sesión real por
+formulario, base real con RLS encendida, y **R2 como única frontera simulada**.
+Lo que NO se simula, a propósito: la autenticación, la base, el rate limit,
+`/api/upload-url` ni RLS. Simular eso sería probar el mock.
+
+**Tres defectos reales en la primera corrida. Dos son de producción.**
+
+| # | Defecto | Por qué nadie lo había visto |
+|---|---|---|
+| 1 | **Publicar estaba roto para todo perfil individual.** `handlePublish` hacía `upsert({user_id, display_name, bio}, {onConflict:"user_id"})` sin `username`, columna `NOT NULL` sin valor por defecto desde `0006`. PostgREST lo traduce a `INSERT ... ON CONFLICT`, y Postgres valida los NOT NULL al **armar la fila candidata**, antes de detectar el conflicto: fallaba con `23502` aunque el perfil ya existiera. | Publicar exige sesión, y no había ni una prueba automática autenticada. |
+| 2 | **La CSP bloqueaba todas las subidas.** El SDK de S3 firma en estilo *virtual-hosted* (`https://<bucket>.<endpoint>/…`), pero `connect-src` sólo listaba el origen desnudo de `R2_ENDPOINT`. El navegador rechazaba el PUT con "Refused to connect" y el editor lo reportaba como `TypeError: Failed to fetch`. | La CSP con nonce se desplegó el 2026-08-16 y ninguna prueba automática subía un archivo. |
+| 3 | **Tres violaciones críticas de accesibilidad** en el inspector: los 56 campos sin nombre accesible (`label`) y los dos selectores de ubicación tampoco (`select-name`). | Mismo motivo que #1. |
+
+**Cómo se corrigió cada uno**
+
+1. `resolveOwnProfileId`, el helper canónico del repositorio para "encuentra mi
+   perfil, y si no existe créalo bien". Además ahorra una escritura: para un
+   perfil existente aquel upsert reescribía `display_name` y `bio` con sus
+   propios valores.
+2. `lib/csp.ts` lista los **dos orígenes exactos** (endpoint desnudo y con el
+   bucket delante), sin comodines. Se sabe el nombre del bucket, así que no hay
+   motivo para abrir `https://*.r2.cloudflarestorage.com`.
+3. `Field` asocia por `htmlFor`/`useId` en vez de envolver en `<label>`: 10 de
+   sus 56 usos contienen botones o subidores, y un `<label>` envolvente haría
+   que tocar el texto abriera el selector de archivos. Detalle en
+   [`docs/accesibilidad.md`](docs/accesibilidad.md).
+
+**F4, la mitad que faltaba.** `lib/r2-config.ts` (nuevo, probado) hace
+fail-closed **antes** de consumir cupo del rate limit y antes de registrar la
+fila en `media_assets` — sin eso, una configuración incompleta dejaba
+inventariado un archivo que jamás se subió. Y queda documentado que
+`R2_ENDPOINT` tiene que existir **en el entorno de build** de Vercel: la CSP se
+arma en `proxy.ts`, que es Edge middleware, y Next incrusta ahí las variables
+al compilar. Si falta en el build, la política sale sin ese origen y las
+subidas mueren en el navegador aunque la variable esté puesta en runtime.
+
+**Higiene del entorno que destapó un riesgo silencioso.** El Supabase local de
+Vibe se movió al bloque de puertos **544xx**. El CLI usa 543xx para todos los
+proyectos y firma los JWT con el mismo secreto de demostración, así que con el
+stack de Bancary levantado en esta misma máquina `SUPABASE_TEST_URL` seguía
+respondiendo —pero era **otra base**, y la clave de servicio autenticaba igual.
+`test/database/identidad-de-la-base.ts` añade la salvaguarda de conducta:
+antes de crear un usuario comprueba que el esquema del otro lado sea el de Vibe.
+
+**Qué cubre ahora la suite autenticada** (26 pruebas, escritorio y móvil):
+
+| Spec | Qué congela |
+|---|---|
+| `sesion.spec.ts` | redirección en el borde sin sesión (y **sin HTML del panel** en la respuesta); sesión real que sobrevive a una recarga |
+| `editor.spec.ts` | añadir bloque → editar → reordenar → borrador que sobrevive a una recarga → publicar → **verlo en el perfil público** |
+| `editor-teclado-y-subidas.spec.ts` | recorrido con teclado; subida de imagen y de audio con PUT firmado y **cero blob URLs** en lo publicado; la ruta no filtra internos |
+| `editor-accesibilidad.spec.ts` | axe sobre el editor y sobre el inspector abierto |
+| `xss-almacenado.spec.ts` | una URL `javascript:` **escrita directo en la base** queda inerte al renderizar, y el bloque no se descarta |
+| `tests/visual-auth/editor.spec.ts` | estructura ARIA del editor en 390/768/1024/1440 |
+
+Además: el feed entró a la capa visual pública (faltaba), y
+`lib/audio-engine.test.ts` fija el contrato del motor único con 16 casos —
+audio↔audio, audio↔vídeo, medios muteados que **no** se tocan, y la ráfaga de
+cambios rápidos que producía el audio zombie. Se usa un doble de
+`HTMLAudioElement` con control manual de la promesa de `play()`, porque jsdom
+no implementa `play()` y es justo esa promesa la que causaba el bug.
+
 ---
 
 ## 3. Qué se corrigió del árbol que se retomó
@@ -402,7 +477,7 @@ no son bloqueos.
 |---|---|---|---|
 | D | **Aprobar las capturas de píxeles de referencia.** Definen oficialmente cómo se ve Vibe; no las fabrica un agente. Un comando: `pnpm test:visual:update`, revisar cada PNG, versionar. Mientras tanto la capa ARIA sí corre y bloquea. | `tests/visual/referencias/` sólo tiene `.aria.yml` | F8 |
 | E | **Verificación externa del estado desplegado (F0)**: anon key sin DNIs, `cleanup` 401 en producción, etc. Requiere tu base y tus variables de Vercel. *(El equivalente local ya corre en `invariantes-publicas.spec.ts` y en el smoke.)* | — | F0 |
-| G | **Accesibilidad del editor con teclado.** Exige una sesión autenticada real; el servidor de fixtures es de sólo lectura y sin auth **a propósito**, porque simular un JWT válido significaría falsificar Supabase Auth entero o meter una credencial en el repositorio. | `docs/accesibilidad.md` | F8 |
+| ~~G~~ | ~~**Accesibilidad del editor con teclado.**~~ **Cerrado el 2026-08-31** (§2.19): no hacía falta falsificar un JWT, sino usar el Supabase local que `pnpm test:db` ya levanta. Destapó tres violaciones críticas, ya corregidas. | `docs/accesibilidad.md` | F8 |
 | H | **Decisiones de proveedor y de negocio:** Sentry vs. log drains (F12), captcha vs. confirmación de correo (F5), staging y backups (F13), correo institucional y plazos de DMCA (F14), cuota por perfil (F11), política de `orders`/`donations` (F0 #6). | §8 del plan | varias |
 
 Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
