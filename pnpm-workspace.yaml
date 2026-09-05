@@ -24,11 +24,29 @@ packages:
 #
 # Se revisan cuando Dependabot suba las directas: un override que ya no hace
 # falta es deuda silenciosa.
+#
+# 2026-09-04 — dos ALTAS nuevas que la puerta de `pnpm audit` atrapo al activar
+# la proteccion de rama. No son deuda heredada: este mismo job salio verde en
+# main el 2026-08-16.
+#   • browserslist 4.28.6 -> 4.28.7 (GHSA-c83g-rgw3-j3cx crecimiento de memoria
+#     sin tope, GHSA-73wf-gq98-2v4g escritura de prototipo via
+#     browserslist-stats.json). Transitiva via @babel/core; no estaba cubierta
+#     por ningun override.
+#   • fast-uri 4.1.2 -> 4.1.3 (confusion de host por canonicalizacion IDN
+#     omitida). La causa no era el selector sino el DESTINO: el override
+#     anterior, `fast-uri@>=3.0.0: ">=3.1.5"`, no tenia tope superior, asi que
+#     el unico consumidor real (ajv@8, que declara `fast-uri: ^3.0.1`) terminaba
+#     resuelto en 4.1.2 — una major que nunca pidio, y justo la rama vulnerable.
+#     Ahora el destino esta acotado a la misma major que el selector, que es la
+#     regla que el resto de este bloque ya seguia. La segunda linea queda como
+#     guardia por si algun dia entra un consumidor de 4.x de verdad.
 overrides:
   postcss: "^8.5.23"
   sharp: "^0.35.0"
   brace-expansion@>=4.0.0: ">=5.0.9"
-  fast-uri@>=3.0.0: ">=3.1.5"
+  browserslist@<4.28.7: ">=4.28.7"
+  "fast-uri@>=3.0.0 <4.0.0": ">=3.1.5 <4.0.0"
+  fast-uri@>=4.0.0: ">=4.1.3"
   ip-address@<10.3.1: ">=10.3.1"
   js-yaml@>=4.0.0: ">=4.3.1"
   nanoid@<3.3.18: ">=3.3.18"
