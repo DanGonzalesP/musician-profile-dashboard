@@ -89,3 +89,15 @@ const nextConfig = {
 }
 
 export default nextConfig
+
+// Da acceso a los bindings de Cloudflare (R2 de cache, D1 de etiquetas) desde
+// `next dev`, a traves de `getCloudflareContext()`. Sin esto, en desarrollo el
+// cache incremental y `revalidateTag` no encuentran su almacen y fallan de una
+// forma que no se parece en nada a como fallarian en produccion.
+//
+// Es una llamada de arranque, no un plugin: no envuelve `nextConfig` ni cambia
+// el build de produccion, que lo hace `opennextjs-cloudflare build`.
+if (process.env.NODE_ENV === "development") {
+  const { initOpenNextCloudflareForDev } = await import("@opennextjs/cloudflare")
+  await initOpenNextCloudflareForDev()
+}

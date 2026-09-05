@@ -6,15 +6,15 @@ import { leerConTope } from "@/lib/stream-limit"
 // porque <canvas>.toDataURL() sobre una imagen cross-origin sin cabeceras
 // CORS que calcen exactamente con el dominio actual "mancha" el canvas y
 // lanza SecurityError — pasa siempre que el bucket solo tiene whitelisteado
-// localhost/*.vercel.app (ver scripts/setup-r2-cors.mjs) y la app corre en
+// localhost/*.workers.dev (ver scripts/setup-r2-cors.mjs) y la app corre en
 // otro dominio. Sirviendo la imagen desde este mismo origen, el canvas ya
 // nunca la ve como cross-origin, sin depender de la config de CORS del bucket.
 //
 // SEGURIDAD — este endpoint hace un fetch server-side con una URL que manda
 // el cliente, o sea que es un SSRF en potencia: sin los controles de abajo,
-// cualquiera lo usa para pedir recursos desde la IP de nuestras funciones
-// serverless (red interna de Vercel, metadata del cloud, escaneo de puertos)
-// o para lavar tráfico contra terceros.
+// cualquiera lo usa para pedir recursos desde la IP de nuestro Worker (redes
+// internas alcanzables desde el borde, metadata del proveedor, escaneo de
+// puertos) o para lavar tráfico contra terceros.
 //
 // La versión anterior validaba con `target.startsWith(R2_PUBLIC_URL)`, que es
 // insuficiente: si R2_PUBLIC_URL es "https://pub-abc.r2.dev", entonces

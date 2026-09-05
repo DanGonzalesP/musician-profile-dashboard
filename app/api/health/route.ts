@@ -73,7 +73,16 @@ export async function GET(request: Request) {
   const sano = supabaseOk && r2Ok
   const cuerpo = {
     estado: sano ? "ok" : "degradado",
-    version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "desarrollo",
+    // Qué commit está sirviendo. Cloudflare Workers Builds expone
+    // `WORKERS_CI_COMMIT_SHA`; `APP_VERSION` queda como escotilla para un
+    // build hecho desde otro sitio (local, otro CI) sin tener que tocar este
+    // archivo. Sin ninguna de las dos, "desarrollo" — nunca se inventa un
+    // número de versión, porque un chequeo de salud que miente sobre qué está
+    // desplegado es peor que uno que dice que no sabe.
+    version:
+      process.env.WORKERS_CI_COMMIT_SHA?.slice(0, 7) ??
+      process.env.APP_VERSION?.slice(0, 7) ??
+      "desarrollo",
     dependencias: {
       supabase: supabaseOk ? "ok" : "error",
       r2: r2Ok ? "ok" : "error",

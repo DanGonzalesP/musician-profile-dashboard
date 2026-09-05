@@ -22,6 +22,24 @@ for (const rawLine of envFile.split("\n")) {
   if (match) process.env[match[1]] ??= match[2].replace(/^"|"$/g, "")
 }
 
+// El dominio de produccion no se escribe a mano: sale de la misma variable
+// que ya usa la app para sus URLs canonicas, asi no hay dos fuentes de verdad
+// que puedan discrepar.
+function origenesPermitidos() {
+  const base = ["http://localhost:3000", "https://*.workers.dev"]
+  const sitio = process.env.NEXT_PUBLIC_SITE_URL
+  if (!sitio) return base
+  try {
+    const { origin } = new URL(sitio)
+    return base.includes(origin) ? base : [...base, origin]
+  } catch {
+    // Una variable mal formada no debe tumbar el script ni, peor, colarse
+    // como origen invalido en la politica del bucket.
+    console.warn(`NEXT_PUBLIC_SITE_URL no es una URL valida, se ignora: ${sitio}`)
+    return base
+  }
+}
+
 const client = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT,
@@ -37,7 +55,15 @@ await client.send(
     CORSConfiguration: {
       CORSRules: [
         {
-          AllowedOrigins: ["http://localhost:3000", "https://*.vercel.app"],
+          // Origenes que pueden hacer el PUT firmado directo al bucket.
+          //
+          // `*.workers.dev` cubre los despliegues de vista previa de
+          // Cloudflare Workers, igual que `*.vercel.app` cubria los de Vercel
+          // antes de la migracion. El dominio definitivo se anade desde
+          // NEXT_PUBLIC_SITE_URL para no tener que editar este archivo cada
+          // vez que cambie: si no esta definida, se cae al par local+preview,
+          // que es lo unico que se puede saber sin adivinar.
+          AllowedOrigins: origenesPermitidos(),
           AllowedMethods: ["GET", "PUT", "HEAD"],
           AllowedHeaders: ["*"],
           ExposeHeaders: ["ETag"],

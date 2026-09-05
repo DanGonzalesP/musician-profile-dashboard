@@ -1,7 +1,7 @@
 // Decisión de consentimiento de analítica (P-31).
 //
 // PROBLEMA QUE RESUELVE
-// `/legal/cookies` promete que Vibe no rastrea, pero `@vercel/analytics` se
+// `/legal/cookies` promete que Vibe no rastrea, pero la analítica se
 // cargaba en producción sin preguntar nada. Una política que la aplicación no
 // cumple es peor que no tenerla: es una afirmación falsa por escrito.
 //

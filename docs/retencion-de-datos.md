@@ -24,7 +24,7 @@ El dato que ya no cumple una función es superficie de riesgo, no un activo.
 | Objetos huérfanos en R2 | R2 | hasta la limpieza; ventana de gracia 7 días | los borra `cleanup-orphaned-files` |
 | Username liberado (historial) | Postgres | permanente (para redirección) | no se borra (no es PII) |
 | Consentimiento de analítica (`vibe:consentimiento-analitica`) | localStorage del visitante | hasta que el visitante borre su almacenamiento | desaparece con el navegador; se vuelve a preguntar |
-| Señales de Vercel Analytics | Vercel | **sólo si el visitante aceptó**; retención del plan de Vercel | no se cargan sin consentimiento |
+| Señales de Cloudflare Web Analytics | Cloudflare | **sólo si el visitante aceptó**; retención del plan de Cloudflare | no se cargan sin consentimiento |
 
 ## Cuentas eliminadas
 
@@ -48,8 +48,15 @@ orden correcto, para no dejar objetos sin dueño. Tras el borrado:
 
 ## Analítica y consentimiento (P-31)
 
-`@vercel/analytics` **ya no se monta solo**. Lo monta
-`components/legal/consentimiento-cookies.tsx`, y sólo tras un sí explícito:
+La analítica **ya no se monta sola**. La monta
+`components/legal/consentimiento-cookies.tsx`, y sólo tras un sí explícito.
+
+El proveedor pasó de Vercel a **Cloudflare Web Analytics** con la migración
+(`components/legal/analitica-cloudflare.tsx`). Lo que se le promete al
+visitante no cambió, y sigue siendo cierto por la misma razón: sin publicidad,
+sin rastreo entre sitios, y sin cargar nada hasta que alguien dice que sí.
+Cloudflare Web Analytics además no usa cookies ni huellas de navegador, lo que
+si acaso refuerza esa promesa.
 
 - Sin decisión guardada → no se carga nada. Fail-closed, igual que el resto del
   proyecto; un valor manipulado a mano en el almacenamiento cuenta como "sin
@@ -73,6 +80,7 @@ JavaScript).
 - [x] Borrado de cuenta implementado y ordenado (base + R2).
 - [x] Consentimiento de analítica implementado, fail-closed y probado (P-31).
 - [ ] Poda automática de `content_reports`/`audit_log` a 12 meses — necesita un
-      job programado (cron de Supabase o Vercel) — **decisión/DDL**.
+      job programado (cron de Supabase o Cron Trigger de Cloudflare) —
+      **decisión/DDL**.
 - [ ] Retención del drain configurada a 30 días — **humano** (depende del
       destino del drain, ver [`observabilidad.md`](observabilidad.md)).

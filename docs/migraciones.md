@@ -238,6 +238,6 @@ Ver `DESPLIEGUE.md` y [`runbooks/rollback.md`](runbooks/rollback.md). Resumen:
    manual de `schema`, `data` y `roles`, guardado fuera del repositorio.
 2. Aplicar la migración, **una sola**, y correr su bloque de verificación.
 3. Recién entonces la siguiente.
-4. Promover el despliegue de código en Vercel.
+4. Promover el despliegue del Worker (`pnpm cf:deploy`, o el build automático de Cloudflare). Ver [`cloudflare.md`](cloudflare.md).
 5. `pnpm smoke` apuntado a producción.
 6. Observar errores 30 minutos.

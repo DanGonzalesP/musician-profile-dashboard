@@ -105,7 +105,11 @@ export function crearCsp(nonce: string, esDesarrollo: boolean): string {
     origenSupabase ? origenSupabase.replace(/^https:/, "wss:").replace(/^http:/, "ws:") : null,
     origenR2Publico,
     ...origenesDeSubidaR2(origenR2Subidas),
-    "https://vitals.vercel-insights.com",
+    // A donde REPORTA Cloudflare Web Analytics (reemplaza a
+    // vitals.vercel-insights.com con la migración). `connect-src` no tiene
+    // 'strict-dynamic', así que aquí el host sí es lo que autoriza la
+    // conexión: sin esta entrada el beacon carga pero no puede enviar nada.
+    "https://cloudflareinsights.com",
   ])
 
   const directivas = [
@@ -116,7 +120,15 @@ export function crearCsp(nonce: string, esDesarrollo: boolean): string {
       "'strict-dynamic'",
       "'wasm-unsafe-eval'",
       "blob:",
-      "https://va.vercel-scripts.com",
+      // De donde se DESCARGA el beacon de Cloudflare Web Analytics.
+      //
+      // Con 'strict-dynamic' presente los navegadores que lo soportan IGNORAN
+      // esta lista de hosts: el beacon carga porque lo inserta el bundle de
+      // React, que sí viene con nonce, y 'strict-dynamic' propaga esa
+      // confianza a los scripts que ese código crea. La entrada se deja
+      // igualmente para los navegadores sin soporte de 'strict-dynamic', que
+      // caen al comportamiento clásico de lista de hosts.
+      "https://static.cloudflareinsights.com",
       esDesarrollo ? "'unsafe-eval'" : null,
     ].filter(Boolean).join(" "),
     // Vibe usa estilos React calculados en runtime. La excepción se limita a

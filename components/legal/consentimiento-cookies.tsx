@@ -2,7 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { Analytics } from "@vercel/analytics/next"
+import { AnaliticaCloudflare } from "./analitica-cloudflare"
 import {
   EVENTO_CONSENTIMIENTO,
   debePreguntar,
@@ -14,10 +14,15 @@ import {
 
 // Consentimiento de analítica (P-31 · F14).
 //
-// Antes, `app/layout.tsx` montaba `<Analytics />` en producción sin preguntar,
+// Antes, `app/layout.tsx` montaba la analítica en producción sin preguntar,
 // mientras `/legal/cookies` afirmaba que Vibe no usa rastreadores. Este
 // componente es lo que hace verdadera esa página: la analítica **sólo** se
 // monta tras un sí explícito.
+//
+// El proveedor cambió de Vercel a Cloudflare Web Analytics con la migración,
+// pero la promesa al visitante no: sigue sin publicidad, sin rastreo entre
+// sitios y sin cargarse hasta que alguien dice que sí. Ver
+// `analitica-cloudflare.tsx`.
 //
 // Tres decisiones de diseño que importan:
 //
@@ -76,7 +81,7 @@ export function ConsentimientoCookies() {
   // aceptada: es la misma condición que tenía `app/layout.tsx` y evita ensuciar
   // las métricas reales con tráfico local.
   const analitica =
-    process.env.NODE_ENV === "production" && permiteAnalitica(decision) ? <Analytics /> : null
+    process.env.NODE_ENV === "production" && permiteAnalitica(decision) ? <AnaliticaCloudflare /> : null
 
   if (!debePreguntar(decision)) return analitica
 

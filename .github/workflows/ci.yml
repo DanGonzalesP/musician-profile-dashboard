@@ -100,6 +100,51 @@ jobs:
       - name: Higiene del diff
         run: git diff --check HEAD
 
+  cloudflare:
+    name: Build del Worker de Cloudflare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm build` (job de calidad) NO cubre esto. Compila la app de Next,
+      # pero no la empaqueta para el runtime de Workers, que es donde aparecen
+      # los fallos propios de la plataforma: un módulo de Node que workerd no
+      # provee, un import que sólo existe en el runtime de Node, una API del
+      # servidor que no está en el borde. Sin este job, esa clase de error se
+      # descubriría en el despliegue.
+      #
+      # Las variables son de relleno: el build sólo necesita que resuelvan, no
+      # se conecta a nada. R2_ENDPOINT y R2_BUCKET_NAME están porque de ellas
+      # sale el `connect-src` de la CSP, que se incrusta en tiempo de build
+      # (ver .env.example y wrangler.jsonc).
+      - name: Construir el Worker
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ejemplo.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: clave-de-relleno-para-ci
+          NEXT_PUBLIC_R2_PUBLIC_URL: https://ejemplo.r2.dev
+          R2_ENDPOINT: https://ejemplo.r2.cloudflarestorage.com
+          R2_BUCKET_NAME: vibe
+        run: pnpm cf:build
+
+      # Que el comando salga 0 no prueba que haya producido algo servible.
+      - name: Comprobar la salida del build
+        run: |
+          test -f .open-next/worker.js || { echo "No se genero .open-next/worker.js"; exit 1; }
+          test -d .open-next/assets   || { echo "No se genero .open-next/assets"; exit 1; }
+          echo "Worker: $(du -h .open-next/worker.js | cut -f1)"
+          echo "Assets: $(du -sh .open-next/assets | cut -f1)"
+
   e2e:
     name: E2E + accesibilidad
     runs-on: ubuntu-latest

@@ -8,13 +8,17 @@ import { aislarRedExterna } from "./fixtures/seed"
 // analítica está apagada hasta que el visitante diga que sí, la respuesta se
 // recuerda, y el aviso no rompe la accesibilidad ni el uso con teclado.
 //
-// Por qué no se verifica aquí "la petición a va.vercel-scripts.com no sale":
-// en desarrollo y en las pruebas `@vercel/analytics` no se monta NUNCA, ni
-// siquiera aceptado (misma condición `NODE_ENV === "production"` que tenía
-// app/layout.tsx). Afirmar que la petición no sale probaría el guard de
-// NODE_ENV, no el consentimiento. Lo que sí decide el consentimiento —el
-// estado guardado y su lectura fail-closed— se prueba en
-// lib/consentimiento-cookies.test.ts, y aquí se prueba la interfaz.
+// Por qué no se verifica aquí "la petición al beacon no sale": en desarrollo y
+// en las pruebas la analítica no se monta NUNCA, ni siquiera aceptada (misma
+// condición `NODE_ENV === "production"` que tenía app/layout.tsx). Afirmar que
+// la petición no sale probaría el guard de NODE_ENV, no el consentimiento. Lo
+// que sí decide el consentimiento —el estado guardado y su lectura
+// fail-closed— se prueba en lib/consentimiento-cookies.test.ts, y aquí se
+// prueba la interfaz.
+//
+// El proveedor pasó de Vercel a Cloudflare Web Analytics con la migración; el
+// contrato que congelan estas pruebas es el mismo, porque nunca dependió del
+// proveedor.
 
 const CLAVE = "vibe:consentimiento-analitica"
 
@@ -109,7 +113,7 @@ test("sin JavaScript no se pinta el aviso ni se carga analítica", async ({ brow
   // El aviso es puramente cliente: el servidor no puede saber qué eligió este
   // visitante, así que no debe adivinarlo en el HTML.
   expect(html).not.toContain("Consentimiento de analítica")
-  expect(html).not.toContain("va.vercel-scripts.com")
+  expect(html).not.toContain("static.cloudflareinsights.com")
 
   await contexto.close()
 })
