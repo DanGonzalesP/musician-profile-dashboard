@@ -129,6 +129,19 @@ function LoginForm() {
               />
             </div>
 
+            {/* Sólo al iniciar sesión: en el formulario de registro no hay
+                ninguna contraseña que recuperar todavía. */}
+            {!isRegistering && (
+              <div className="text-right -mt-2">
+                <Link
+                  href="/recuperar"
+                  className="text-[11px] text-muted-foreground transition-colors hover:text-primary hover:underline"
+                >
+                  {t("auth_forgot_link")}
+                </Link>
+              </div>
+            )}
+
             {isRegistering && (
               <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-muted-foreground">
                 <input

@@ -1211,6 +1211,28 @@ Lo que yo no puedo hacer. Ordenado por urgencia.
 | 18 | Definir plazos del SLA de DMCA y revisar los textos legales | F14 | Decisión legal, posiblemente con asesoría | F14 |
 | 19 | Definir la cuota de almacenamiento por perfil | F11 | Decisión de producto y costo | F11 |
 | 20 | Definir RTO/RPO y la retención de datos | F13/F14 | Decisión de negocio | F13, F14 |
+| 21 | **Autorizar la URL de retorno de recuperación en Supabase** | — | Sólo desde el panel de Supabase | Que el enlace del correo funcione |
+| 22 | Crear el bucket R2 y la base D1 de caché, y pegar el `database_id` en `wrangler.jsonc` | — | Sólo desde tu cuenta de Cloudflare | Todo el despliegue |
+
+### 8.2 · Recuperación de contraseña — lo que falta configurar
+
+El flujo está implementado (`/recuperar` → correo → `/nueva-contrasena`), pero
+**Supabase rechaza cualquier URL de retorno que no esté en su lista blanca**, y
+el rechazo se ve como un enlace roto en el correo del usuario, no como un error
+en el panel.
+
+En **Supabase → Authentication → URL Configuration**:
+
+1. **Site URL**: el dominio definitivo, el mismo de `NEXT_PUBLIC_SITE_URL`.
+2. **Redirect URLs**: añadir `https://TU-DOMINIO/nueva-contrasena`.
+
+Conviene además revisar la **plantilla del correo de recuperación** (Auth →
+Email Templates → Reset Password): la que trae Supabase por defecto está en
+inglés y sin la marca, que no es lo que uno quiere que reciba un artista.
+
+Y comprobar que el **envío de correo** está configurado. El SMTP de cortesía de
+Supabase tiene un límite bajo por hora y no sirve para producción: con él, a
+partir de cierto volumen los correos simplemente dejan de salir, sin aviso.
 
 ### 8.1 · Protección de `main` — configuración aplicada (2026-09-04)
 
