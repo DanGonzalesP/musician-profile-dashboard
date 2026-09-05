@@ -1,20 +1,21 @@
 # Dueños del código. GitHub pide revisión automática a quien figure aquí.
 #
-# ⚠️ PENDIENTE HUMANO (§8 del plan, acción #7): reemplazar @PENDIENTE-DUEÑO por
-# el usuario u organización real de GitHub. Mientras diga @PENDIENTE-DUEÑO,
-# GitHub ignora el archivo y no asigna revisores.
+# Dueño confirmado el 2026-08-31 (§8 del plan, acción #7). Antes decía
+# @PENDIENTE-DUENO, y mientras dijera eso GitHub ignoraba el archivo entero:
+# no asignaba revisores y la lista de superficies sensibles de abajo no servía
+# de nada.
 
-* @PENDIENTE-DUENO
+* @DanGonzalesP
 
 # Superficies que no deberían cambiar sin una segunda mirada, aunque el cambio
 # parezca trivial.
-/supabase/migrations/  @PENDIENTE-DUENO
-/app/api/              @PENDIENTE-DUENO
-/lib/safe-url.ts       @PENDIENTE-DUENO
-/lib/server-auth.ts    @PENDIENTE-DUENO
-/lib/rate-limit.ts     @PENDIENTE-DUENO
-/lib/blocks-schema.ts  @PENDIENTE-DUENO
-/next.config.mjs       @PENDIENTE-DUENO
-/proxy.ts              @PENDIENTE-DUENO
-/.github/workflows/    @PENDIENTE-DUENO
-/AGENTS.md             @PENDIENTE-DUENO
+/supabase/migrations/  @DanGonzalesP
+/app/api/              @DanGonzalesP
+/lib/safe-url.ts       @DanGonzalesP
+/lib/server-auth.ts    @DanGonzalesP
+/lib/rate-limit.ts     @DanGonzalesP
+/lib/blocks-schema.ts  @DanGonzalesP
+/next.config.mjs       @DanGonzalesP
+/proxy.ts              @DanGonzalesP
+/.github/workflows/    @DanGonzalesP
+/AGENTS.md             @DanGonzalesP

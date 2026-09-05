@@ -69,7 +69,7 @@ jobs:
       # puede cerrarse: `--audit-level=high` sale 0 hoy, así que un rojo aquí
       # significa una vulnerabilidad NUEVA, no deuda heredada.
       #
-      # Se deja en `high` y no en `moderate` a propósito: quedan 5 moderadas y 1
+      # Se deja en `high` y no en `moderate` a propósito: quedan 7 moderadas y 1
       # baja, todas transitivas y sin parche disponible. Poner la puerta donde
       # nadie puede pasarla es la forma más rápida de que se aprenda a ignorar.
       - name: Auditoría de dependencias
