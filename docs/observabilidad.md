@@ -53,6 +53,29 @@ dependencias duras y responde sin filtrar nada interno:
 
 Se consume desde `scripts/smoke-staging.mjs` y desde el uptime monitor externo.
 
+## 2.bis · El registro que hay que leer ahora: la cuota de almacenamiento
+
+La cuota de almacenamiento por usuario está desplegada **en modo observación**:
+hoy no rechaza a nadie, sólo registra. Ese registro es el producto entero de la
+funcionalidad, porque es de donde sale el número con el que después se
+configura el límite real.
+
+Buscar en los registros del Worker:
+
+```
+mensaje = "subida por encima de la cuota de almacenamiento"
+```
+
+Cada línea trae `userId`, `usadoBytes`, `limiteBytes`, `bytesPedidos`, `modo` y
+`rechazada`. Con `modo: "observar"`, `rechazada` es siempre `false`: la subida
+siguió adelante.
+
+**Qué hacer con eso.** Si tras unas semanas casi nadie aparece, el límite por
+defecto (5 GB) es holgado y se puede pasar a `rechazar` con tranquilidad. Si
+aparecen artistas legítimos —perfiles con discografía larga, no scripts—, el
+número está corto y hay que subirlo ANTES de activar el rechazo. Activarlo sin
+mirar esto es exactamente lo que el modo observación existe para evitar.
+
 ## 3. Lo que falta (decisión de proveedor — §16 del plan)
 
 - **Agregador de errores / drain.** Con la migración los logs viven en
