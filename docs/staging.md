@@ -35,7 +35,7 @@ tocar producción.
 | `R2_ENDPOINT` / `R2_*` | prod | staging | prueba |
 | `NEXT_PUBLIC_SITE_URL` | dominio final | `https://staging.<dominio>` | `http://localhost:3000` |
 | `ADMIN_USER_IDS` | UUIDs reales | UUIDs de prueba | de prueba |
-| `TRUSTED_PROXY` | (Vercel lo infiere) | igual | sin definir |
+| `TRUSTED_PROXY` | `true` en `wrangler.jsonc` | igual | sin definir |
 
 Los nombres canónicos están en [`.env.example`](../.env.example).
 

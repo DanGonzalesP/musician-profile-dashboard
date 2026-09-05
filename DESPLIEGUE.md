@@ -6,7 +6,16 @@
 >
 > Para una migración futura: backup manual fuera del repositorio, `pnpm
 > db:verify`, `pnpm test:db`, `supabase db push --linked --dry-run`, aplicación
-> de una sola migración, verificación, despliegue de Vercel y `pnpm smoke`.
+> de una sola migración, verificación, despliegue y `pnpm smoke`.
+
+> **La plataforma cambió (2026-09-05): Vibe ya no se despliega en Vercel.**
+> El runbook vigente es **[`docs/cloudflare.md`](docs/cloudflare.md)**: qué
+> recursos crear, en qué entorno va cada variable —la distinción entre build y
+> ejecución, que ya costó un bug una vez—, cómo desplegar y cómo volver atrás.
+>
+> Este documento se conserva como trazabilidad del despliegue histórico. Donde
+> diga "Vercel", léase la plataforma de entonces; los pasos de base de datos
+> siguen siendo válidos porque Supabase no cambió.
 
 Lo que sigue documenta el despliegue histórico original y se conserva como
 trazabilidad.

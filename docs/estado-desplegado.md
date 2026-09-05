@@ -149,7 +149,17 @@ salud y sitemap.
 Nombres canónicos en `.env.example`. Marcar el estado real de cada una **por entorno**.
 No pegar valores aquí, jamás.
 
-| Variable | Local (`.env.local`) | Vercel producción | Vercel preview | Staging (F13) |
+> **La plataforma cambió (2026-09-05).** Las columnas decían "Vercel"; ahora
+> son entornos de Cloudflare. Y la distinción importante ya no es
+> producción/preview sino **build vs. ejecución**: `NEXT_PUBLIC_*` y
+> `R2_ENDPOINT` se incrustan al compilar, el resto se lee al atender la
+> petición. Ver §3 de [`cloudflare.md`](cloudflare.md).
+>
+> Las casillas marcadas abajo son de la verificación del 2026-08-16 contra
+> Vercel: **hay que rehacerlas contra Cloudflare**, no se pueden dar por
+> heredadas.
+
+| Variable | Local (`.env.local`) | Cloudflare — build | Cloudflare — ejecución | Staging (F13) |
 |---|---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | | | | |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | | | | |
@@ -163,7 +173,7 @@ No pegar valores aquí, jamás.
 | `ADMIN_USER_IDS` | | ✅ *(según el plan)* | | |
 | `TOGETHER_API_KEY` | ❌ **ausente (P-02)** | ❌ **ausente (P-02)** | | |
 | `META_APP_ACCESS_TOKEN` | | | | |
-| `TRUSTED_PROXY` | no aplica | no aplica (Vercel se autodetecta) | | |
+| `TRUSTED_PROXY` | vacía | no aplica | ✅ en `wrangler.jsonc` | |
 
 ---
 

@@ -31,13 +31,13 @@ es donde el número se vuelve accionable: hoy el perfil se hidrata en el cliente
 
 Decisión de F11. Las imágenes vienen de R2 con dimensiones variables y el editor
 ya las comprime en el navegador. Activar el optimizador de Next añade costo por
-transformación en Vercel y riesgo de cambio visual, a cambio de un beneficio que
+transformación en la plataforma y riesgo de cambio visual, a cambio de un beneficio que
 la compresión previa ya captura. Se revisa **con datos** si el presupuesto lo
 pide, no antes.
 
 ## Cómo se medirá
 
-- Lighthouse CI o `@vercel/speed-insights` sobre el perfil público servido
+- Lighthouse CI sobre el perfil público servido
   desde el servidor (post-F10).
 - El tamaño del primer JS, con el output del `next build` (ya se registra en la
   línea base; falta separar "primera pintura" del total).

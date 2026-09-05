@@ -16,7 +16,7 @@ Cada evento es **una línea JSON** con campos estables:
 | `nivel` | `info` \| `warn` \| `error` |
 | `ruta` | ruta lógica, p. ej. `api/health` |
 | `mensaje` | texto fijo, sin datos variables sensibles |
-| `request_id` | correlación; viene de `x-vercel-id` o se genera |
+| `request_id` | correlación; viene de `cf-ray` (el mismo id que busca el panel de Cloudflare), luego `x-request-id`, y si no se genera |
 | `ts` | ISO 8601 |
 | `duracionMs`, `resultado`, `userId` | opcionales |
 
@@ -55,10 +55,16 @@ Se consume desde `scripts/smoke-staging.mjs` y desde el uptime monitor externo.
 
 ## 3. Lo que falta (decisión de proveedor — §16 del plan)
 
-- **Agregador de errores / drain.** Hoy los logs viven en la consola de Vercel.
-  Recomendación por defecto: **log drains de Vercel** a un destino barato antes
-  que Sentry; añadir Sentry sólo si el volumen de errores lo justifica. Es una
-  decisión de costo, no técnica.
+- **Agregador de errores / drain.** Con la migración los logs viven en
+  **Cloudflare Workers Logs** (`observability.enabled` ya está en
+  `wrangler.jsonc`, así que se están recogiendo). Cloudflare los retiene unos
+  días; para conservarlos más hay que sacarlos con un **Logpush** a un destino
+  barato (R2 sirve, y ya se paga).
+
+  Recomendación por defecto: **Logpush a R2** antes que Sentry; añadir Sentry
+  sólo si el volumen de errores lo justifica. Sigue siendo una decisión de
+  costo, no técnica. Lo que cambió respecto de la recomendación anterior —log
+  drains de Vercel— es sólo el nombre del mecanismo.
 - **Alertas.** Al menos una activa: tasa de 5xx sostenida, o `/api/health`
   devolviendo 503 más de N minutos. Se configura en el destino del drain o en
   el uptime monitor.
