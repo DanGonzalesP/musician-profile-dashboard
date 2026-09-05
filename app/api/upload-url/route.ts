@@ -7,6 +7,13 @@ import { checkAuthenticatedRateLimit, respuesta429 } from "@/lib/rate-limit"
 import { validateUploadRequest } from "@/lib/upload-validation"
 import { idDePeticion, logError, logInfo, logWarn } from "@/lib/log"
 import { subidasR2Configuradas, variablesDeSubidaAusentes } from "@/lib/r2-config"
+import {
+  evaluarCuota,
+  formatearGb,
+  limiteCuotaBytes,
+  modoCuota,
+  usoDeAlmacenamiento,
+} from "@/lib/cuota-almacenamiento"
 
 // Genera una URL firmada de subida directa a R2. El archivo NUNCA pasa por
 // este servidor/función serverless — el navegador hace el PUT directo a R2
@@ -62,6 +69,59 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 })
     }
     const { safeExt } = validation
+
+    // ─── Cuota de almacenamiento ──────────────────────────────────────────
+    //
+    // Va DESPUÉS de validar y ANTES de registrar en media_assets: sólo tiene
+    // sentido cobrar por una subida cuyo tamaño ya se sabe legítimo, y
+    // registrar la fila primero contaminaría la propia medición.
+    //
+    // Arranca en modo observación (ver lib/cuota-almacenamiento.ts): hoy esto
+    // no rechaza a nadie, sólo deja en los registros qué habría rechazado. El
+    // paso a `rechazar` es una variable de entorno.
+    const usado = await usoDeAlmacenamiento(supabase)
+    if (usado !== null) {
+      const modo = modoCuota()
+      const cuota = evaluarCuota({
+        usadoBytes: usado,
+        bytesPedidos: typeof bytes === "number" ? bytes : 0,
+        limiteBytes: limiteCuotaBytes(),
+        modo,
+      })
+
+      if (cuota.excede) {
+        // Se registra tanto si se rechaza como si no: en observación, ESTE
+        // registro es el producto entero de la funcionalidad — es de donde
+        // sale el número con el que después se configura el límite de verdad.
+        logWarn("api/upload-url", "subida por encima de la cuota de almacenamiento", {
+          requestId,
+          userId: user.id,
+          modo,
+          usadoBytes: cuota.usadoBytes,
+          limiteBytes: cuota.limiteBytes,
+          bytesPedidos: bytes,
+          rechazada: !cuota.permitido,
+        })
+      }
+
+      if (!cuota.permitido) {
+        // El mensaje dice cuánto ocupa y cuánto le queda: sin eso, el artista
+        // sabe que no puede subir pero no qué borrar ni cuánto liberar, que es
+        // exactamente el callejón sin salida que hace que la gente se vaya.
+        return NextResponse.json(
+          {
+            error:
+              `Alcanzaste tu límite de almacenamiento (${formatearGb(cuota.limiteBytes)}). ` +
+              `Estás usando ${formatearGb(cuota.usadoBytes)}. ` +
+              `Borra archivos que ya no uses para liberar espacio.`,
+          },
+          { status: 413 }
+        )
+      }
+    }
+    // `usado === null` significa que no se pudo medir. Se deja pasar a
+    // propósito: bloquear a alguien que está publicando su disco por un fallo
+    // NUESTRO cuesta más que unos megas de más. Ver el comentario del módulo.
 
     const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`
 
