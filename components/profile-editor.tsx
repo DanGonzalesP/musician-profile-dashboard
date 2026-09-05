@@ -550,6 +550,15 @@ function ProfileEditorInner() {
     await supabase.auth.signOut()
     // Navegación dura (no router.push): así se sale de verdad de la trampa
     // de historial de arriba en vez de quedar atrapado en el mismo ciclo.
+    //
+    // Next 16.3 añadió `no-location-assign-relative-destination`, que pide
+    // `router.push()` para destinos internos. Aquí es exactamente lo que NO
+    // se debe hacer: `router.push()` es navegación de cliente, no descarta el
+    // historial ni reinicia el estado del editor, así que el `popstate` de
+    // arriba volvería a capturar el gesto y el usuario quedaría encerrado
+    // después de cerrar sesión. La recarga completa es el mecanismo, no un
+    // descuido.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/"
   }
 
