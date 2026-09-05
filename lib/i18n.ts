@@ -181,6 +181,35 @@ export const dictionaries: Record<Locale, Dict> = {
       "¡Cuenta creada! Revisa tu correo y confirma tu dirección para poder iniciar sesión.",
     auth_toggle_to_login: "¿Ya tienes cuenta? Inicia sesión aquí",
     auth_toggle_to_register: "¿No tienes cuenta? Regístrate aquí",
+
+    auth_forgot_link: "¿Olvidaste tu contraseña?",
+    auth_recovery_title: "Recuperar tu contraseña",
+    auth_recovery_subtitle:
+      "Escribe el correo de tu cuenta y te mandamos un enlace para elegir una nueva.",
+    auth_recovery_submit: "Enviar enlace",
+    auth_recovery_sending: "Enviando...",
+    // Este mensaje sale SIEMPRE, exista la cuenta o no. Si cambiara según el
+    // caso, el formulario diría qué correos están registrados en Vibe.
+    auth_recovery_sent:
+      "Si ese correo tiene una cuenta en Vibe, te llegará un enlace en unos minutos. Revisa también la carpeta de spam.",
+    auth_recovery_back_to_login: "Volver a iniciar sesión",
+
+    auth_new_password_title: "Elige tu contraseña nueva",
+    auth_new_password_subtitle: "Escríbela dos veces para evitar una errata.",
+    auth_new_password_label: "Contraseña nueva",
+    auth_new_password_confirm_label: "Repite la contraseña",
+    auth_new_password_submit: "Guardar contraseña",
+    auth_new_password_saving: "Guardando...",
+    auth_new_password_done: "Listo. Tu contraseña quedó cambiada.",
+    auth_new_password_too_short:
+      "La contraseña debe tener al menos 8 caracteres. Una frase que recuerdes es mejor que algo corto y complicado.",
+    auth_new_password_mismatch: "Las dos contraseñas no coinciden.",
+    auth_new_password_checking: "Comprobando el enlace...",
+    auth_new_password_invalid_link:
+      "Este enlace ya no sirve: caducó o se usó. Pide uno nuevo y vuelve a intentarlo.",
+    auth_new_password_request_another: "Pedir un enlace nuevo",
+    auth_new_password_error:
+      "No se pudo cambiar la contraseña. Pide un enlace nuevo e inténtalo otra vez.",
   },
   en: {
     tab_home: "Legacy",
@@ -353,6 +382,33 @@ export const dictionaries: Record<Locale, Dict> = {
       "Account created! Check your email and confirm your address before logging in.",
     auth_toggle_to_login: "Already have an account? Log in here",
     auth_toggle_to_register: "Don't have an account? Sign up here",
+
+    auth_forgot_link: "Forgot your password?",
+    auth_recovery_title: "Reset your password",
+    auth_recovery_subtitle:
+      "Enter your account email and we'll send you a link to choose a new one.",
+    auth_recovery_submit: "Send link",
+    auth_recovery_sending: "Sending...",
+    auth_recovery_sent:
+      "If that email has a Vibe account, a link will arrive in a few minutes. Check your spam folder too.",
+    auth_recovery_back_to_login: "Back to log in",
+
+    auth_new_password_title: "Choose your new password",
+    auth_new_password_subtitle: "Type it twice so a typo can't lock you out.",
+    auth_new_password_label: "New password",
+    auth_new_password_confirm_label: "Repeat the password",
+    auth_new_password_submit: "Save password",
+    auth_new_password_saving: "Saving...",
+    auth_new_password_done: "Done. Your password has been changed.",
+    auth_new_password_too_short:
+      "The password must be at least 8 characters. A phrase you can remember beats something short and complicated.",
+    auth_new_password_mismatch: "The two passwords don't match.",
+    auth_new_password_checking: "Checking the link...",
+    auth_new_password_invalid_link:
+      "This link no longer works: it expired or was already used. Request a new one and try again.",
+    auth_new_password_request_another: "Request a new link",
+    auth_new_password_error:
+      "Couldn't change the password. Request a new link and try again.",
   },
 }
 
