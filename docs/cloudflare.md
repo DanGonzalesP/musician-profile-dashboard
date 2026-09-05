@@ -182,15 +182,35 @@ invalidación sin ninguna medición que lo justifique.
 | Versión en `/api/health` | `VERCEL_GIT_COMMIT_SHA` | `WORKERS_CI_COMMIT_SHA` / `APP_VERSION` | |
 | CORS de R2 | `*.vercel.app` | `*.workers.dev` + dominio real | |
 
-### El rate limit sigue siendo en memoria
+### El rate limit: qué está distribuido y qué no
 
-`lib/rate-limit.ts` cuenta en memoria del proceso. En Vercel cada función
-serverless era su propia instancia; **en Workers cada isolate tiene su propio
-contador**, así que el límite se diluye igual o más.
+Hay **dos capas**, y la diferencia importa a la hora de decidir si queda algo
+que arreglar:
 
-No es una regresión de la migración —ya era así—, pero Cloudflare da la
-herramienta para arreglarlo de verdad: un Durable Object da un contador único
-y consistente. Queda pendiente y anotado.
+| Ruta | Contador | Efecto en Workers |
+|---|---|---|
+| `/api/upload-url` | **Postgres** (RPC `consume_authenticated_rate_limit`, migración `0009`) | Correcto: uno solo para todos los isolates |
+| `/api/generate-image` | **Postgres**, igual | Correcto |
+| `/api/oembed` | en memoria del isolate | **Se diluye** |
+| `/api/health` | en memoria del isolate | Se diluye |
+| `/api/eliminar-cuenta` | en memoria del isolate | Se diluye |
+
+Las dos rutas donde el abuso cuesta dinero de verdad —la que entrega
+almacenamiento y la que gasta créditos de Together AI— **ya usan el contador
+distribuido**, y además fallan cerradas: si Postgres no responde, deniegan en
+vez de caer a un `Map` por instancia (F5, migración `0009`).
+
+Lo que queda en memoria es la primera barrera para peticiones **anónimas**, y
+es deliberado: sin una identidad verificable, dejar que el cliente elija la
+clave de un RPC compartido haría el límite trivialmente evadible (ver el
+comentario en `lib/rate-limit.ts`).
+
+**El hueco real que deja Workers** es entonces más estrecho de lo que parece:
+`/api/oembed`, que hace `fetch` a terceros sin autenticación. Con un contador
+por isolate, el límite efectivo es más alto que el configurado, y esa ruta es
+un proxy gratis para quien la encuentre. Ahí sí valdría un Durable Object —que
+es justo lo que Cloudflare hace fácil—, pero es una mejora acotada, no un
+agujero abierto en las rutas que cuestan dinero.
 
 ---
 
