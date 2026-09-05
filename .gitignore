@@ -32,3 +32,8 @@ node_modules
 # Supabase CLI local (contenedores, temporales)
 /supabase/.branches/
 /supabase/.temp/
+
+# Salida del adaptador de Cloudflare y estado local de wrangler. Se regeneran
+# con `pnpm cf:build`; versionarlos serian megabytes de artefacto derivado.
+.open-next/
+.wrangler/

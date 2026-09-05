@@ -24,7 +24,11 @@
     "db:reset": "supabase db reset --local --no-seed",
     "db:lint": "supabase db lint --level warning --fail-on error",
     "db:verify": "node scripts/verify-db.mjs",
-    "smoke": "node scripts/smoke-staging.mjs"
+    "smoke": "node scripts/smoke-staging.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1088.0",
@@ -35,7 +39,6 @@
     "@ffmpeg/util": "^0.12.2",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.110.1",
-    "@vercel/analytics": "1.6.1",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -53,6 +56,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/eslintrc": "^3.3.6",
+    "@opennextjs/cloudflare": "^1.20.6",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^24",
@@ -66,7 +70,8 @@
     "supabase": "^2.114.0",
     "tailwindcss": "^4.2.0",
     "typescript": "5.7.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.129.0"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -158,12 +158,19 @@ describe("emisión", () => {
 describe("idDePeticion", () => {
   const req = (h: Record<string, string> = {}) => new Request("https://x", { headers: h })
 
-  it("prefiere el identificador que ya pone Vercel", () => {
-    expect(idDePeticion(req({ "x-vercel-id": "iad1::abc" }))).toBe("iad1::abc")
+  it("prefiere cf-ray, el identificador que ya pone Cloudflare", () => {
+    expect(idDePeticion(req({ "cf-ray": "8f2a1b3c4d5e6f70-LIM" }))).toBe("8f2a1b3c4d5e6f70-LIM")
   })
 
   it("cae a x-request-id", () => {
     expect(idDePeticion(req({ "x-request-id": "r-9" }))).toBe("r-9")
+  })
+
+  // El valor de cf-ray es el que se pega en el buscador del panel de
+  // Cloudflare para encontrar la petición: si x-request-id le ganara, un
+  // registro nuestro dejaría de poder cruzarse con el del borde.
+  it("cf-ray le gana a x-request-id cuando llegan los dos", () => {
+    expect(idDePeticion(req({ "cf-ray": "abc-LIM", "x-request-id": "r-9" }))).toBe("abc-LIM")
   })
 
   it("genera uno si no hay ninguno, y no se repite", () => {

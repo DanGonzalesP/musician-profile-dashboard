@@ -52,11 +52,16 @@ overrides:
   nanoid@<3.3.18: ">=3.3.18"
   undici@>=7.0.0: ">=7.29.0"
 
+# `esbuild` y `workerd` los trae el adaptador de Cloudflare y necesitan su
+# postinstall: descargan el binario nativo de la plataforma. Sin permitirlo,
+# `opennextjs-cloudflare build` falla al no encontrar el runtime de Workers.
 allowBuilds:
   core-js: true
+  esbuild: true
   msw: true
   sharp: true
   unrs-resolver: true
+  workerd: true
 
 patchedDependencies:
   '@ffmpeg/ffmpeg': patches/@ffmpeg__ffmpeg.patch

@@ -51,40 +51,56 @@ describe("checkRateLimit — contador local en memoria", () => {
 describe("identificarSolicitante", () => {
   const req = (headers: Record<string, string>) => new Request("https://x", { headers })
 
-  // El entorno decide si x-forwarded-for es creíble (P-07). Cada bloque de
-  // abajo fija el suyo y lo restaura, para que el orden de las pruebas no
+  // El entorno decide si las cabeceras de IP son creíbles (P-07). Cada bloque
+  // de abajo fija el suyo y lo restaura, para que el orden de las pruebas no
   // importe.
-  const entornoOriginal = { VERCEL: process.env.VERCEL, TRUSTED_PROXY: process.env.TRUSTED_PROXY }
+  //
+  // La rama `VERCEL=1` desapareció con la migración a Cloudflare: la confianza
+  // se declara siempre con TRUSTED_PROXY, y en Cloudflare la declara
+  // `wrangler.jsonc`.
+  const entornoOriginal = { TRUSTED_PROXY: process.env.TRUSTED_PROXY }
   afterEach(() => {
-    process.env.VERCEL = entornoOriginal.VERCEL
     process.env.TRUSTED_PROXY = entornoOriginal.TRUSTED_PROXY
   })
   function sinProxy() {
-    delete process.env.VERCEL
     delete process.env.TRUSTED_PROXY
+  }
+  function conProxy() {
+    process.env.TRUSTED_PROXY = "true"
   }
 
   it("prefiere el id de usuario cuando hay sesión, con o sin proxy de confianza", () => {
     sinProxy()
     expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }), "u-9")).toBe("user:u-9")
-    process.env.VERCEL = "1"
-    expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }), "u-9")).toBe("user:u-9")
+    conProxy()
+    expect(identificarSolicitante(req({ "cf-connecting-ip": "1.2.3.4" }), "u-9")).toBe("user:u-9")
   })
 
   describe("con proxy de confianza", () => {
-    it("cae a la primera IP de x-forwarded-for cuando es anónimo (VERCEL=1)", () => {
-      process.env.VERCEL = "1"
+    it("prefiere cf-connecting-ip, que es la cabecera que pone Cloudflare", () => {
+      conProxy()
+      expect(identificarSolicitante(req({ "cf-connecting-ip": "203.0.113.7" }))).toBe("ip:203.0.113.7")
+    })
+
+    // Cloudflare sobrescribe cf-connecting-ip en el borde, así que si llegan
+    // las dos la de Cloudflare es la honesta y x-forwarded-for puede venir
+    // manipulada por el cliente. Ganar la de Cloudflare no es una preferencia
+    // de estilo: es la que no se puede falsificar.
+    it("cf-connecting-ip le gana a x-forwarded-for cuando llegan las dos", () => {
+      conProxy()
+      const clave = identificarSolicitante(
+        req({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "1.2.3.4" })
+      )
+      expect(clave).toBe("ip:203.0.113.7")
+    })
+
+    it("cae a la primera IP de x-forwarded-for fuera de Cloudflare", () => {
+      conProxy()
       expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe("ip:1.2.3.4")
     })
 
-    it("también con TRUSTED_PROXY=true fuera de Vercel", () => {
-      sinProxy()
-      process.env.TRUSTED_PROXY = "true"
-      expect(identificarSolicitante(req({ "x-forwarded-for": "1.2.3.4" }))).toBe("ip:1.2.3.4")
-    })
-
     it("usa x-real-ip si no hay forwarded, y un marcador si no hay nada", () => {
-      process.env.VERCEL = "1"
+      conProxy()
       expect(identificarSolicitante(req({ "x-real-ip": "9.9.9.9" }))).toBe("ip:9.9.9.9")
       expect(identificarSolicitante(req({}))).toBe("ip:desconocida")
     })
@@ -99,6 +115,26 @@ describe("identificarSolicitante", () => {
     it("ignora también x-real-ip", () => {
       sinProxy()
       expect(identificarSolicitante(req({ "x-real-ip": "9.9.9.9" }))).toBe("ip:sin-proxy-confiable")
+    })
+
+    // El caso que importa de la migración: `cf-connecting-ip` sólo es
+    // infalsificable cuando la petición REALMENTE pasó por el borde de
+    // Cloudflare. Corriendo fuera de él —`next dev`, un contenedor, un
+    // servidor propio— cualquiera puede mandarla a mano. Si se confiara en
+    // ella por el simple hecho de estar presente, el límite por IP se evadiría
+    // rotando la cabecera, que es exactamente P-07 reintroducido con otro
+    // nombre.
+    it("NO confía en cf-connecting-ip sin proxy de confianza declarado", () => {
+      sinProxy()
+      expect(identificarSolicitante(req({ "cf-connecting-ip": "1.2.3.4" }))).toBe("ip:sin-proxy-confiable")
+    })
+
+    it("un atacante que rota cf-connecting-ip tampoco consigue cubos distintos", () => {
+      sinProxy()
+      const claves = ["1.1.1.1", "2.2.2.2", "3.3.3.3"].map((ip) =>
+        identificarSolicitante(req({ "cf-connecting-ip": ip }))
+      )
+      expect(new Set(claves).size).toBe(1)
     })
 
     it("un atacante que rota la cabecera NO consigue cubos distintos", () => {

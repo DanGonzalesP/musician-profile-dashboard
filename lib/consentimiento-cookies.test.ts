@@ -11,7 +11,7 @@ import {
 
 // P-31 — la analítica sólo puede cargarse tras un sí explícito. Estas pruebas
 // fijan ese contrato: cualquier estado que no sea "aceptado" mantiene apagado
-// `@vercel/analytics`, incluido el caso en que el almacenamiento falla.
+// la analítica, incluido el caso en que el almacenamiento falla.
 
 /** Sustituye `window` por lo mínimo que usa el módulo. El entorno es node. */
 function montarVentana(opciones: { almacenRoto?: boolean; inicial?: string } = {}) {

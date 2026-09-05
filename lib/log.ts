@@ -166,12 +166,27 @@ export function logError(ruta: string, mensaje: string, error: unknown, campos?:
 }
 
 /**
- * Identificador de correlación de la petición. Vercel ya manda `x-vercel-id`;
- * si no está, se genera uno. Nunca se deriva de datos del usuario.
+ * Identificador de correlación de la petición. Nunca se deriva de datos del
+ * usuario.
+ *
+ * El orden es de más específico a más genérico:
+ *
+ *   • `cf-ray` — lo pone Cloudflare en el borde, en TODA petición que llega a
+ *     un Worker, y es el mismo identificador que aparece en los registros del
+ *     panel de Cloudflare. Poder pegar un `cf-ray` de un registro nuestro en
+ *     el buscador de Cloudflare y encontrar la petición es justamente para lo
+ *     que existe este campo. (Antes de la migración este puesto lo ocupaba
+ *     `x-vercel-id`, que era su equivalente en Vercel.)
+ *
+ *   • `x-request-id` — convención genérica, por si algún día hay otro borde
+ *     delante o se corre fuera de Cloudflare.
+ *
+ *   • uno generado — última opción, para que una petición local o de prueba
+ *     también sea rastreable dentro de su propio registro.
  */
 export function idDePeticion(request: Request): string {
   return (
-    request.headers.get("x-vercel-id") ??
+    request.headers.get("cf-ray") ??
     request.headers.get("x-request-id") ??
     globalThis.crypto?.randomUUID?.() ??
     `req-${Date.now().toString(36)}`

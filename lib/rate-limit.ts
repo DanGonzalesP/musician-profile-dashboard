@@ -105,22 +105,28 @@ export async function checkAuthenticatedRateLimit(
 }
 
 /**
- * ¿Podemos creerle a `x-forwarded-for`?
+ * ¿Podemos creerle a las cabeceras de IP que trae la petición?
  *
- * Solo si un proxy de confianza la reescribe en el borde. En Vercel eso pasa
- * siempre y la plataforma expone `VERCEL=1` en el runtime, así que se detecta
- * sola. Fuera de Vercel —local, un contenedor, un servidor propio— la cabecera
- * la manda el cliente y es trivialmente falsificable: el límite por IP se evade
- * mandando un `x-forwarded-for` distinto en cada petición.
+ * Sólo si un proxy de confianza las reescribe en el borde. Sin eso —local, un
+ * contenedor, un servidor propio expuesto directo— las manda el cliente y son
+ * trivialmente falsificables: el límite por IP se evade mandando una cabecera
+ * distinta en cada petición.
  *
- * Fail-closed: por defecto NO se confía. Quien tenga un proxy inverso propio que
- * sanee la cabecera lo declara con `TRUSTED_PROXY=true` (ver `.env.example`).
+ * Fail-closed: por defecto NO se confía. Se declara con `TRUSTED_PROXY=true`
+ * (ver `.env.example`).
+ *
+ * **En Cloudflare se declara en `wrangler.jsonc`.** Antes existía además una
+ * rama `process.env.VERCEL === "1"`, que se quitó con la migración: la
+ * autodetección de una plataforma en la que ya no se corre sólo servía para
+ * confundir. Un despliegue en Vercel sin `TRUSTED_PROXY` no queda inseguro,
+ * queda MÁS restrictivo —todas las peticiones anónimas comparten un cubo—,
+ * que es la dirección correcta para fallar.
  *
  * Se lee en cada llamada, no una vez al importar el módulo, para que las
  * pruebas puedan alternar el entorno sin recargar el módulo.
  */
 function proxyDeConfianza(): boolean {
-  return process.env.VERCEL === "1" || process.env.TRUSTED_PROXY === "true"
+  return process.env.TRUSTED_PROXY === "true"
 }
 
 /**
@@ -132,15 +138,25 @@ function proxyDeConfianza(): boolean {
  * a nivel de aplicación, así que todas las peticiones anónimas comparten el
  * cubo `ip:sin-proxy-confiable`. Es deliberado y es la falla segura: prefiere
  * limitar de más a que un atacante se salte el límite con un header. En
- * producción (Vercel) esta rama no se toma nunca.
+ * producción esta rama no se toma nunca.
  */
 export function identificarSolicitante(request: Request, userId?: string): string {
   if (userId) return `user:${userId}`
 
   if (!proxyDeConfianza()) return "ip:sin-proxy-confiable"
 
-  // Con proxy de confianza: el primer valor de x-forwarded-for es el cliente y
-  // el resto son los proxies intermedios.
+  // `cf-connecting-ip` va PRIMERO, y es mejor señal que `x-forwarded-for`: la
+  // pone Cloudflare en el borde en toda petición que llega a un Worker y
+  // SOBRESCRIBE cualquier valor que mandara el cliente, así que no hay una
+  // versión falsificable de esta cabecera que pueda llegar hasta aquí. Además
+  // es un valor único: no hay que decidir cuál de una lista es el cliente
+  // real, que es exactamente donde suelen aparecer los errores de parseo de
+  // `x-forwarded-for`.
+  const cloudflare = request.headers.get("cf-connecting-ip")?.trim()
+  if (cloudflare) return `ip:${cloudflare}`
+
+  // Fuera de Cloudflare, con proxy de confianza: el primer valor de
+  // x-forwarded-for es el cliente y el resto son los proxies intermedios.
   const forwarded = request.headers.get("x-forwarded-for") ?? ""
   const ip = forwarded.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "desconocida"
   return `ip:${ip}`

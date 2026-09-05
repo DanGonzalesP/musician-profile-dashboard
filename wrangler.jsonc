@@ -1,0 +1,95 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ── Identidad del Worker ──────────────────────────────────────────────────
+  "name": "vibe",
+  "main": ".open-next/worker.js",
+
+  // Fecha de compatibilidad del runtime. NO se sube a la ligera: cambia el
+  // comportamiento de workerd. Se mueve leyendo primero el changelog de
+  // Cloudflare, nunca "porque hay una más nueva".
+  "compatibility_date": "2026-09-03",
+
+  // `nodejs_compat` es OBLIGATORIO, no una preferencia. Sin él, workerd no
+  // expone `node:crypto`, `node:async_hooks` ni el resto de módulos que usan
+  // internamente Next, el SDK de S3 y `@supabase/ssr`, y el Worker revienta al
+  // arrancar en vez de fallar en el build.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ── Assets estáticos ──────────────────────────────────────────────────────
+  // Lo que `opennextjs-cloudflare build` deja listo para servir sin ejecutar
+  // código: `/_next/static`, imágenes de `public/`, los binarios de ffmpeg.wasm.
+  // El binding lo usa el propio worker generado; el nombre ASSETS no es
+  // negociable.
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // ── Caché incremental (ISR) ───────────────────────────────────────────────
+  // Bucket SEPARADO del de los archivos de los artistas. Ver el razonamiento
+  // completo en `open-next.config.ts`.
+  //
+  //   pnpm wrangler r2 bucket create vibe-cache-incremental
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "vibe-cache-incremental"
+    }
+  ],
+
+  // ── Caché de etiquetas (revalidateTag) ────────────────────────────────────
+  // Lo que hace que "publicar" se vea de inmediato en el perfil público.
+  //
+  //   pnpm wrangler d1 create vibe-cache-etiquetas
+  //
+  // ⚠️ El `database_id` de abajo es un MARCADOR. El comando de arriba imprime
+  // el id real; hay que pegarlo aquí antes del primer despliegue. Dejarlo así
+  // hace que el despliegue falle en vez de arrancar contra una base que no
+  // existe, que es como se prefiere fallar.
+  "d1_databases": [
+    {
+      "binding": "NEXT_TAG_CACHE_D1",
+      "database_name": "vibe-cache-etiquetas",
+      "database_id": "PENDIENTE-CORRER-wrangler-d1-create"
+    }
+  ],
+
+  // ── Variables de EJECUCIÓN ────────────────────────────────────────────────
+  //
+  // ⚠️ LA DISTINCIÓN QUE YA COSTÓ UN BUG UNA VEZ:
+  //
+  //   • Lo que va AQUÍ son variables de EJECUCIÓN. El Worker las lee cuando
+  //     atiende una petición.
+  //
+  //   • Todo lo que empieza por `NEXT_PUBLIC_` NO sirve aquí. Next las
+  //     INCRUSTA EN EL CÓDIGO durante `next build`, así que tienen que existir
+  //     en el entorno del BUILD (`.env.local` en local; las variables del
+  //     proyecto en Cloudflare Workers Builds). Ponerlas sólo aquí produce el
+  //     fallo más confuso posible: la app compila, despliega y arranca, pero
+  //     el navegador recibe `undefined`.
+  //
+  //     Lo mismo vale para `R2_ENDPOINT`, aunque no lleve el prefijo: de ella
+  //     sale el origen que `lib/csp.ts` mete en `connect-src`, y esa CSP la
+  //     arma `proxy.ts`, que también se compila. Si falta en el build, la
+  //     política sale sin ese origen y el navegador bloquea TODAS las subidas
+  //     aunque la variable esté puesta en ejecución. Ver `.env.example`.
+  //
+  //   • Las credenciales (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+  //     TOGETHER_API_KEY, META_APP_ACCESS_TOKEN) NO van aquí: van como
+  //     secretos, que no se versionan.
+  //
+  //       pnpm wrangler secret put R2_ACCESS_KEY_ID
+  //
+  "vars": {
+    // Declara que hay un proxy de confianza delante. En Cloudflare es cierto:
+    // el borde pone `cf-connecting-ip` y sobrescribe cualquier valor que
+    // mandara el cliente, así que el límite por IP puede creerle. Ver el
+    // razonamiento en `lib/rate-limit.ts`.
+    "TRUSTED_PROXY": "true"
+  }
+}
