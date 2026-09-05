@@ -162,7 +162,30 @@ RLS**. Los cuatro corren de verdad, sin credenciales.
 > **Los cinco jobs ejecutan.**
 
 Todas las acciones externas están fijadas a un commit SHA inmutable;
-`pnpm audit --audit-level=high` sale 0 (quedan 5 moderadas y 1 baja).
+`pnpm audit --audit-level=high` sale 0 (quedan 7 moderadas y 1 baja).
+
+> **Actualización (2026-09-04) — la puerta ya es puerta.** `main` quedó
+> protegida con los cinco jobs como checks obligatorios (§8.1 del plan), así que
+> el CI dejó de ser informativo y pasó a bloquear de verdad.
+>
+> Lo atrapó de inmediato. El primer PR que cruzó la puerta se puso en rojo en
+> «Auditoría de dependencias» por **dos ALTAS nuevas**, no por deuda heredada:
+> este mismo job salió verde en `main` el 2026-08-16.
+>
+> - **browserslist 4.28.6 → 4.28.8** (`GHSA-c83g-rgw3-j3cx`,
+>   `GHSA-73wf-gq98-2v4g`). Transitiva vía `@babel/core`, sin ningún override
+>   que la cubriera.
+> - **fast-uri 4.1.2 → 3.1.7** (cuatro avisos, todos en la rama 4.x). La causa
+>   no era el selector del override sino su **destino**: `fast-uri@>=3.0.0`
+>   apuntaba a `">=3.1.5"`, un rango **sin tope superior**, así que el único
+>   consumidor real —`ajv@8.20.0`, que declara `fast-uri: ^3.0.1`— terminaba
+>   resuelto en una major 4.x que nunca pidió, y justo la vulnerable. Acotar el
+>   destino a la misma major que el selector lo devuelve a 3.1.7.
+>
+> La lección para el resto del bloque `overrides` de `pnpm-workspace.yaml`: un
+> destino sin tope superior puede empujar una dependencia a una major que su
+> consumidor no pidió, y ahí los avisos de esa major nueva entran sin que ningún
+> override los vea.
 
 ### 2.8 F10 · Perfil público renderizado en el servidor — **cerrada localmente**
 
@@ -522,8 +545,14 @@ Ninguno de estos impide que `pnpm qa`, `pnpm build`, `pnpm test:e2e`,
 
 1. Completar las comprobaciones externas restantes de **F0** contra producción.
 2. `pnpm test:visual:update`, revisar las capturas y versionarlas.
-3. Definir dueños de **CODEOWNERS** y activar la protección de rama.
-4. `TOGETHER_API_KEY` y las decisiones de proveedor del punto H de §4.
+3. `TOGETHER_API_KEY` y las decisiones de proveedor del punto H de §4.
+
+> **Cerrada el 2026-09-04.** «Definir dueños de **CODEOWNERS** y activar la
+> protección de rama» era el punto 3 de esta lista. `CODEOWNERS` ya nombra a
+> `@DanGonzalesP` y `main` está protegida con los cinco checks del flujo CI como
+> obligatorios. La configuración exacta —y por qué las aprobaciones quedaron en
+> 0 mientras haya un solo mantenedor— está en **§8.1 del
+> `PLAN_VIBE_EMPRESARIAL.md`**.
 
 *(Lista completa y priorizada: §8 del `PLAN_VIBE_EMPRESARIAL.md`.)*
 

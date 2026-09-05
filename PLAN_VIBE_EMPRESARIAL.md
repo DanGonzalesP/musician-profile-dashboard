@@ -1197,10 +1197,10 @@ Lo que yo no puedo hacer. Ordenado por urgencia.
 | 4 | Configurar `NEXT_PUBLIC_SITE_URL` con el dominio definitivo | F0 | Decisión de producto | F10 (SEO) |
 | 5 | Configurar `TOGETHER_API_KEY` | F0 | Credencial de pago tuya | Generación de imágenes |
 | 6 | Decidir la política de `orders`/`order_items`/`donations` | F0 | Depende de tu modelo de negocio | F7 |
-| 7 | Definir dueños de `CODEOWNERS` | F1 | Decisión organizativa | F9 |
+| ~~7~~ | ~~Definir dueños de `CODEOWNERS`~~ — **cerrada 2026-09-04**: `@DanGonzalesP` | F1 | Decisión organizativa | ~~F9~~ |
 | 8 | Instalar Docker Desktop + `supabase link` | F6 | Requiere tu máquina y tu proyecto | F6, F7 |
 | 9 | **Aprobar las capturas visuales de referencia** | F8 | Definen oficialmente "así se ve Vibe" | F10 |
-| 10 | Activar protección de rama en GitHub | F9 | Sólo desde la configuración del repo | Que el CI sea puerta real |
+| ~~10~~ | ~~Activar protección de rama en GitHub~~ — **cerrada 2026-09-04**, ver §8.1 | F9 | Sólo desde la configuración del repo | ~~Que el CI sea puerta real~~ |
 | 11 | Decidir: Sentry o log drains de Vercel | F12 | Decisión de costo | F12 |
 | 12 | Decidir: captcha con proveedor o confirmación de correo | F5 | Proveedor nuevo vs. función existente | F5 |
 | 13 | Crear el proyecto Supabase y el bucket R2 de **staging** | F13 | Cuesta dinero; es tu cuenta | F13 |
@@ -1211,6 +1211,46 @@ Lo que yo no puedo hacer. Ordenado por urgencia.
 | 18 | Definir plazos del SLA de DMCA y revisar los textos legales | F14 | Decisión legal, posiblemente con asesoría | F14 |
 | 19 | Definir la cuota de almacenamiento por perfil | F11 | Decisión de producto y costo | F11 |
 | 20 | Definir RTO/RPO y la retención de datos | F13/F14 | Decisión de negocio | F13, F14 |
+
+### 8.1 · Protección de `main` — configuración aplicada (2026-09-04)
+
+Autorizada explícitamente por el dueño del repositorio. Se aplicó por la API de
+GitHub, no a mano, para que quede reproducible. La configuración vive **sólo en
+GitHub**, no en el repositorio, así que se documenta aquí:
+
+| Ajuste | Valor | Por qué |
+|---|---|---|
+| Checks obligatorios | Los **5** jobs de `ci.yml` | Escaneo de secretos · Tipos, lint, pruebas y build · E2E + accesibilidad · Regresión visual (capa ARIA) · Base de datos, RLS y editor autenticado |
+| `strict` (rama al día) | ✅ | Un PR verde contra un `main` viejo no entra: se revalida contra la punta actual |
+| Pull request obligatorio | ✅ | Nada llega a `main` por push directo |
+| Aprobaciones requeridas | **0** | Ver la nota de abajo |
+| Descartar aprobaciones obsoletas | ✅ | Un push nuevo invalida la revisión anterior |
+| Revisión de CODEOWNERS | ❌ | Ver la nota de abajo |
+| `enforce_admins` | ❌ | Ver la nota de abajo |
+| Force push | 🚫 bloqueado | La historia de `main` es inmutable |
+| Borrado de rama | 🚫 bloqueado | |
+| Resolver conversaciones | ✅ | Un comentario sin responder bloquea el merge |
+| Historia lineal | ❌ | El proyecto usa merge commits (`Merge pull request #…`) |
+
+**Por qué 0 aprobaciones y sin revisión de CODEOWNERS.** GitHub no permite que
+el autor de un PR lo apruebe. Con un solo mantenedor, exigir 1 aprobación —o la
+revisión del dueño del código— haría **imposible** fusionar cualquier PR: la
+puerta no sería estricta, sería un candado sin llave. Con 0 aprobaciones el PR
+sigue siendo obligatorio y los cinco checks siguen bloqueando, que es lo que
+esta acción buscaba. `CODEOWNERS` no queda sin efecto: sigue asignando revisores
+automáticamente y marcando las superficies sensibles. **En cuanto haya un
+segundo mantenedor, subir a 1 aprobación y activar la revisión de CODEOWNERS.**
+
+**Por qué `enforce_admins` desactivado.** Es la única salida de emergencia que
+le queda a un mantenedor único si CI se cae por una causa externa (un runner
+roto, una acción de terceros caída). No es un bypass silencioso: GitHub exige
+un clic deliberado y lo deja registrado. Con un segundo mantenedor, activarlo.
+
+Para revisar el estado actual:
+
+```bash
+gh api repos/DanGonzalesP/musician-profile-dashboard/branches/main/protection
+```
 
 ---
 
