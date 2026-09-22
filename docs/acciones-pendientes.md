@@ -1,6 +1,6 @@
 # Acciones pendientes — todo lo que necesita una persona
 
-**Estado: 2026-09-05.** Todo el código está en `main` y en verde. Lo que falta
+**Estado: 2026-09-22.** Todo el código está en `main` y en verde. Lo que falta
 no es programar: es crear recursos, configurar paneles y tomar decisiones.
 
 **Cómo leer este documento.** Cada acción lleva una etiqueta:
@@ -22,11 +22,21 @@ Together AI se escriben directamente en el panel del proveedor. Ningún agente
 
 Sin esto, Vibe no puede salir a producción. En orden.
 
-## 1.1 · Crear el bucket de caché en R2 — 🌐 Web o 💻 Terminal
+## 1.0 · Reactivar el proyecto de Supabase de Vibe — 🌐 Web
 
-Cloudflare → **R2** → *Create bucket*.
+El proyecto actual de Vibe se llama **Decima** en Supabase (referencia
+`yiexwdqgaqoqlfqihsfr`). Está suspendido por inactividad: **no lo recrees ni
+uses los proyectos de Bancary**. En el panel de Supabase, abre Decima y pulsa
+**Restore project**. Espera a que el estado cambie a activo antes de continuar.
 
-- **Nombre exacto:** `vibe-cache-incremental`
+> La restauración conserva la base de datos y sus usuarios. Hasta que termine,
+> Vibe no puede iniciar sesión, mostrar perfiles ni ejecutar migraciones.
+
+## 1.1 · Crear el bucket de caché en R2 — ✅ Completado
+
+Creado el 2026-09-22 en la cuenta temporal actual de Cloudflare.
+
+- **Nombre:** `vibe-cache-incremental`
 
 O por terminal:
 
@@ -39,11 +49,11 @@ pnpm wrangler r2 bucket create vibe-cache-incremental
 > subido por alguien, y que las reglas de ciclo de vida de uno se apliquen al
 > otro.
 
-## 1.2 · Crear la base D1 de etiquetas — 🌐 Web o 💻 Terminal
+## 1.2 · Crear la base D1 de etiquetas — ✅ Completado
 
-Cloudflare → **Workers & Pages** → **D1 SQL Database** → *Create*.
+Creada el 2026-09-22 en la cuenta temporal actual de Cloudflare.
 
-- **Nombre exacto:** `vibe-cache-etiquetas`
+- **Nombre:** `vibe-cache-etiquetas`
 
 O por terminal:
 
@@ -51,20 +61,15 @@ O por terminal:
 pnpm wrangler d1 create vibe-cache-etiquetas
 ```
 
-**Copia el `database_id` que aparece.** Es un UUID.
+Su identificador ya quedó registrado en `wrangler.jsonc`.
 
 > Esto es lo que hace que "publicar" se vea **de inmediato** en el perfil
 > público. Sin ello, un artista publica y sigue viendo su versión anterior.
 
-## 1.3 · Pegar el `database_id` — 🤝 Me lo pasas
+## 1.3 · Pegar el `database_id` — ✅ Completado
 
-En `wrangler.jsonc` hay un marcador:
-
-```
-"database_id": "PENDIENTE-CORRER-wrangler-d1-create"
-```
-
-Pásame el UUID y lo cambio. Si prefieres hacerlo tú, es esa única línea.
+El marcador de `wrangler.jsonc` se sustituyó por el identificador de la D1 de
+Vibe el 2026-09-22.
 
 > Lo dejé como marcador **a propósito**: así el despliegue falla en vez de
 > arrancar contra una base que no existe y que lo descubras cuando un artista
