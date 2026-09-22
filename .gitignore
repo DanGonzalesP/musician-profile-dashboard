@@ -37,3 +37,5 @@ node_modules
 # con `pnpm cf:build`; versionarlos serian megabytes de artefacto derivado.
 .open-next/
 .wrangler/
+# Tipos generados localmente por `pnpm cf:typegen`; no son fuente de la app.
+cloudflare-env.d.ts
