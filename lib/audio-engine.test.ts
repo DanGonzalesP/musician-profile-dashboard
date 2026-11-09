@@ -40,7 +40,14 @@ class AudioFalso {
     for (const cb of this.oyentes.get(evento) ?? []) cb()
   }
 
+  /** Rechazos de play() preparados por la prueba (bloqueo de autoplay, etc.). */
+  rechazosDePlay: unknown[] = []
+
   play(): Promise<void> {
+    if (this.rechazosDePlay.length) {
+      this.paused = true
+      return Promise.reject(this.rechazosDePlay.shift())
+    }
     this.paused = false
     return new Promise<void>((resolve) => {
       this.playsPendientes.push(() => {
@@ -305,6 +312,27 @@ describe("motor de audio · toggle, pause y stop", () => {
 
     expect(motor.getState().playing).toBe(false)
     expect(motor.getState().url).toBeNull()
+  })
+
+  it("si el navegador bloquea la reproducción automática, queda en pausa sin mostrar error", async () => {
+    const motor = await cargarMotor()
+    motor.play("https://ejemplo.local/a.mp3")
+    creados[0].rechazosDePlay.push(new DOMException("autoplay bloqueado", "NotAllowedError"))
+    motor.play("https://ejemplo.local/b.mp3")
+    await Promise.resolve(); await Promise.resolve()
+
+    expect(motor.getState()).toMatchObject({ playing: false, error: null })
+  })
+
+  it("otro rechazo de play() sí informa un error recuperable", async () => {
+    const motor = await cargarMotor()
+    motor.play("https://ejemplo.local/a.mp3")
+    creados[0].rechazosDePlay.push(new DOMException("formato no soportado", "NotSupportedError"))
+    motor.play("https://ejemplo.local/b.mp3")
+    await Promise.resolve(); await Promise.resolve()
+
+    expect(motor.getState().playing).toBe(false)
+    expect(motor.getState().error).toContain("No se pudo iniciar el audio")
   })
 
   it("al terminar una pista avisa y se rebobina", async () => {

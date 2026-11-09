@@ -153,11 +153,19 @@ function safePlay(element: HTMLAudioElement, myToken: number) {
         setState({ playing: true })
         ensureLevelLoop()
       }
-    }).catch(() => {
+    }).catch((reason: unknown) => {
       // Rechazo típico (AbortError) cuando se cambia de src antes de que
       // resuelva play(): si ya no somos la reproducción vigente, se ignora
       // en silencio en vez de dejar el botón atascado.
-      if (token === myToken) setState({ playing: false, error: "No se pudo iniciar el audio. Pulsa reproducir para volver a intentarlo." })
+      if (token !== myToken) return
+      // El navegador bloqueó la reproducción automática (primera visita, sin
+      // gesto): no es un fallo de red ni del archivo. Queda en pausa y basta
+      // pulsar Reproducir; mostrar un error aquí confundía a cada visitante.
+      if (reason instanceof DOMException && reason.name === "NotAllowedError") {
+        setState({ playing: false })
+        return
+      }
+      setState({ playing: false, error: "No se pudo iniciar el audio. Pulsa reproducir para volver a intentarlo." })
     })
   }
 }
