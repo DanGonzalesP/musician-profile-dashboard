@@ -1,4 +1,60 @@
-# Evidencia vigente — 2026-11-05
+# Evidencia vigente — continuación del 2026-11-09
+
+Base: HEAD `f3303fd7fa20a3b2934788298e230de9e1964d64`, rama
+`codex/cierre-integridad-media`, índice inicialmente vacío. Se conservaron los
+cambios locales de Claude (audio y 24 ARIA), el prompt y el traspaso no rastreados.
+Las correcciones nuevas afectan al aplicador de staging y al arnés autenticado;
+no cambian el esquema ni la UI. Audio y referencias recuperados se consolidaron.
+
+| Comprobación en esta continuación | Resultado real | Alcance |
+|---|---|---|
+| `pnpm qa` | salida 0; 525/525 en 54 archivos; tipos y lint 0 | Árbol local con cambios de audio y preparador de migraciones. |
+| Build Next aislado (`pnpm build` / mismo binario Next) | salida 0; 38 páginas generadas | Copia `cloudflare`, variables públicas ficticias; no prueba conexión remota. |
+| `pnpm exec vitest run --config vitest.db.config.mjs test/database/staging-migration.test.ts` | salida 0; 5/5 | PostgreSQL real, base efímera separada; éxito, rollback por SQL/historial, secuencia y concurrencia. |
+| `GET http://127.0.0.1:3070/legal` | HTTP 200 | Vista local separada del build. |
+| E2E autenticado | corrida completa: 44/46; repetición dirigida final: 4/4 | Los dos fallos iniciales de moderación eran de preparación. Provisión efímera añadida a los comandos directos y dos etiquetas del test actualizadas; no se repitieron los otros 44 casos. |
+| Visual autenticado | salida 0; 4/4 | Referencias ARIA revisadas en cuatro anchos; no aprobación de píxeles. |
+
+Unitarias: **511 → 525** respecto del log final de Claude: dos casos de audio ya
+presentes al retomar y doce del preparador nuevo. Las cinco pruebas DB son
+adicionales a la suite 221 de Claude; no se afirma haber ejecutado una suite
+completa de 226 en esta continuación. El primer intento dirigido falló porque
+Docker estaba detenido; tras recuperarlo pasó. `db:verify` no se volvió a ejecutar.
+
+Logs de esta continuación en
+`.wrangler/auditoria/continuacion-codex-2026-11-09/`: `auth-corregido.log`
+(44/46), `moderacion-verificada.log` (4/4) y `visual-auth-final.log` (4/4).
+Los lanzamientos previos que fallaron por preparación o referencias desfasadas
+siguen conservados. Las 24 referencias públicas recuperadas y las cuatro del
+editor fueron revisadas; no se generaron ni aprobaron referencias de píxeles.
+Los comandos directos preparan y eliminan al moderador ficticio si no lo recibió
+el arnés superior; las claves de pruebas no se propagan al servidor de la app.
+
+Consolidación: `685b299` migraciones atómicas, `f15b1e9` arnés autenticado,
+`d63c955` audio, `2f05a05` ARIA públicas, `3f6a8d9` exclusión de una única huella
+de falso positivo de gitleaks (ruta del archivo de configuración de Playwright).
+
+### Evidencia final recuperada de Claude
+
+Logs existentes bajo `.wrangler/auditoria/final-2026-11-09/`, inspeccionados al
+retomar. Corresponden a su copia aislada del trabajo recuperado; no acreditan
+el preparador nuevo ni staging/producción y no se presentan como nuevas ejecuciones.
+
+| Log | Resultado |
+|---|---|
+| `qa.log` | salida 0, 511/511, tipos y lint limpios |
+| `build.log` | salida 0 |
+| `db.log` | salida 0, 221/221 en 21 archivos |
+| `e2e.log` | salida 0, 122/122 |
+| `visual.log` | salida 0, 24 ARIA aprobadas y 24 píxeles omitidos |
+| `cf-build.log` | salida 0, build OpenNext |
+| `cf-test.log` | salida 0, Worker local con D1/R2/DO/WASM, salud, caché, publicación y suspensión |
+
+Las referencias de píxeles no están aprobadas. CI remoto, recorrido de staging,
+credencial R2 de staging, correo/dominio y aceptación operativa/legal siguen
+pendientes. No hubo push, despliegue ni migración remota en esta continuación.
+
+## Historial de evidencia — 2026-11-05
 
 ## Reportes0040 y operación0041 — 2026-11-05
 

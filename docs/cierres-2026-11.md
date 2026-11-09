@@ -1,5 +1,34 @@
 # Cierres pendientes de Vibe
 
+## Avance del 9 de noviembre de 2026 (3) — continuidad y migraciones atómicas
+
+- Retomado desde `f3303fd`, con los ocho commits de Claude y sus cambios locales
+  preservados. Las entradas anteriores conservan el historial; no representan
+  por sí solas el estado vigente ni obligan a repetir trabajo ya verificado.
+- Cierre18: `aplicar-migracion-staging.ps1` ya no separa la aplicación de SQL del
+  registro en el historial. El preparador exige una transacción explícita y
+  genera una sola operación con bloqueo y guarda de versión dentro de ella.
+  Cinco pruebas conductuales en PostgreSQL efímero verifican rollback completo,
+  orden y dos ejecuciones concurrentes. No se aplicó SQL remoto ni se modifica una
+  migración ya existente. Compatibilidad y corte de producción siguen pendientes.
+- Cierre15: `pnpm qa` actual aprobado, tipos y lint a cero; techo en cero.
+  Unitarias 511 del log de Claude → 525 actuales (dos casos previos de audio y
+  doce nuevos). Falta CI remoto para acreditar el cierre completo.
+- Recuperados logs finales de Claude: DB221, público122, visual24ARIA y Worker
+  local aprobados. Build Next de esta continuación también aprobado. No confundir
+  estos resultados con integración remota ni con aprobación de píxeles. Detalle
+  de procedencia y comandos en `../RESULTADOS_PRUEBAS.md`.
+- Editor autenticado: 44/46 en corrida completa y moderación corregida 4/4 en
+  repetición dirigida; referencias del editor revisadas y visual autenticado4/4.
+  Los comandos directos de editor/Worker ahora preparan el moderador ficticio
+  cuando falta, sin trasladar claves administrativas al servidor de la app.
+  Base local0071
+  comprobada; vista3070 recuperada. Staging0070/producción0017 son últimos estados
+  remotos documentados, sin consulta ni cambio remoto nuevos.
+- No se acredita un nuevo cierre completo por esta actualización. Bloqueos del
+  siguiente bloque: R2 exclusivo/origen/secretos de staging, CI y las decisiones
+  de identidad, dominio/correo, retención y responsables ya registradas.
+
 ## Avance del 9 de noviembre de 2026 (2) — edad y constancia legal en el registro
 
 - Cierre24 (parte técnica) y seguridad: `0071_aceptacion_legal_y_edad.sql` guarda en
@@ -327,7 +356,7 @@ No completa el rediseño integral, los cierres27 ni un despliegue.
 | 12 | WAV real convertido por navegador sobre Worker | Worker local verificado: WAV PCM real de medio segundo, FFmpeg real y MP3 decodificado; suite38/38, de las cuales solo2 prueban WAV (escritorio/móvil). Fallos/concurrencia/recuperación y staging remoto pendientes. |
 | 13 | Publicación autenticada e invalidación D1 integradas | Worker local revalidado con 0035: 38/38, cuatro etiquetas invalidadas en D1 y objetos de caché R2 comprobados; staging remoto pendiente. |
 | 14 | Baselines de píxeles revisados individualmente y aprobados | Pendiente |
-| 15 | Reducir las 22 advertencias sin desactivar reglas | Implementado 2026-11-09: 22 → 18 → 13 medidas → **0**, techo `--max-warnings=0`, sin reglas apagadas. Falta confirmarlo en `pnpm qa` final y en CI. |
+| 15 | Reducir las 22 advertencias sin desactivar reglas | Verificado localmente 2026-11-09: 22 → 18 → 13 medidas → **0**, techo `--max-warnings=0`, sin reglas apagadas; `pnpm qa` actual aprobado (525/525). Falta CI remoto. |
 | 16 | Entrega preservada, commits/PR revisables, CI y protecciones | En curso |
 | 17 | Rotación de S3 R2 limitada al bucket de artistas, revocación comprobada | En curso: sustituta verificada con listado/HEAD y acceso a otros buckets denegado; primera clave revocada devuelve 403 |
 | 18 | Backup y comparación/aplicación ordenada de migraciones remotas | Parcial: respaldo cifrado nuevo, 58 tablas cotejadas y 0018–0037 aplicadas sin pérdida de filas principales sobre copia aislada. Origen sigue en0017; faltan compatibilidad final, corte coordinado y verificación remota. |

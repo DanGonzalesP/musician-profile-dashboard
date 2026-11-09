@@ -1,4 +1,27 @@
-# Estado de implementación — 2026-11-06
+# Estado de implementación — 2026-11-09
+
+Continuación desde el trabajo consolidado por Claude en `f3303fd`, sin reiniciar
+el proyecto. Hay implementación local de producto, moderación, medios y esquema
+0000–0071. No equivale a tener los 27 cierres aceptados ni un lanzamiento listo.
+
+La validación actual de código da **525/525 unitarias, cero errores de tipos,
+cero advertencias de lint y build aprobado**. El aplicador de migraciones de
+staging ahora confirma SQL e historial juntos, resiste ejecuciones concurrentes
+y revierte todo ante fallos; cinco pruebas reales en una base efímera lo verifican.
+No se aplicó una migración remota en esta continuación.
+
+Se recuperó evidencia final de Claude que las notas anteriores no reflejaban:
+DB 221/221, E2E público 122/122, 24 referencias ARIA públicas y Worker local
+aprobados. Editor autenticado: 44 casos aprobados en la corrida completa y el
+bloque de moderación corregido aprobado 4/4 en su repetición dirigida. Visual
+autenticado 4/4. Procedencia, límites y
+resultados actualizados: `RESULTADOS_PRUEBAS.md`. Continuidad: `NEXT_TASK.md`.
+
+La vista local responde en `http://127.0.0.1:3070`. Quedan integración remota de
+staging, credencial R2 exclusiva, origen/correo, CI real y decisiones legales y
+operativas. No se compró, desplegó ni modificó producción en esta continuación.
+
+## Historial de implementación — 2026-11-06
 
 Staging remoto preparado: Supabase `iyppeurjtbuydhjtraxf` con71 migraciones
 0000–0070, 0 usuarios/perfiles al terminar; tres buckets R2, WASM subido y D1

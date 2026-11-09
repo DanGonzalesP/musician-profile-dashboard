@@ -1,4 +1,36 @@
-## Continuidad — edad y constancia legal 0071 (2026-11-09)
+## Continuidad vigente — retomada desde Claude (2026-11-09)
+
+- Base recuperada: `f3303fd`, rama `codex/cierre-integridad-media`. Claude ya
+  consolidó ocho commits; sus cambios locales de audio y las 24 referencias ARIA
+  quedaron guardados en commits separados. Las entradas siguientes son historial, no tareas que haya
+  que repetir ni mediciones vigentes de este árbol.
+- Corregido `aplicar-migracion-staging.ps1`: SQL e historial se confirman en una
+  sola transacción, con bloqueo y comprobación de secuencia dentro de ella.
+  Preparador sin credenciales en `scripts/preparar-migracion-staging.mjs`.
+  No se ejecutó el aplicador contra staging ni producción.
+- Validación de esta continuación: `pnpm qa` 525/525, tipos y lint sin problemas;
+  build aislado aprobado; cinco pruebas nuevas de atomicidad/concurrencia en una
+  base efímera aprobadas. Docker estaba detenido en el primer intento; se recuperó
+  y sólo se repitió esa comprobación afectada.
+- Evidencia final que dejó Claude, recuperada de `final-2026-11-09`: DB 221/221,
+  público 122/122, visual público 24 ARIA (24 píxeles omitidos), build OpenNext y
+  runtime Worker aprobados. No volver a ejecutar esas suites sin un cambio que lo
+  justifique. Ver alcance y procedencia en `RESULTADOS_PRUEBAS.md`.
+- Editor autenticado: 44/46 casos pasaron en la corrida completa; los dos de
+  moderación fallaron por preparación del arnés. Corregida la provisión efímera
+  del moderador en los comandos directos/CI y dos etiquetas antiguas del test,
+  el bloque afectado pasó 4/4. Visual autenticado 4/4 tras revisar sus referencias.
+  No se presenta esto como una nueva corrida completa de 46/46. Las claves
+  administrativas del arnés se retiran antes de arrancar el servidor de la app.
+- Vista disponible en `http://127.0.0.1:3070`; código en copia separada del build.
+  Base local comprobada en 0071. Staging 0070 y producción 0017 son los últimos
+  estados remotos documentados, no una consulta remota nueva.
+- Siguiente bloque remoto: credencial R2 exclusiva de staging, origen/callbacks y
+  acceso restringido, instalación de secretos y recorrido integrado. Mantener
+  cerrado el registro remoto durante preparación. Identidad legal, dominio,
+  remitente, retención y operación requieren decisiones reales del titular.
+
+## Historial — edad y constancia legal 0071 (2026-11-09)
 
 - Hecho: registro exige 18+ y aceptación; 0071 guarda constancia y bloquea perfiles
   sin ella (cuentas nuevas). Base local en0071 (psql, respaldo previo). Staging y
