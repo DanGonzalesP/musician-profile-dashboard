@@ -1,0 +1,32 @@
+name: Disponibilidad de Vibe
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: disponibilidad-vibe
+  cancel-in-progress: false
+
+jobs:
+  disponibilidad:
+    # No heredar ejecución en forks ni consumir minutos sin habilitación.
+    if: github.repository == 'vibemusicprofile-oss/musician-profile-dashboard' && vars.VIBE_MONITOR_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Consultar página y dependencias
+        env:
+          VIBE_MONITOR_ORIGIN: ${{ vars.VIBE_MONITOR_ORIGIN }}
+          VIBE_EXPECTED_VERSION: ${{ vars.VIBE_EXPECTED_VERSION }}
+        run: node scripts/comprobar-disponibilidad.mjs

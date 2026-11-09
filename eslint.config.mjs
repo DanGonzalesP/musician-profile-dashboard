@@ -13,9 +13,12 @@ const config = [
   {
     ignores: [
       ".next/**",
+      ".open-next/**",
+      ".wrangler/**",
       "node_modules/**",
       "public/ffmpeg/**",
       "next-env.d.ts",
+      "cloudflare-env.d.ts",
       ".claude/**",
     ],
   },

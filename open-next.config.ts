@@ -1,6 +1,7 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare"
 import r2IncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache"
 import d1NextTagCache from "@opennextjs/cloudflare/overrides/tag-cache/d1-next-tag-cache"
+import doQueue from "@opennextjs/cloudflare/overrides/queue/do-queue"
 
 // Configuración del adaptador de Cloudflare (OpenNext).
 //
@@ -37,11 +38,10 @@ import d1NextTagCache from "@opennextjs/cloudflare/overrides/tag-cache/d1-next-t
 // escala y es a donde habría que mover esto si el volumen lo pide. Hoy sería
 // complejidad sin una medición que la justifique.
 //
-// ─── Cola de revalidación → "direct" ──────────────────────────────────────
-// La revalidación en segundo plano se hace en la misma petición en vez de
-// pasar por un Durable Object. Es lo correcto para el volumen actual y evita
-// provisionar un recurso más. Cuando el tráfico lo note, el cambio es una
-// línea: `queue: doQueue` más el binding `NEXT_CACHE_DO_QUEUE`.
+// ─── Cola de revalidación → Durable Object ─────────────────────────────────
+// La cola "direct" sólo sirve para preview/debug y OpenNext no la recomienda
+// en producción. Durable Objects coordinan y deduplican revalidaciones entre
+// isolates sin cambiar qué páginas ni cuándo deben invalidarse.
 //
 // ─── Lo que NO se activó, y por qué ───────────────────────────────────────
 // `withRegionalCache` y la purga automática de caché quedan fuera de este
@@ -55,5 +55,5 @@ import d1NextTagCache from "@opennextjs/cloudflare/overrides/tag-cache/d1-next-t
 export default defineCloudflareConfig({
   incrementalCache: r2IncrementalCache,
   tagCache: d1NextTagCache,
-  queue: "direct",
+  queue: doQueue,
 })

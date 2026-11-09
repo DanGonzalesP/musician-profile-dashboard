@@ -11,6 +11,8 @@ __v0_jsx-dev-runtime.ts
 
 # Common ignores
 node_modules
+.pnpm-store/
+.claude/settings.local.json
 .next/
 .DS_Store
 .vercel

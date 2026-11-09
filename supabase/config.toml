@@ -82,7 +82,20 @@ enabled = false
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["https://127.0.0.1:3000", "http://localhost:3000"]
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000/nueva-contrasena",
+  "http://127.0.0.1:3000/login",
+  "http://localhost:3000/nueva-contrasena",
+  "http://localhost:3000/login",
+  "http://127.0.0.1:3070",
+  "http://127.0.0.1:3070/nueva-contrasena",
+  "http://127.0.0.1:3070/login",
+  "http://localhost:3070",
+  "http://localhost:3070/nueva-contrasena",
+  "http://localhost:3070/login",
+]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10

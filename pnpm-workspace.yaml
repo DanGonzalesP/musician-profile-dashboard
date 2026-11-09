@@ -41,6 +41,9 @@ packages:
 #     regla que el resto de este bloque ya seguia. La segunda linea queda como
 #     guardia por si algun dia entra un consumidor de 4.x de verdad.
 overrides:
+  # Parche 2026-11-04: OpenNext fija glob 10.3.3.
+  # Se mantienen las majors de sus consumidores; no se fuerza glob 14.
+  "glob@>=10.0.0 <11.0.0": "^10.5.0"
   postcss: "^8.5.23"
   sharp: "^0.35.0"
   brace-expansion@>=4.0.0: ">=5.0.9"
@@ -65,3 +68,21 @@ allowBuilds:
 
 patchedDependencies:
   '@ffmpeg/ffmpeg': patches/@ffmpeg__ffmpeg.patch
+
+minimumReleaseAgeExclude:
+  - '@next/env@16.4.5'
+  - '@next/eslint-plugin-next@16.4.5'
+  - '@next/swc-darwin-arm64@16.4.5'
+  - '@next/swc-darwin-x64@16.4.5'
+  - '@next/swc-linux-arm64-gnu@16.4.5'
+  - '@next/swc-linux-arm64-musl@16.4.5'
+  - '@next/swc-linux-x64-gnu@16.4.5'
+  - '@next/swc-linux-x64-musl@16.4.5'
+  - '@next/swc-win32-arm64-msvc@16.4.5'
+  - '@next/swc-win32-x64-msvc@16.4.5'
+  - '@opennextjs/aws@4.1.15'
+  - '@opennextjs/cloudflare@1.20.16'
+  - eslint-config-next@16.4.5
+  - miniflare@5.20261103.0-beta
+  - next@16.4.5
+  - wrangler@4.157.0

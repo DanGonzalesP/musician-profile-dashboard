@@ -63,22 +63,15 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
-      # Auditoría de dependencias — BLOQUEANTE. Las 8 altas que quedaban eran
-      # transitivas y se cerraron con los `overrides` de pnpm-workspace.yaml
-      # (ver ahí el detalle de cada bump). Con el arreglo hecho, esta puerta ya
-      # puede cerrarse: `--audit-level=high` sale 0 hoy, así que un rojo aquí
-      # significa una vulnerabilidad NUEVA, no deuda heredada.
-      #
-      # Se deja en `high` y no en `moderate` a propósito: quedan 7 moderadas y 1
-      # baja, todas transitivas y sin parche disponible. Poner la puerta donde
-      # nadie puede pasarla es la forma más rápida de que se aprenda a ignorar.
+      # Auditoría BLOQUEANTE. Estado y excepciones pendientes en
+      # docs/dependencias-2026-11.md; no se excluye ningún aviso del análisis.
       - name: Auditoría de dependencias
         run: pnpm audit --audit-level=high
 
       - name: Comprobar tipos
         run: pnpm typecheck
 
-      # `pnpm lint` corre con el trinquete `--max-warnings=22` definido en
+      # `pnpm lint` corre con el trinquete `--max-warnings=21` definido en
       # package.json. Un PR que añade un warning falla aquí.
       - name: Lint (con trinquete de warnings)
         run: pnpm lint
@@ -130,12 +123,19 @@ jobs:
       # (ver .env.example y wrangler.jsonc).
       - name: Construir el Worker
         env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ejemplo.supabase.co
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54999
           NEXT_PUBLIC_SUPABASE_ANON_KEY: clave-de-relleno-para-ci
           NEXT_PUBLIC_R2_PUBLIC_URL: https://ejemplo.r2.dev
           R2_ENDPOINT: https://ejemplo.r2.cloudflarestorage.com
           R2_BUCKET_NAME: vibe
+          APP_VERSION: ${{ github.sha }}
         run: pnpm cf:build
+
+      - name: Verificar runtime local del Worker
+        env:
+          SMOKE_BUILD_VERSION: ${{ github.sha }}
+          WRANGLER_SEND_METRICS: "false"
+        run: pnpm cf:test
 
       # Que el comando salga 0 no prueba que haya producido algo servible.
       - name: Comprobar la salida del build
@@ -211,8 +211,8 @@ jobs:
   base-de-datos:
     name: Base de datos, RLS y editor autenticado
     runs-on: ubuntu-latest
-    # 20 no alcanzaban al sumarle el E2E autenticado y su navegador.
-    timeout-minutes: 30
+    # Incluye el segundo recorrido autenticado sobre el Worker compilado.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -252,6 +252,11 @@ jobs:
       # comparable en Linux, igual que la capa ARIA de las páginas públicas.
       - name: Instantánea ARIA del editor autenticado
         run: pnpm test:visual:auth
+
+      # Misma sesión local y mismas pruebas, ahora sobre workerd con D1/R2/DO.
+      # El lanzador excluye la clave administrativa del build y del Worker.
+      - name: Worker autenticado, conversión real de audio e invalidación D1
+        run: pnpm cf:test:auth
 
       - name: Guardar reporte de Playwright
         if: ${{ !cancelled() }}

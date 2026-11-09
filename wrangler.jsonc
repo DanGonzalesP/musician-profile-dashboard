@@ -3,6 +3,9 @@
 
   // ── Identidad del Worker ──────────────────────────────────────────────────
   "name": "vibe",
+  // Cuenta empresarial de Vibe, verificada el 2026-11-04.
+  // No desplegar en la cuenta personal ni en Bancary por defecto.
+  "account_id": "5b647e532f3d4996206529d5595295f3",
   "main": ".open-next/worker.js",
 
   // Fecha de compatibilidad del runtime. NO se sube a la ligera: cambia el
@@ -16,14 +19,24 @@
   // arrancar en vez de fallar en el build.
   "compatibility_flags": ["nodejs_compat"],
 
+  // DOQueueHandler invoca el propio Worker para regenerar una ruta vencida.
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "vibe" }
+  ],
+
   // ── Assets estáticos ──────────────────────────────────────────────────────
   // Lo que `opennextjs-cloudflare build` deja listo para servir sin ejecutar
-  // código: `/_next/static`, imágenes de `public/`, los binarios de ffmpeg.wasm.
+  // código: `/_next/static` y los archivos públicos (excepto el WASM grande de
+  // ffmpeg, que se entrega desde el bucket privado VIBE_STATIC_ASSETS).
   // El binding lo usa el propio worker generado; el nombre ASSETS no es
   // negociable.
   "assets": {
     "directory": ".open-next/assets",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    // Mantener rutas exactas de Next; sin alias HTML que eludan el proxy.
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": ["/ffmpeg/ffmpeg-core.wasm"]
   },
 
   "observability": {
@@ -31,14 +44,35 @@
   },
 
   // ── Caché incremental (ISR) ───────────────────────────────────────────────
-  // Bucket SEPARADO del de los archivos de los artistas. Ver el razonamiento
-  // completo en `open-next.config.ts`.
+  // Buckets independientes: caché incremental, WASM estático de ffmpeg y
+  // archivos de artistas (este último se accede con S3 desde la app).
+  // Ver el razonamiento completo en `open-next.config.ts`.
   //
   //   pnpm wrangler r2 bucket create vibe-cache-incremental
   "r2_buckets": [
     {
       "binding": "NEXT_INC_CACHE_R2_BUCKET",
       "bucket_name": "vibe-cache-incremental"
+    },
+    {
+      "binding": "VIBE_STATIC_ASSETS",
+      "bucket_name": "vibe-static-assets"
+    }
+  ],
+
+  // Cola de revalidación ISR, compartida entre isolates mediante Durable Objects.
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NEXT_CACHE_DO_QUEUE",
+        "class_name": "DOQueueHandler"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DOQueueHandler"]
     }
   ],
 
@@ -47,15 +81,12 @@
   //
   //   pnpm wrangler d1 create vibe-cache-etiquetas
   //
-  // ⚠️ El `database_id` de abajo es un MARCADOR. El comando de arriba imprime
-  // el id real; hay que pegarlo aquí antes del primer despliegue. Dejarlo así
-  // hace que el despliegue falle en vez de arrancar contra una base que no
-  // existe, que es como se prefiere fallar.
+  // D1 creada en la cuenta empresarial; la antigua se conserva como respaldo.
   "d1_databases": [
     {
       "binding": "NEXT_TAG_CACHE_D1",
       "database_name": "vibe-cache-etiquetas",
-      "database_id": "20d9afec-6953-4e9c-b97b-ab3393cbd507"
+      "database_id": "02051ecd-e52a-4b5f-8e81-f5d44b63a03f"
     }
   ],
 
