@@ -1,7 +1,7 @@
 // Comprobación fail-closed de la configuración de subidas a R2.
 //
 // POR QUÉ EXISTE (F4)
-// `lib/r2.ts` lee sus cinco variables con `!`, la aserción de TypeScript que
+// `lib/r2.ts` lee la configuración S3 con `!`, la aserción de TypeScript que
 // promete "esto no es undefined". En runtime esa promesa no vale nada: si
 // falta `R2_ENDPOINT`, el `S3Client` se construye con `endpoint: undefined` y
 // el fallo aparece recién al firmar, como un 500 opaco. Peor todavía: para
@@ -22,18 +22,27 @@
 // Por eso `R2_ENDPOINT` tiene que estar presente en el ENTORNO DE BUILD de
 // Vercel, no sólo en el de ejecución. Ver docs/rotacion-de-credenciales.md.
 
-/** Las cinco variables sin las cuales una subida no puede completarse. */
+/** Configuración S3 necesaria para subir. El origen histórico no es necesario. */
 export const VARIABLES_DE_SUBIDA_R2 = [
   "R2_ENDPOINT",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
   "R2_BUCKET_NAME",
-  "NEXT_PUBLIC_R2_PUBLIC_URL",
 ] as const
 
 export type VariableDeSubidaR2 = (typeof VARIABLES_DE_SUBIDA_R2)[number]
 
 type Entorno = Record<string, string | undefined>
+
+// Las credenciales se leen exclusivamente en runtime, en el servidor.
+// La URL histórica sólo sirve para reconocer enlaces previos a /api/media;
+// exigirla aquí impediría subir a un bucket privado nuevo sin contenido legado.
+const entornoDeSubidas = (): Entorno => ({
+  R2_ENDPOINT: process.env.R2_ENDPOINT,
+  R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+  R2_BUCKET_NAME: process.env.R2_BUCKET_NAME,
+})
 
 /**
  * Devuelve los nombres de las variables ausentes o vacías, en orden.
@@ -42,7 +51,7 @@ type Entorno = Record<string, string | undefined>
  * Una cadena de sólo espacios cuenta como ausente: es el resultado típico de
  * pegar mal un valor en el panel de Vercel, y firma igual de mal que no tenerla.
  */
-export function variablesDeSubidaAusentes(entorno: Entorno = process.env): VariableDeSubidaR2[] {
+export function variablesDeSubidaAusentes(entorno: Entorno = entornoDeSubidas()): VariableDeSubidaR2[] {
   return VARIABLES_DE_SUBIDA_R2.filter((nombre) => !(entorno[nombre] ?? "").trim())
 }
 
@@ -69,10 +78,10 @@ export function origenDeSubidaR2(entorno: Entorno = process.env): string | null 
 /**
  * ¿Puede intentarse una subida con esta configuración?
  *
- * Exige las cinco variables **y** que `R2_ENDPOINT` produzca un origen HTTPS
+ * Exige las cuatro variables **y** que `R2_ENDPOINT` produzca un origen HTTPS
  * válido. Un endpoint presente pero malformado es peor que uno ausente: pasa
  * la comprobación de presencia y falla al firmar.
  */
-export function subidasR2Configuradas(entorno: Entorno = process.env): boolean {
+export function subidasR2Configuradas(entorno: Entorno = entornoDeSubidas()): boolean {
   return variablesDeSubidaAusentes(entorno).length === 0 && origenDeSubidaR2(entorno) !== null
 }

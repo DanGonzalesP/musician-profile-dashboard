@@ -28,20 +28,21 @@ afterEach(() => {
 })
 
 describe("modoCuota", () => {
-  it("por defecto observa, no rechaza", () => {
+  // Fail-closed (2026-11-06): sin configuración la cuota se hace cumplir.
+  it("por defecto rechaza: una configuración ausente no abre la cuota", () => {
     delete process.env.CUOTA_ALMACENAMIENTO_MODO
-    expect(modoCuota()).toBe("observar")
+    expect(modoCuota()).toBe("rechazar")
   })
 
-  it("sólo el valor exacto 'rechazar' activa el rechazo", () => {
-    process.env.CUOTA_ALMACENAMIENTO_MODO = "rechazar"
-    expect(modoCuota()).toBe("rechazar")
+  it("sólo el valor exacto 'observar' relaja la cuota", () => {
+    process.env.CUOTA_ALMACENAMIENTO_MODO = "observar"
+    expect(modoCuota()).toBe("observar")
 
-    // Un valor a medias —una errata, un "true", un "1"— NO debe cerrar la
-    // puerta sin querer: el paso a rechazo es una decisión explícita.
-    for (const valor of ["Rechazar", "true", "1", "si", "rechaza", ""]) {
+    // Una errata, un "true" o un vacío NO deben abrir la puerta sin querer:
+    // pasar a observación es una decisión explícita.
+    for (const valor of ["Observar", "true", "1", "no", "observa", "", "rechazar"]) {
       process.env.CUOTA_ALMACENAMIENTO_MODO = valor
-      expect(modoCuota()).toBe("observar")
+      expect(modoCuota()).toBe("rechazar")
     }
   })
 })

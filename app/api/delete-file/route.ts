@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server"
-import { DeleteObjectCommand } from "@aws-sdk/client-s3"
+import { tombstoneUploadedObject } from "@/lib/r2-object-lifecycle"
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
 import { idDePeticion, logError, logInfo } from "@/lib/log"
+import { deleteOwnedMedia } from "@/lib/media-deletion"
+import { MEDIA_PATH, mediaKeyFromUrl } from "@/lib/media-url"
+import { readJsonObject } from "@/lib/request-json"
+import { subidasR2Configuradas } from "@/lib/r2-config"
 
 // Borra de R2 archivos que quedaron huérfanos al publicar (ej. el usuario
 // reemplazó una pista o una imagen por otra). Lo llama profile-editor.tsx
@@ -23,8 +27,6 @@ import { idDePeticion, logError, logInfo } from "@/lib/log"
 // quien lo está pidiendo?". La responde la tabla media_assets, y la responde
 // la BASE (vía RLS con el JWT del usuario), no esta ruta.
 
-const ALLOWED_FOLDERS = new Set(["images", "audio", "video"])
-
 // Tope defensivo: un publish normal deja unos pocos huérfanos.
 const MAX_URLS = 100
 
@@ -36,23 +38,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Inicia sesión para borrar archivos." }, { status: 401 })
     }
     const { supabase, user } = auth
+    // Fail-closed, igual que upload-url/finalize: sin las cuatro variables S3
+    // no se reserva ningún borrado que luego no podría completarse en R2.
+    if (!subidasR2Configuradas()) {
+      return NextResponse.json({ error: "El borrado de archivos no está disponible en este momento." }, { status: 503 })
+    }
 
-    const { urls } = await request.json()
-    if (!Array.isArray(urls) || urls.length === 0) {
+    const parsed = await readJsonObject(request, 262_144)
+    if (!parsed.ok) return NextResponse.json({ error: "Solicitud de borrado inválida o demasiado extensa." }, { status: parsed.status })
+    const { urls } = parsed.value
+    if (!Array.isArray(urls) || urls.length === 0 || urls.length > MAX_URLS ||
+      urls.some(url => typeof url !== "string" || url.length > 2048)) {
       return NextResponse.json({ error: "Lista de URLs inválida" }, { status: 400 })
     }
 
     // Filtrar a URLs que de verdad apuntan a nuestro bucket y a una carpeta
     // permitida, y quedarnos con la key de R2 de cada una.
-    const base = `${R2_PUBLIC_URL}/`
-    const candidateKeys = (urls as unknown[])
-      .filter((u): u is string => typeof u === "string" && u.startsWith(base))
-      .map((u) => u.slice(base.length))
-      .filter((key) => ALLOWED_FOLDERS.has(key.split("/")[0]))
-      .slice(0, MAX_URLS)
+    const base = R2_PUBLIC_URL ? `${R2_PUBLIC_URL.replace(/\/+$/, "")}/` : MEDIA_PATH
+    const candidateKeys = [...new Set((urls as string[])
+      .map(u => mediaKeyFromUrl(u, R2_PUBLIC_URL))
+      .filter((key): key is string => key !== null))]
 
     if (candidateKeys.length === 0) {
-      return NextResponse.json({ deleted: [], skipped: urls })
+      return NextResponse.json({ deleted: [], skipped: urls, failed: [] })
     }
 
     // La política media_assets_select_own hace que esta consulta devuelva
@@ -76,6 +84,7 @@ export async function POST(request: Request) {
 
     const deleted: string[] = []
     const skipped: string[] = []
+    const failed: string[] = []
 
     for (const key of candidateKeys) {
       const url = `${base}${key}`
@@ -90,14 +99,17 @@ export async function POST(request: Request) {
       }
 
       try {
-        await r2Client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }))
-        // El registro se borra después del archivo: si R2 falla, la fila
-        // sigue ahí y el próximo publish lo vuelve a intentar.
-        await supabase.from("media_assets").delete().eq("key", key)
-        deleted.push(url)
+        const removed = await deleteOwnedMedia(supabase, key, (ownedKey) =>
+          tombstoneUploadedObject(r2Client, R2_BUCKET_NAME, ownedKey), user.id
+        )
+        // La propiedad por sí sola no basta: el archivo puede seguir en uso
+        // en otro perfil, catálogo, feed o borrador, incluso de otra cuenta.
+        if (removed) deleted.push(url)
+        else skipped.push(url)
       } catch (err) {
         logError("api/delete-file", "fallo al borrar objeto de R2", err, { requestId, userId: user.id })
         skipped.push(url)
+        failed.push(url)
       }
     }
 
@@ -107,9 +119,10 @@ export async function POST(request: Request) {
       solicitados: candidateKeys.length,
       borrados: deleted.length,
       omitidos: skipped.length,
-      resultado: "ok",
+      fallidos: failed.length,
+      resultado: failed.length > 0 ? "error" : "ok",
     })
-    return NextResponse.json({ deleted, skipped })
+    return NextResponse.json({ deleted, skipped, failed })
   } catch (error) {
     logError("api/delete-file", "error inesperado al borrar", error, { requestId })
     return NextResponse.json({ error: "No se pudo borrar el archivo" }, { status: 500 })

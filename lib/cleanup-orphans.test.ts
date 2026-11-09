@@ -92,10 +92,10 @@ describe("clasificarClaves — capa 3: atribución obligatoria", () => {
     expect(r.huerfanas).toEqual([])
   })
 
-  it("con incluirSinAtribuir sí entra al borrado (limpieza de históricos)", () => {
+  it("ni un cliente antiguo puede autorizar borrar históricos sin propiedad", () => {
     const r = clasificar({ claves: ["audio/legado.mpeg"], incluirSinAtribuir: true })
-    expect(r.huerfanas).toEqual(["audio/legado.mpeg"])
-    expect(r.sinAtribuir).toEqual([])
+    expect(r.huerfanas).toEqual([])
+    expect(r.sinAtribuir).toEqual(["audio/legado.mpeg"])
   })
 
   it("incluirSinAtribuir NO anula las otras dos capas", () => {

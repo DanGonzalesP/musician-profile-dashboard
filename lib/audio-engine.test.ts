@@ -23,6 +23,7 @@ class AudioFalso {
   currentTime = 0
   duration = 0
   paused = true
+  ended = false
   muted = false
   preload = ""
   /** Resolutores pendientes de cada `play()`, en orden de llamada. */
@@ -312,11 +313,24 @@ describe("motor de audio · toggle, pause y stop", () => {
 
     motor.play("https://ejemplo.local/a.mp3", { onEnded: alTerminar })
     creados[0].currentTime = 180
+    creados[0].ended = true
     creados[0].emitir("ended")
 
     expect(alTerminar).toHaveBeenCalledTimes(1)
     expect(creados[0].currentTime).toBe(0)
     expect(motor.getState().playing).toBe(false)
+  })
+
+  it("un evento ended sin que el medio haya terminado no salta de pista", async () => {
+    const motor = await cargarMotor()
+    const alTerminar = vi.fn()
+
+    motor.play("https://ejemplo.local/a.mp3", { onEnded: alTerminar })
+    creados[0].currentTime = 42
+    creados[0].emitir("ended")
+
+    expect(alTerminar).not.toHaveBeenCalled()
+    expect(creados[0].currentTime).toBe(42)
   })
 })
 

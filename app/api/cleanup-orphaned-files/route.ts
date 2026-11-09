@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server"
-import { ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3"
+import { ListObjectsV2Command } from "@aws-sdk/client-s3"
+import { tombstoneUploadedObject } from "@/lib/r2-object-lifecycle"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2"
 import { getAuthenticatedContext } from "@/lib/server-auth"
-import { isAdminUser } from "@/lib/admin"
+import { hasPlatformPermission } from "@/lib/admin"
 import { clasificarClaves, VENTANA_DE_GRACIA_MS } from "@/lib/cleanup-orphans"
 import { logError, logInfo } from "@/lib/log"
+import { deleteOwnedMedia } from "@/lib/media-deletion"
+import { readJsonObject } from "@/lib/request-json"
 
 // Limpieza de archivos huérfanos de R2. Es la ruta más destructiva del
 // proyecto: borra objetos en masa y sin vuelta atrás.
 //
 // SEGURIDAD — historia de esta ruta, para que no se relaje de nuevo:
 //   • Importaba getAuthenticatedUser y nunca lo llamaba: cualquiera vaciaba el
-//     bucket con un curl. Hoy exige sesión + allowlist ADMIN_USER_IDS.
+//     bucket con un curl. Hoy exige sesión + permiso de mantenimiento.
 //   • `folder` llegaba sin validar y se podía apuntar a cualquier prefijo.
 //     Hoy se valida contra el mismo conjunto que acepta /api/upload-url.
 //   • El haystack se leía sin paginar y PostgREST corta en 1000 filas, así que
@@ -75,17 +78,20 @@ export async function POST(request: Request) {
   }
   const { user, supabase } = contexto
 
-  if (!isAdminUser(user.id)) {
+  if (!(await hasPlatformPermission(supabase, "maintenance"))) {
     return NextResponse.json({ error: "No tienes permiso para ejecutar la limpieza." }, { status: 403 })
   }
 
-  let cuerpo: Record<string, unknown>
-  try {
-    cuerpo = (await request.json()) as Record<string, unknown>
-  } catch {
-    return NextResponse.json({ error: "Cuerpo de la petición inválido" }, { status: 400 })
-  }
+  const input = await readJsonObject(request, 4096)
+  if (!input.ok) return NextResponse.json({ error: input.status === 413 ? "Petición demasiado grande" : input.status === 408 ? "La recepción tardó demasiado. Inténtalo de nuevo." : "Cuerpo de la petición inválido" }, { status: input.status })
+  const cuerpo = input.value
 
+  if ((cuerpo.folder !== undefined && typeof cuerpo.folder !== "string") ||
+      (cuerpo.alcance !== undefined && cuerpo.alcance !== "propios" && cuerpo.alcance !== "todos") ||
+      (cuerpo.simular !== undefined && typeof cuerpo.simular !== "boolean") ||
+      (cuerpo.incluirSinAtribuir !== undefined && typeof cuerpo.incluirSinAtribuir !== "boolean")) {
+    return NextResponse.json({ error: "Opciones de limpieza inválidas" }, { status: 400 })
+  }
   const folder = typeof cuerpo.folder === "string" ? cuerpo.folder : "audio"
   if (!ALLOWED_FOLDERS.has(folder)) {
     return NextResponse.json({ error: "Carpeta de destino inválida" }, { status: 400 })
@@ -99,9 +105,9 @@ export async function POST(request: Request) {
   // Ensayo: calcula y reporta exactamente igual, pero no borra nada.
   const simular = cuerpo.simular === true
 
-  if (incluirSinAtribuir && alcance !== "todos") {
+  if (incluirSinAtribuir) {
     return NextResponse.json(
-      { error: "Borrar archivos sin fila de propiedad requiere alcance 'todos'." },
+      { error: "No se pueden borrar archivos sin propiedad acreditada." },
       { status: 400 }
     )
   }
@@ -125,6 +131,9 @@ export async function POST(request: Request) {
       }
 
       if (!listRes.IsTruncated) break
+      if (!listRes.NextContinuationToken || listRes.NextContinuationToken === continuationToken) {
+        throw new Error("Listado de almacenamiento incompleto")
+      }
       continuationToken = listRes.NextContinuationToken
     }
 
@@ -200,12 +209,19 @@ export async function POST(request: Request) {
     // ─── 6) Borrar solo lo que sobrevivió a las tres capas ───────────────
     const deleted: string[] = []
     const failed: { key: string; error: string }[] = []
+    let protegidosAlRetirar = 0
 
     if (!simular) {
       for (const key of clasificacion.huerfanas) {
         try {
-          await r2Client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }))
-          deleted.push(key)
+          // La clasificación anterior sólo propone candidatos. Esta decisión
+          // atómica incluye todas las referencias, incluso privadas de otro
+          // artista, avatares/feed y escrituras posteriores al escaneo.
+          const removed = await deleteOwnedMedia(supabase, key, (ownedKey) =>
+            tombstoneUploadedObject(r2Client, R2_BUCKET_NAME, ownedKey), user.id
+          )
+          if (removed) deleted.push(key)
+          else protegidosAlRetirar++
         } catch (err) {
           logError("api/cleanup-orphaned-files", "fallo al borrar objeto de R2", err, {
             userId: user.id,
@@ -249,13 +265,14 @@ export async function POST(request: Request) {
         protegidosPorGracia: clasificacion.protegidasPorGracia.length,
         sinAtribuir: clasificacion.sinAtribuir.length,
         fueraDeAlcance: fueraDeAlcance.length,
+        protegidosAlRetirar,
       },
       deleted,
       failed,
       inUse: clasificacion.enUso,
       protegidosPorGracia: clasificacion.protegidasPorGracia,
       sinAtribuir: clasificacion.sinAtribuir,
-    })
+    }, { headers: { "Cache-Control": "no-store" } })
   } catch (error) {
     if (error instanceof FuenteIncompleta) {
       logError("api/cleanup-orphaned-files", "fuente del haystack incompleta", error, {

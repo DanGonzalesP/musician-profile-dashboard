@@ -14,7 +14,6 @@ const ENTORNO_COMPLETO = {
   R2_ACCESS_KEY_ID: "clave-de-prueba",
   R2_SECRET_ACCESS_KEY: "secreto-de-prueba",
   R2_BUCKET_NAME: "vibe-pruebas",
-  NEXT_PUBLIC_R2_PUBLIC_URL: "https://pub-ejemplo.r2.dev",
 }
 
 describe("variablesDeSubidaAusentes", () => {
@@ -40,8 +39,9 @@ describe("variablesDeSubidaAusentes", () => {
     ])
   })
 
-  it("un entorno vacío reporta las cinco", () => {
+  it("un entorno vacío reporta las cuatro variables S3", () => {
     expect(variablesDeSubidaAusentes({})).toEqual([...VARIABLES_DE_SUBIDA_R2])
+    expect(VARIABLES_DE_SUBIDA_R2).toHaveLength(4)
   })
 })
 
@@ -71,6 +71,21 @@ describe("subidasR2Configuradas — fail-closed", () => {
 
   it("sin configuración, no", () => {
     expect(subidasR2Configuradas({})).toBe(false)
+  })
+
+  it("la URL pública histórica no es necesaria para subir a un bucket privado", () => {
+    // Las URLs canónicas nuevas son /api/media: el bucket no se hace público.
+    expect(subidasR2Configuradas({ ...ENTORNO_COMPLETO, NEXT_PUBLIC_R2_PUBLIC_URL: undefined })).toBe(true)
+  })
+
+  it("la URL pública histórica no sustituye una variable S3 ausente", () => {
+    expect(
+      subidasR2Configuradas({
+        ...ENTORNO_COMPLETO,
+        R2_SECRET_ACCESS_KEY: undefined,
+        NEXT_PUBLIC_R2_PUBLIC_URL: "https://pub-ejemplo.r2.dev",
+      })
+    ).toBe(false)
   })
 
   it("un endpoint presente pero malformado también cierra la puerta", () => {

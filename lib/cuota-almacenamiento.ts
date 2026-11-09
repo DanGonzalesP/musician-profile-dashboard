@@ -8,15 +8,9 @@ import { logError } from "@/lib/log"
 // todos dentro del límite. Sin cuota, una sola cuenta puede llenar el bucket y
 // la factura de R2 la paga el dueño de la plataforma.
 //
-// ─── ARRANCA EN MODO OBSERVACIÓN, Y ES DELIBERADO ─────────────────────────
-// Es el mismo patrón que `lib/blocks-schema.ts` usa para la validación de
-// bloques (F3): por defecto REGISTRA lo que habría rechazado y deja pasar.
-//
-// El motivo es que nadie sabe todavía cuánto ocupa un artista real. Un límite
-// inventado y activo tiene un fallo asimétrico: si se queda corto, artistas
-// legítimos no pueden subir su disco y se van sin decir nada. Observar primero
-// convierte el número en una medición en vez de una corazonada, y el cambio a
-// rechazo es una variable de entorno, no un despliegue de código.
+// Ante configuración ausente o inválida se exige la cuota. El modo observar
+// requiere selección explícita para una ventana operativa controlada; no es
+// un límite de gasto y permite reservas por encima del techo.
 
 export const GIGABYTE = 1024 ** 3
 
@@ -32,7 +26,7 @@ export type ModoCuota = "observar" | "rechazar"
  * `proxyDeConfianza()` en lib/rate-limit.ts.
  */
 export function modoCuota(): ModoCuota {
-  return process.env.CUOTA_ALMACENAMIENTO_MODO === "rechazar" ? "rechazar" : "observar"
+  return process.env.CUOTA_ALMACENAMIENTO_MODO === "observar" ? "observar" : "rechazar"
 }
 
 /**
@@ -42,12 +36,13 @@ export function modoCuota(): ModoCuota {
  * vez de desactivar la cuota. Es lo contrario de lo que suele hacerse, y es a
  * propósito: `CUOTA_ALMACENAMIENTO_GB=` vacío por un despiste no debe traducirse
  * en "almacenamiento infinito para todos". Ante una configuración rota,
- * conviene seguir midiendo.
+ * se conserva un límite efectivo.
  */
 export function limiteCuotaBytes(): number {
   const crudo = Number(process.env.CUOTA_ALMACENAMIENTO_GB)
   const gb = Number.isFinite(crudo) && crudo > 0 ? crudo : CUOTA_POR_DEFECTO_GB
-  return Math.round(gb * GIGABYTE)
+  const bytes = Math.round(gb * GIGABYTE)
+  return Number.isSafeInteger(bytes) && bytes > 0 ? bytes : CUOTA_POR_DEFECTO_GB * GIGABYTE
 }
 
 export type DecisionCuota = {
@@ -94,16 +89,8 @@ export function evaluarCuota(opciones: {
 /**
  * Cuánto ocupa ya quien hace la petición, vía el RPC de la migración `0019`.
  *
- * ⚠️ Devuelve `null` cuando la consulta falla, y quien llama debe tratar ese
- * caso como "no se pudo medir" y DEJAR PASAR.
- *
- * Es la falla contraria a la del rate limit, y la asimetría es intencionada:
- * ahí, no poder consultar el contador significa no poder proteger un recurso
- * que cuesta dinero, así que se deniega. Aquí, no poder medir significaría
- * bloquear a un artista legítimo por un fallo NUESTRO —y encima uno que él no
- * puede resolver ni entender—. El costo de dejar pasar una subida de más es
- * unos megas; el de bloquear a alguien que está publicando su disco es que se
- * va.
+ * Devuelve `null` cuando la consulta falla o la respuesta es inválida.
+ * Quien llama debe detener la subida antes de registrar o firmar el archivo.
  */
 export async function usoDeAlmacenamiento(supabase: SupabaseClient): Promise<number | null> {
   const { data, error } = await supabase.rpc("uso_de_almacenamiento_bytes")
@@ -115,8 +102,9 @@ export async function usoDeAlmacenamiento(supabase: SupabaseClient): Promise<num
     return null
   }
 
-  const bytes = typeof data === "number" ? data : Number(data)
-  if (!Number.isFinite(bytes) || bytes < 0) {
+  const bytes = typeof data === "number" ? data
+    : typeof data === "string" && /^\d+$/.test(data) ? Number(data) : NaN
+  if (!Number.isSafeInteger(bytes) || bytes < 0) {
     logError("cuota-almacenamiento", "el RPC de uso devolvió un valor inesperado", undefined, {
       resultado: "error",
     })
