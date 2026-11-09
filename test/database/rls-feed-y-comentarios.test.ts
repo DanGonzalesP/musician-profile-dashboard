@@ -261,12 +261,14 @@ describe("RLS · feed, comentarios y bloqueos", () => {
       expect(data?.[0]?.asker_display_name).toBe("Beto Feed")
     })
 
-    it("ni quien preguntó ni un anónimo leen la bandeja de A", async () => {
+    // 0049: quien pregunta ve SUS preguntas enviadas (pantalla "Preguntas
+    // enviadas"), nunca el resto de la bandeja de A ni la de nadie más.
+    it("quien preguntó sólo ve su propia pregunta y un anónimo no lee la bandeja de A", async () => {
       const { data: comoBeto } = await beto.supabase
         .from("profile_questions")
-        .select("id")
-        .eq("id", preguntaDeBeto)
-      expect(comoBeto ?? []).toHaveLength(0)
+        .select("id, asker_user_id")
+      expect(comoBeto?.map((fila) => fila.id)).toContain(preguntaDeBeto)
+      expect((comoBeto ?? []).every((fila) => fila.asker_user_id === beto.id)).toBe(true)
 
       const { data: comoAnon, error } = await clienteAnonimo()
         .from("profile_questions")

@@ -90,6 +90,7 @@ describe("Security Advisor · fronteras explícitas", () => {
   })
 
   it("el wrapper de borrado elimina sólo a la cuenta autenticada", async () => {
+    expect((await ana.supabase.rpc("begin_media_account_closure")).data).toBe(true)
     const { error } = await ana.supabase.rpc("eliminar_mi_cuenta")
     expect(error).toBeNull()
 
