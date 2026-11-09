@@ -220,10 +220,9 @@ aplicar migraciones.
 pnpm node scripts/setup-r2-cors.mjs
 ```
 
-Permite `localhost`, `*.workers.dev` y el origen de `NEXT_PUBLIC_SITE_URL`.
-
-> ⚠️ **Esa variable tiene que estar definida al correrlo.** Si no, tu dominio de
-> producción no queda autorizado y las subidas fallarán desde él.
+Exige `NEXT_PUBLIC_SITE_URL` con un origen exacto, sin comodines ni orígenes
+añadidos automáticamente. Permite sólo el PUT condicional de la app. Sin
+configuración válida no aplica cambios. Para staging, seguir [staging.md](staging.md).
 
 ## 1.9 · Desplegar — 🌐 Web o 💻 Terminal
 

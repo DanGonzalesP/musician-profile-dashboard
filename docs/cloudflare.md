@@ -184,9 +184,10 @@ Esto es lo que hace que "publicar" se vea de inmediato en el perfil público.
 pnpm node scripts/setup-r2-cors.mjs
 ```
 
-Ahora permite `localhost`, `*.workers.dev` y el origen de
-`NEXT_PUBLIC_SITE_URL`. Si esa variable no está definida al correrlo, el
-dominio de producción **no** queda permitido y las subidas fallarán desde él.
+Exige `NEXT_PUBLIC_SITE_URL` con un origen exacto: no agrega localhost ni
+comodines. Permite sólo PUT con `Content-Type` e `If-None-Match`; las lecturas
+se sirven por `/api/media`. Sin origen válido o configuración R2 completa,
+no envía cambios. Para staging, usar la regla fijada en [staging.md](staging.md).
 
 ---
 
