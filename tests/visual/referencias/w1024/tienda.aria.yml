@@ -7,9 +7,9 @@
   - heading "Productos" [level=2]
   - text: 1 producto ¡Últimas 5! Ropa y textil
   - paragraph: Polera de Prueba
-  - paragraph: Producto ficticio del artista de prueba.
+  - group: "Detalles del producto : Polera de Prueba"
   - paragraph: /PEN \d+\.\d+/
-  - text: Consultar
+  - text: Sin enlace de compra
   - paragraph: Trabaja conmigo
   - heading "Servicios" [level=2]
   - text: 1 servicio Clases y mentoría
@@ -17,3 +17,13 @@
   - paragraph: Servicio ficticio del artista de prueba.
   - text: /Online \d+ minutos/
   - paragraph: /PEN \d+\.00por hora/
+  - text: Sin enlace de reserva
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"

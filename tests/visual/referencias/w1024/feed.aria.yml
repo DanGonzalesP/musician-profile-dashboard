@@ -24,19 +24,29 @@
       - button "Músico Intérprete, vocalista o músico de sesión"
       - button "Grupos musicales Páginas de bandas y ensambles"
   - button "Reproducir"
-  - text: /Pista Publica de Prueba Artista de Prueba 0:\d+/
+  - text: Pista Publica de Prueba
+  - link "Ver perfil de Artista de Prueba":
+    - /url: /artista_prueba
+    - text: ""
+  - alert: No se pudo reproducir el audio. Comprueba tu conexión y vuelve a intentarlo. Si continúa, el archivo puede no estar disponible.
+  - button "Reintentar reproducción"
+  - text: /0:\d+/
   - slider "Progreso de la canción": "0"
   - text: /0:\d+/
   - button "Guardar canción"
   - button "Reproducir"
   - button "Ver comentarios"
+  - heading "Llegaste al final del contenido cargado" [level=2]
+  - paragraph: Puedes cambiar de filtro o actualizar para buscar nuevas publicaciones.
+  - button "Actualizar feed"
   - button "Contenido anterior" [disabled]
-  - button "Siguiente contenido" [disabled]
+  - button "Siguiente contenido"
   - button "Compartir"
   - complementary "Comentarios":
     - paragraph: Comentarios 0
     - paragraph: Pista Publica de Prueba — Artista de Prueba
     - paragraph: Nadie ha comentado todavía. Sé la primera persona en decir algo.
+    - button "Ver los más recientes"
     - link "Inicia sesión para comentar":
       - /url: /login
 - alert

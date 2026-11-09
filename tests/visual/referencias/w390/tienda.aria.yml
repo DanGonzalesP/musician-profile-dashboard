@@ -2,13 +2,22 @@
   - link "Volver al perfil":
     - /url: /artista_prueba
   - text: Artista de Prueba
-  - button "productos"
+  - button "productos" [pressed]
   - button "servicios"
 - main:
   - paragraph: Tienda
   - heading "Productos" [level=2]
   - text: 1 producto ¡Últimas 5! Ropa y textil
   - paragraph: Polera de Prueba
-  - paragraph: Producto ficticio del artista de prueba.
+  - group: "Detalles del producto : Polera de Prueba"
   - paragraph: /PEN \d+\.\d+/
-  - text: Consultar
+  - text: Sin enlace de compra
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"

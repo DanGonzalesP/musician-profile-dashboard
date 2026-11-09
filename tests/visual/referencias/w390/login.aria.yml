@@ -4,12 +4,19 @@
   - link "Ir al feed principal":
     - /url: /
     - img
-  - heading "Bienvenido a Vibe" [level=2]
+  - heading "Bienvenido a Vibe" [level=1]
   - paragraph: Ingresa para gestionar tu música y productos.
 - text: Correo Electrónico
-- textbox "correo@ejemplo.com"
+- textbox "Correo Electrónico":
+  - /placeholder: correo@ejemplo.com
 - text: Contraseña
-- textbox "••••••••"
+- textbox "Contraseña":
+  - /placeholder: ••••••••
+- button "Mostrar contraseña"
+- link "¿Olvidaste tu contraseña?":
+  - /url: /recuperar
+- link "Reenviar confirmación de correo":
+  - /url: /confirmar-correo
 - button "Ingresar"
 - button "¿No tienes cuenta? Regístrate aquí"
 - paragraph:
@@ -24,3 +31,12 @@
   - text: ·
   - link "Centro legal":
     - /url: /legal
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"
