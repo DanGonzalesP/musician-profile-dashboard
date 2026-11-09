@@ -1,8 +1,7 @@
 # Runbook — Un usuario reporta contenido borrado
 
-**Síntoma típico:** "se borraron mis fotos/mi audio". Es el incidente que este
-proyecto ya vivió (el bug de las 1000 filas de PostgREST en el cleanup) y el que
-más red de seguridad tiene ahora.
+**Síntoma típico:** "se borraron mis fotos/mi audio". La limpieza tiene
+protecciones en aplicación, pero no hay una recuperación de R2 confirmada.
 
 ## 1. Rastrear qué pasó
 
@@ -26,20 +25,20 @@ Tras F2, la limpieza **no** borra:
 
 Si el archivo cae en uno de esos casos, no se borró por la limpieza.
 
-## 3. Recuperar
+## 3. Evaluar recuperación
 
-- **Con object versioning en R2** (ver [`../backups.md`](../backups.md)): el
-  `DELETE` dejó un marcador, no destruyó el objeto. Restaurar la versión previa
-  desde la consola de Cloudflare dentro de la ventana de retención.
-- **Sin versioning:** si el objeto no está en R2 y no hay versión, sólo se
-  recupera desde un backup de R2 si existe. Este es el escenario que el
-  versioning está para evitar — priorizar activarlo (acción humana #15).
-- Restaurar además la fila de `media_assets` si se borró, para que el objeto
-  vuelva a tener dueño y no sea candidato a una futura limpieza.
+- Comprobar si existe una copia independiente del objeto y si fue probada; no
+  asumir que un `DELETE` dejó una versión recuperable. Cloudflare documenta el
+  borrado de R2 como irreversible y lifecycle como expiración/transición, no
+  como backup. Referencias y estado: [`../backups.md`](../backups.md).
+- Si existe copia, restaurar primero en un destino aislado, comprobar clave,
+  contenido y metadatos, y asociar la fila de `media_assets` correcta antes de
+  hacerla visible. La recuperación queda pendiente si no existe copia válida.
 
 ## 4. Cerrar
 
-- Confirmar con el usuario que el contenido volvió.
+- Confirmar con el usuario si se recuperó; no afirmar restauración hasta
+  verificar el objeto servido y la fila de propiedad.
 - Si la causa fue un bug, abrir el arreglo con una prueba que lo fije.
 - Registrar el incidente y el tiempo de recuperación.
 
@@ -48,4 +47,5 @@ Si el archivo cae en uno de esos casos, no se borró por la limpieza.
 - Ventana de gracia de 7 días + haystack completo + aborto ante lectura parcial
   (F2).
 - Cuotas (F11) y alertas de gasto acotan el volumen.
-- Object versioning en R2 (pendiente, humano) es la última red.
+- Copia independiente y prueba de restauración de R2 siguen pendientes;
+  versioning/delete markers no se consideran una capacidad disponible.

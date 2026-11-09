@@ -1,7 +1,43 @@
 # Acciones pendientes — todo lo que necesita una persona
 
-**Estado: 2026-09-22.** Todo el código está en `main` y en verde. Lo que falta
-no es programar: es crear recursos, configurar paneles y tomar decisiones.
+> Revisión 2026-10-04: consultar primero `../ACCIONES_HUMANAS_FINALES.md` y
+> `../ESTADO_PLAN.md`. Se conserva este historial; sus afirmaciones de que
+> R2_ENDPOINT/R2_BUCKET_NAME sólo van en build y de que bastan credenciales
+> para terminar ya no describen el estado verificado. No recrear recursos.
+
+**Estado histórico 2026-09-27.** Decima fue restaurado entonces desde la cuenta
+personal y los recursos de caché de Cloudflare se crearon en la cuenta personal.
+**Actualización 2026-11-04:** el proyecto se transfirió a la organización
+empresarial Supabase y se renombró **Vibe Music**; conserva la referencia y los
+datos. No asumir que Vibe está desplegado: siguen pendientes las verificaciones
+operativas indicadas más abajo. Se retiró con confirmación explícita el miembro
+temporal Developer; la UI muestra un miembro Owner (`vibemusicprofile@gmail.com`).
+Supabase conserva 3 usuarios, 2 perfiles, 14 bloques, 63 objetos Storage, 0
+`media_assets` y 18 migraciones. Antes de retirarlo se respaldaron y verificaron
+80 snippets privados únicos (80/80; 141340 bytes de texto plano total) con DPAPI
+local en `.wrangler/migracion-empresa-2026-11-04/snippets-cifrados/manifest.json`.
+Los snippets del panel se eliminaron al retirar el miembro; no se eliminaron la
+BD ni archivos. Estado al inicio del 2026-11-04, antes de la copia: Cloudflare
+empresarial tenía R2 activo, buckets privados vacíos
+`vibe-artist-media`, `vibe-cache-incremental` y `vibe-static-assets`, y D1 vacía
+`02051ecd-e52a-4b5f-8e81-f5d44b63a03f`; entonces aún no había copia de archivos
+ni deploy.
+
+**Actualización 2026-11-04 (estado posterior):** Wrangler empresarial autorizado
+usa el perfil `vibe` asociado solo a este repositorio; el perfil global y Bancary
+quedaron intactos. Supabase CLI empresarial está aislada, token protegido con
+DPAPI, y solo lista `Vibe Music` (`ACTIVE_HEALTHY`). D1 ahora tiene el esquema
+`revalidations(tag,revalidatedAt,stale,expire)`, `tag` único, 0 filas. La copia
+R2 de `derias-assets` a `vibe-artist-media` terminó y se verificó: 67 objetos,
+124,720,470 bytes; origen intacto, bucket destino privado, `media_assets` 0,
+URLs antiguas intactas y sin deploy. Evidencia local ignorada por Git:
+`.wrangler/migracion-empresa-2026-11-04/r2-copia-verificada.json`. WASM cotejado:
+32,232,419 bytes, SHA-256 `9F57947A5BD530D8F00C5B3F2CB2A3492FAA7E5D823315342D6A8656D0A6B7B7`.
+La credencial empresarial de runtime está creada, protegida y verificada con
+alcance al bucket de artistas; la primera clave se rotó tras una exposición
+accidental y su revocación se comprobó. Detalle y evidencia en
+[`migracion-empresa-vibe.md`](migracion-empresa-vibe.md). No ejecutar migraciones `0018`–`0024`: el dry-run detectó que
+`0022` es incompatible con rutas antiguas antes de un corte coordinado.
 
 **Cómo leer este documento.** Cada acción lleva una etiqueta:
 
@@ -22,21 +58,28 @@ Together AI se escriben directamente en el panel del proveedor. Ningún agente
 
 Sin esto, Vibe no puede salir a producción. En orden.
 
-## 1.0 · Reactivar el proyecto de Supabase de Vibe — 🌐 Web
+## 1.0 · Reactivar y transferir el proyecto de Supabase de Vibe — ✅ Completado
 
-El proyecto actual de Vibe se llama **Decima** en Supabase (referencia
-`yiexwdqgaqoqlfqihsfr`). Está suspendido por inactividad: **no lo recrees ni
-uses los proyectos de Bancary**. En el panel de Supabase, abre Decima y pulsa
-**Restore project**. Espera a que el estado cambie a activo antes de continuar.
+El proyecto actual de Vibe se llama **Vibe Music** en Supabase (referencia
+`yiexwdqgaqoqlfqihsfr`), transferido a la organización empresarial el
+2026-11-04. Su nombre anterior era **Decima**; conserva la misma referencia y
+datos. Fue restaurado inicialmente el 2026-09-27 desde la cuenta personal.
+**No lo recrees ni uses los proyectos de Bancary.**
 
-> La restauración conserva la base de datos y sus usuarios. Hasta que termine,
-> Vibe no puede iniciar sesión, mostrar perfiles ni ejecutar migraciones.
+> La restauración conservó la base de datos y sus usuarios. La transferencia
+> también conservó la referencia y los datos; las verificaciones operativas
+> siguen pendientes.
 
 ## 1.1 · Crear el bucket de caché en R2 — ✅ Completado
 
-Creado el 2026-09-22 en la cuenta temporal actual de Cloudflare.
+Creado el 2026-09-27 en la cuenta personal de Cloudflare de Vibe, separada de Bancary.
 
 - **Nombre:** `vibe-cache-incremental`
+
+También está creado el bucket privado `vibe-static-assets`, separado de la
+caché y de los archivos de artistas. Contiene únicamente el WASM de FFmpeg que
+supera el límite de 25 MiB de Workers Static Assets; el Worker lo sirve por una
+ruta de mismo origen que solo expone ese objeto fijo.
 
 O por terminal:
 
@@ -51,7 +94,7 @@ pnpm wrangler r2 bucket create vibe-cache-incremental
 
 ## 1.2 · Crear la base D1 de etiquetas — ✅ Completado
 
-Creada el 2026-09-22 en la cuenta temporal actual de Cloudflare.
+Creada el 2026-09-27 en la cuenta personal de Cloudflare de Vibe, separada de Bancary.
 
 - **Nombre:** `vibe-cache-etiquetas`
 
@@ -61,19 +104,16 @@ O por terminal:
 pnpm wrangler d1 create vibe-cache-etiquetas
 ```
 
-Su identificador ya quedó registrado en `wrangler.jsonc`.
+Su identificador `e2596149-b064-4be5-95b9-6ed0acede920` ya quedó registrado en `wrangler.jsonc`.
 
 > Esto es lo que hace que "publicar" se vea **de inmediato** en el perfil
 > público. Sin ello, un artista publica y sigue viendo su versión anterior.
 
 ## 1.3 · Pegar el `database_id` — ✅ Completado
 
-El marcador de `wrangler.jsonc` se sustituyó por el identificador de la D1 de
-Vibe el 2026-09-22.
-
-> Lo dejé como marcador **a propósito**: así el despliegue falla en vez de
-> arrancar contra una base que no existe y que lo descubras cuando un artista
-> publique.
+El identificador real de la D1 de Vibe se fijó en `wrangler.jsonc` el
+2026-09-27, junto al `account_id` personal para impedir que Wrangler elija la
+cuenta de Bancary por defecto.
 
 ## 1.4 · Variables de entorno en Cloudflare — 🌐 Web
 
@@ -154,27 +194,25 @@ un artista que perdió el acceso.
 > de salir, sin aviso. Si vas a abrir registros, configura un SMTP propio
 > (Resend, Postmark, SendGrid o similar).
 
-## 1.7 · Aplicar las migraciones pendientes — 🌐 Web (SQL Editor) o 💻 Terminal
+## 1.7 · Revisar las migraciones pendientes — 🌐 Web (SQL Editor) o 💻 Terminal
 
-Producción está en `0017`. Faltan **dos**:
+El registro histórico de abajo decía que producción estaba en `0017` y que
+faltaban dos migraciones. Actualización 2026-11-04: Supabase CLI empresarial
+aislada lista solo `Vibe Music` en `ACTIVE_HEALTHY`; el dry-run remoto inspeccionó
+`0018`–`0024` y **no aplicó ninguna**. No ejecutar ni retirar `--dry-run`: `0022`
+es incompatible con rutas antiguas y su aplicación exige corte coordinado.
+Comprobar el historial exacto y acordar secuencia/compatibilidad antes de cualquier
+aplicación. La tabla siguiente conserva únicamente los nombres que ya figuraban
+en el registro histórico:
 
 | Migración | Qué hace |
 |---|---|
 | `0018_corregir_concurrencia_y_suspension.sql` | Concurrencia y suspensión de perfiles |
 | `0019_cuota_almacenamiento.sql` | La medición de la cuota de almacenamiento |
 
-⚠️ **Haz un backup antes** (Supabase → Database → Backups).
-
-Por web: Supabase → SQL Editor → pegar el contenido de cada archivo **en orden**
-y ejecutar de una en una, verificando entre medias.
-
-Por terminal:
-
-```bash
-pnpm supabase db push --linked --dry-run
-```
-
-Revisa lo que va a hacer, y si te convence, quita `--dry-run`.
+Antes de una futura ejecución se requiere backup verificado, comparación del
+historial remoto y plan de corte compatible; el dry-run por sí solo no basta para
+aplicar migraciones.
 
 ## 1.8 · Configurar el CORS del bucket de archivos — 💻 Terminal
 

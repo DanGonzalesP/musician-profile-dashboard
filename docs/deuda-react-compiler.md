@@ -24,16 +24,52 @@ El mecanismo es un **trinquete** (`eslint . --max-warnings=<N>`):
 
 ## Techo vigente
 
-**`N = 22`** — declarado en `package.json` (`"lint": "eslint . --max-warnings=22"`).
+**2026-11-09: `N = 0`.** Las13 advertencias medidas ese día se corrigieron sin
+apagar reglas: reinicio de estado por cambio de props durante el render
+(CommentsPanel, AskAboutBlock, grupo), `useEffectEvent` para cargas iniciales
+(productos, servicios), `useSyncExternalStore` para la URL de compartir, lectura de
+Auth antes del primer `setState` (grupos), microtarea en el fallo síncrono de
+suscripción (FeedHeader) y alias del objeto ref en limpiezas de contadores de
+generación (no nodos DOM). `npx eslint .`: 0 problemas. Pendiente confirmarlo en
+`pnpm qa` final y CI. El texto de abajo es historia.
+
+Perfil público y tienda (2026-11-06): la nueva sesión de datos inicializa su estado
+de carga/error; ya no lo establece síncronamente desde el efecto de carga.
+Reintentos nacen de eventos. Se mantiene el techo18 hasta la medición final.
+
+TrackListSession (2026-11-06) usa la notificación inicial de ResizeObserver en
+vez de medir y actualizar estado síncronamente en el efecto. También escucha
+el breakpoint móvil para actualizar la presentación si el ancho del contenedor
+no cambia. Sin ejecución de lint todavía; el techo permanece en18.
+
+El handler generarBannerConIA queda conectado al inspector del bloque principal
+(2026-11-06), con vista previa y aceptación del archivo antes de la subida normal.
+Ya no es una función deliberadamente desconectada. Pendiente medir lint al final;
+no se reduce el techo ni se declara la advertencia resuelta por ejecución.
+
+Implementación del 2026-11-06, pendiente de validación final: ThemeToggle,
+AppAccentCard y LocaleProvider sustituyen la recuperación de preferencias con
+setState en efectos por un almacén externo con snapshot de servidor estable.
+Conserva claves anteriores, notifica cambios en la misma pestaña y entre pestañas,
+y conserva una elección en memoria si localStorage rechaza la escritura.
+ThemePreferences sincroniza las clases del documento fuera de Configuración.
+No se ejecutó lint ni se reduce el techo hasta medir el resultado. Pendientes:
+hidratación, preferencias previas, almacenamiento bloqueado/lleno, borrar claves,
+cambio entre pestañas, desmontaje, teclado y axe. El switch de tema ahora tiene
+nombre accesible explícito.
+
+**Histórico `N = 18`** — antes declarado en `package.json`. El 2026-11-05 se retiraron los tres `any` de la pantalla de limpieza con validación de su respuesta, sin desactivar reglas.
 
 > Historia del techo:
+> - **18** — respuesta de limpieza tipada y validada; errores capturados como `unknown`.
+> - **21** — eliminado el binding sin uso de `FeedContainer`; se preservan las actualizaciones de estado.
 > - **28** — línea base medida sobre el árbol commiteado `6ffa555` (ver `linea-base.md`).
 > - **22** — tras aplicar el trabajo de seguridad/validación no commiteado de esta
 >   tanda (F2/F3/F5 + adopción de `lib/log.ts`), que retiró 6 advertencias de paso
 >   (varios `catch (error: any)` pasaron a `catch (error)` tipado). El techo se
 >   ratchetea a la cifra realmente alcanzada por el árbol entregado.
 
-## Inventario actual (22)
+## Inventario previo (22)
 
 Medido con `npx eslint . -f json`. Reproducible con:
 
@@ -81,8 +117,13 @@ Retiro: junto con los `set-state-in-effect` del mismo archivo.
 
 | Archivo | Línea | Símbolo |
 |---|---|---|
-| `components/feed/FeedContainer.tsx` | 31 | variable sin usar |
 | `components/profile-editor.tsx` | 556 | `generarBannerConIA` |
+
+En la revisión del 2026-11-04 se retiró la advertencia de variable sin usar de
+`FeedContainer`: su valor no se leía, pero se conservó el setter y sus
+actualizaciones para evitar cambiar comportamiento. La ejecución actual de
+`pnpm lint` muestra 21 advertencias; el inventario histórico restante se
+mantiene por archivo hasta retirar cada warning de forma segura.
 
 `generarBannerConIA` es un handler definido pero no cableado a ningún botón hoy;
 se conserva porque la lógica de generación con IA sigue siendo funcional. Retiro:
@@ -93,3 +134,16 @@ al cablearlo de nuevo o al retirar la generación de banner, lo que ocurra prime
 Nunca subir `N`. Si un cambio necesita añadir una advertencia, o se arregla otra
 en el mismo PR para compensar, o se justifica por escrito aquí y se decide
 explícitamente — nunca en silencio.
+
+Implementación adicional 2026-11-06: ImageAdjustModal deriva el desplazamiento
+válido sin efecto de setState y reinicia su sesión por imagen/proporción. Se retira
+su desactivación de exhaustive-deps; carga de imagen sólo actualiza desde eventos.
+Pendiente medir lint en la etapa final; techo de 18 sin cambios.
+
+LocationSelect (2026-11-06): selección derivada del valor recibido y catálogo
+cargado asíncronamente; retirados setState síncronos del efecto de departamentos
+y la desactivación de exhaustive-deps. Resultado de lint pendiente; techo intacto.
+
+TracksFields (2026-11-06): lectura inicial de duraciones con trabajos estables y
+useEffectEvent para aplicar al borrador vigente, sin desactivar exhaustive-deps.
+Sin medición de lint ni pruebas todavía; techo18 intacto.

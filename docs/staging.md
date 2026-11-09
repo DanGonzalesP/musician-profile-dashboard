@@ -1,70 +1,192 @@
 # Staging — Vibe
 
-Cierra **P-24**. Un lugar donde probar migraciones y despliegues sin arriesgar
-los datos reales. Hoy no existe: cualquier prueba de migración se hace contra
-producción, que es exactamente lo que causó los incidentes de pérdida de datos
-que documenta `DESPLIEGUE.md`.
+Actualización 2026-11-06. Preparación del cierre 20, **no acreditado**.
+Se crearon los tres buckets R2 y la D1 exclusiva de staging el 2026-11-06;
+Supabase staging se creó después y recibió las migraciones `0000`–`0070`. No hay
+Worker staging desplegado. La copia local
+en `:3070` y los fixtures no sustituyen la integración remota.
 
-## Principio
+## Aislamiento obligatorio
 
-Staging es un **clon aislado**, nunca un espejo con datos reales. Jamás se
-copian perfiles, correos ni DNIs de producción a staging (Ley 29733: los datos
-personales sólo se tratan para el fin consentido; "probar" no es ese fin).
-Staging se siembra con datos ficticios (`tests/e2e/fixtures`).
+Durante la preparación, Auth staging tiene `disable_signup=true`,
+`mailer_autoconfirm=false` y `external_anonymous_users_enabled=false`.
+Se aplicaron mediante PATCH y se confirmaron con GET el 2026-11-06; evidencia
+no secreta en `.wrangler/staging-schema/auth-preparacion.json`. No se modificó
+Auth de producción. Antes de los recorridos de registro, definir el origen
+exacto, callbacks y acceso restringido de staging; habilitar el registro sólo
+en esa ventana controlada. No desactivar la confirmación de correo para
+simular que la entrega SMTP funciona.
 
-## Recursos exclusivos por entorno
+Staging usa datos ficticios y recursos propios. No copiar perfiles, correos,
+DNIs, archivos privados ni respaldos de producción para sembrarlo. Verificar
+cuenta empresarial y propiedad antes de crear o modificar recursos. No cambiar
+planes ni facturación; si la capacidad disponible exige un gasto, se necesita
+decisión del titular antes de contratarlo.
 
-| Recurso | Producción | Staging |
+| Recurso | Destino de staging | Estado |
 |---|---|---|
-| Proyecto Supabase | el actual | **uno nuevo, separado** |
-| Bucket R2 | el actual | **uno nuevo, separado** |
-| Dominio | dominio final | `staging.<dominio>` |
-| Credenciales | las de prod | **propias de staging** |
-| `TOGETHER_API_KEY` | la de pago | una de prueba o vacía (la ruta degrada a 503) |
+| Worker | `vibe-staging` | nombre propuesto |
+| Supabase Auth/Postgres | `Vibe Music Staging`, `iyppeurjtbuydhjtraxf` | creado en `sa-east-1`; migraciones `0000`–`0070` aplicadas |
+| R2 de artistas | `vibe-staging-artist-media` | creado; sin archivos subidos ni acceso público habilitado en esta operación |
+| R2 de caché | `vibe-staging-cache-incremental` | creado; sin archivos subidos |
+| R2 de WASM | `vibe-staging-static-assets` | creado; `ffmpeg-core.wasm` subido; lectura desde Worker pendiente |
+| D1 de etiquetas | `vibe-staging-cache-etiquetas` | creada: `37f4a26b-5d19-4143-a632-c52a2aba7dd5`; esquema inicial aplicado |
+| Durable Object | instancia del Worker staging | pendiente |
+| Origen HTTPS | exclusivo y con acceso definido | pendiente; no hay dominio elegido |
 
-Ninguna credencial se comparte entre entornos. Una fuga en staging no debe
-tocar producción.
+La [plantilla de Wrangler](../wrangler.staging.jsonc.example) incluye los
+bindings del adaptador actual y autorreferencia a `vibe-staging`. El UUID D1
+es deliberadamente inválido hasta identificar el recurso real. No pasar la
+plantilla directamente a un despliegue ni sustituir el UUID con el de producción.
+`workers_dev` y `preview_urls` quedan deshabilitados; no se publica una entrada
+por defecto. Definir explícitamente el acceso al origen antes de habilitarlo.
 
-## Tabla de variables por entorno
+La [configuración concreta](../wrangler.staging.jsonc) ya referencia los recursos
+creados. La sesión `whoami --json` confirmó la cuenta empresarial del titular;
+los comandos de creación terminaron con código0. Se aplicó
+`scripts/cache-etiquetas-d1.sql` sólo a la D1 staging mediante `--config
+wrangler.staging.jsonc --profile vibe --remote`. No se modificaron planes,
+configuración de producción, CORS, secretos ni rutas públicas. Esto acredita
+aprovisionamiento, no funcionamiento de la aplicación ni aislamiento probado.
 
-| Variable | Producción | Staging | Local |
-|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | prod | staging | `http://127.0.0.1:54321` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | prod | staging | local |
-| `NEXT_PUBLIC_R2_PUBLIC_URL` | prod | staging | local/prueba |
-| `R2_ENDPOINT` / `R2_*` | prod | staging | prueba |
-| `NEXT_PUBLIC_SITE_URL` | dominio final | `https://staging.<dominio>` | `http://localhost:3000` |
-| `ADMIN_USER_IDS` | UUIDs reales | UUIDs de prueba | de prueba |
-| `TRUSTED_PROXY` | `true` en `wrangler.jsonc` | igual | sin definir |
+El 2026-11-06 se subió `public/ffmpeg/ffmpeg-core.wasm` mediante `r2 object put`
+con `--remote --config wrangler.staging.jsonc --profile vibe`, tipo
+`application/wasm`. Wrangler terminó con código 0 y `Upload complete.`. Antes
+de subirlo, su SHA-256 coincidió con el archivo del paquete instalado
+`@ffmpeg/core/dist/esm/ffmpeg-core.wasm`:
+`9F57947A5BD530D8F00C5B3F2CB2A3492FAA7E5D823315342D6A8656D0A6B7B7`.
+No se habilitó acceso público. Falta comprobar su lectura mediante el binding
+del Worker y la conversión en navegador durante la verificación final.
 
-Los nombres canónicos están en [`.env.example`](../.env.example).
+## Configuración antes del build
 
-## Flujo de despliegue
+El 2026-11-06 `scripts/preparar-claves-staging.ps1` terminó con código 0:
+registró un par HMAC exclusivo para recibos de medios y otro independiente
+para límites anónimos en las tablas privadas de staging. El material local
+queda cifrado con DPAPI en `.wrangler/supabase-empresa/staging-hmac.dpapi`.
+El script comprueba proyecto/organización, conserva las claves en reintentos
+y aborta si un identificador existente corresponde a otro secreto. No muestra
+valores ni respuestas de error que puedan contener SQL sensible.
+**Falta instalarlas como secretos del Worker staging** cuando se prepare el
+despliegue autorizado tras los gates; no se activó aplicación ni mantenimiento.
 
-Definido en `.github/workflows/staging.yml` *(pendiente, F13)*:
+La API de administración confirmó la organización `gojxsdxguggjmcbkwbhb`
+(`Vibe`) en plan `free` y sólo el proyecto de producción antes de crear staging.
+La creación del proyecto independiente terminó con código 0 el 2026-11-06.
+Se solicitó explícitamente el plan gratuito, sin cambio de suscripción, y no se
+copiaron datos. La contraseña nueva se generó aleatoriamente y se guardó sólo
+cifrada con DPAPI en la carpeta local ignorada de credenciales empresariales;
+no está en esta documentación ni en configuración de la aplicación.
+El inventario no secreto quedó en
+`.wrangler/supabase-empresa/staging-project.json`.
 
-1. Merge a `main` → deploy automático a **staging**.
-2. Aplicar migraciones en staging (nunca a mano; con la CLI).
-3. Correr `pnpm smoke <url-staging>` (ver `scripts/smoke-staging.mjs`).
-4. Verificación manual del flujo tocado por la fase.
+Se comprobó la identidad del proyecto y que tenía 0 usuarios y 0 tablas públicas.
+Se copiaron únicamente las migraciones a `.wrangler/staging-schema`, con una
+configuración mínima propia. La CLI instalada terminó con código 0 al ejecutar
+`db push --project-ref iyppeurjtbuydhjtraxf --workdir .wrangler/staging-schema
+--skip-vault --yes`: aplicó `0000`–`0070`, sin semillas ni roles adicionales.
+La contraseña y el token se pasaron en el entorno del proceso, sin guardarlos
+en la configuración. No se enlazó el repositorio principal a staging.
+No restaurar producción ni apuntar el baseline `0000` al proyecto
+`yiexwdqgaqoqlfqihsfr`. La instalación no acredita todavía RLS, autenticación
+ni conexión con Cloudflare; esas pruebas siguen pendientes para el final.
 
-Producción **sigue siendo manual y deliberada** (ver `DESPLIEGUE.md` y §7 del
-plan). Staging valida; producción se promueve a mano.
+Referencias oficiales consultadas:
+[creación por API](https://supabase.com/docs/reference/api/v1-create-a-project)
+y [alcance del plan gratuito](https://supabase.com/docs/guides/platform/billing-on-supabase).
 
-## Alternativa mínima si el presupuesto no da (§16 del plan)
+Trabajar en una copia aislada, sin `.env` heredados ni artefactos `.next` o
+`.open-next` de otro entorno. Copiar la plantilla como `wrangler.staging.jsonc`
+en la raíz de esa copia y completar únicamente recursos verificados de staging.
+En este repositorio ya existe la configuración concreta: conservarla al preparar
+la copia, sin sobrescribirla con la plantilla de UUID inválido.
 
-Un segundo proyecto Supabase + segundo bucket cuestan dinero. Si no se puede:
+- `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`: proyecto staging,
+  iguales en build y ejecución. No usar service role.
+- `NEXT_PUBLIC_SITE_URL`: origen HTTPS exacto de staging; configurar ese mismo
+  origen y sus callbacks en Supabase Auth, sin comodines hacia producción.
+- `R2_ACCOUNT_ID`, `R2_ENDPOINT`, `R2_BUCKET_NAME`: cuenta empresarial y bucket
+  staging de artistas. Endpoint disponible también durante build para CSP.
+- `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`: par exclusivo con permisos mínimos
+  sobre el bucket staging. CORS sólo para el origen de staging necesario para PUT.
+- `NEXT_PUBLIC_R2_PUBLIC_URL`: sólo si los datos ficticios tienen un origen
+  histórico que deba reconocerse; nunca activar acceso público al bucket para
+  rellenarlo. Medios servidos mediante `/api/media`.
+- Pares `MEDIA_RECEIPT_KEY`/`_KEY_ID` y `ANONYMOUS_RATE_LIMIT_KEY`/`_KEY_ID`:
+  independientes de producción y entre sí, registrados en la base de staging
+  (hecho) y secretos del Worker (pendiente). Sin ellos las rutas correspondientes quedan cerradas.
+- Roles en `private.platform_roles`, con identidad de prueba comprobada;
+  `ADMIN_USER_IDS` no concede permisos.
+- Together y Meta: vacíos si no se necesita probar la integración. No reutilizar
+  claves personales ni activar consumo facturable sin autorización.
 
-- **Supabase local** (`pnpm db:start`, requiere Docker) como entorno de
-  migración.
-- Un **preview deployment** de Vercel apuntando a él.
+Mantenimiento se configura aparte según [su plantilla](../workers/media-maintenance.env.example).
+La [configuración staging de mantenimiento](../wrangler.media-maintenance.staging.jsonc)
+apunta únicamente al proyecto y bucket staging, sin cron y con el interruptor
+apagado. Su tercer par de firma independiente se generó y registró en
+`private.media_maintenance_keys` el 2026-11-06 (operación con salida 0).
+El material está cifrado en `.wrangler/supabase-empresa/staging-maintenance.dpapi`;
+falta instalarlo en el Worker de mantenimiento, que no está desplegado.
+No apuntar su Worker o cron a producción. No activar mantenimiento programado
+antes de verificar manualmente el aislamiento y la recuperación de staging.
 
-Es peor que un staging real, pero infinitamente mejor que probar contra
-producción. La decisión es del dueño del proyecto.
+Acceso R2 pendiente: el inventario del navegador del 2026-11-06 sólo permitió
+controlar perfiles Daniel y Canodent, sin la sesión empresarial de Vibe. Se pidió
+abrir Cloudflare en el perfil Vibe y habilitar su extensión de control; no se
+creó credencial en otra cuenta. No reutilizar la credencial de producción ni
+ampliar sus permisos para cubrir staging. La nueva debe limitarse al bucket
+`vibe-staging-artist-media`.
 
-## Estado
+Paso preparado (2026-11-09): tras crear la credencial en Cloudflare, ejecutar
+`powershell -File scripts/guardar-credencial-r2-staging.ps1` desde la raíz. Pide los
+dos valores ocultos, los guarda cifrados en
+`.wrangler/credenciales-empresa/r2-staging-runtime.dpapi` y verifica acceso de objeto
+sólo en el bucket de staging (objeto ficticio creado y borrado) y rechazo401/403 en
+producción y en los buckets de caché/estáticos. `-SoloVerificar` repite la prueba.
 
-- [x] Documentado (este archivo).
-- [ ] Proyecto Supabase de staging creado — **acción humana #13**.
-- [ ] Bucket R2 de staging — **acción humana #13**.
-- [ ] `.github/workflows/staging.yml` — depende de que existan los recursos.
+La configuración principal ya fija URL de Supabase, endpoint y bucket R2 de
+staging, cuota en modo rechazo y validación estricta de bloques. Replicar las
+variables necesarias al build; `vars` no sustituye ese entorno. No se requiere
+`NEXT_PUBLIC_R2_PUBLIC_URL` en un entorno sin archivos históricos: las nuevas
+subidas finalizan con rutas `/api/media/`. La corrección de ese requisito y del
+resultado de borrado sin origen histórico sigue pendiente de pruebas finales.
+
+## Preparación y promoción
+
+1. Inventariar recursos reales y capacidad disponible; confirmar aislamiento y
+   registrar identificadores no secretos. Conservar credenciales fuera de Git.
+2. Aplicar migraciones forward-only al proyecto staging identificado. Sembrar
+   únicamente fixtures ficticios; nunca ejecutar un reset sobre producción.
+3. Preparar D1 con el esquema requerido por el adaptador instalado, subir el WASM
+   oficial verificado al bucket estático y mantener privados los tres buckets.
+4. Superar gates locales en la copia de verificación. Después compilar el
+   artefacto staging con sus variables propias y configuración explícita:
+
+   ```powershell
+   pnpm exec opennextjs-cloudflare build --config wrangler.staging.jsonc
+   pnpm exec opennextjs-cloudflare deploy --config wrangler.staging.jsonc
+   ```
+
+   Son comandos para la fase autorizada de integración, **no ejecutados** al
+   preparar esta guía. Revisar la configuración generada y bindings de destino
+   antes del segundo comando. El build no reutiliza los valores de producción.
+5. Ejecutar smoke y recorridos reales: sesión, recuperación por correo, subida,
+   finalización, publicación, reproducción, permisos, moderación, suspensión,
+   enlaces antiguos, D1/R2 e invalidación; registrar resultados por versión.
+   Smoke por sí solo no acredita esos recorridos.
+6. Promover a producción deliberadamente tras gates, respaldo y plan compatible
+   de vuelta atrás. No renombrar y desplegar el bundle staging: las variables
+   públicas están incorporadas al build y requieren un artefacto de producción.
+
+Existen workflows de CI y disponibilidad; el monitor requiere habilitación
+explícita. No hay deploy automático a staging ni workflow `staging.yml` implementado.
+Prepararlo sólo después de identificar recursos y configurar el entorno GitHub
+con permisos y secretos propios. No hacer que un merge publique por sorpresa.
+
+Si aún no se pueden disponer recursos aislados, continuar con Supabase local y
+Worker local; conservar el cierre remoto como pendiente. No usar Vercel ni
+exponer la base local a Internet como sustitución improvisada.
+
+Referencia: [CLI oficial de OpenNext](https://opennext.js.org/cloudflare/cli)
+para selección explícita de configuración. Revisar siempre la versión instalada
+y el artefacto generado antes de ejecutar operaciones remotas.
