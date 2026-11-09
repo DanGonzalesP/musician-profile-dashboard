@@ -2,3 +2,5 @@
 # los argumentos del comando de Playwright. Sólo esta huella histórica;
 # no se excluye el archivo, una regla ni detecciones de commits futuros.
 a3dbf9b49c6131133d6257945245e56f1b1b8799:scripts/worker-auth-runner.mjs:generic-api-key:133
+# Ejemplo histórico de curl con el marcador literal TU_ANON_KEY, no una clave.
+1b9512442e5a149235193a9b8de9568ac7f78c67:DESPLIEGUE.md:curl-auth-header:111
