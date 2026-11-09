@@ -1,3 +1,13 @@
+## Estado vigente — despliegue privado de staging (2026-11-09)
+
+
+Despliegue Linux OpenNext y dry run exitosos. Worker `vibe-staging`, cuenta `5b647e532f3d4996206529d5595295f3`, creado 2026-11-09T22:37:01.587252Z. Versión `b2660d02-d870-437e-b67f-16ebd185df3d`, despliegue `0e3dcb46-9388-4f81-bf10-053091484c35`. `workers_dev=false`, `preview_urls=false`, sin rutas ni HTTP remoto. Startup 23 ms; 109 assets; dos entradas de caché R2 y esquema D1 creados. Metadata confirma `DOQueueHandler` y bindings ASSETS/R2/D1/self/DO; export y binding `DOQueueHandler` confirmados; instanciación remota pendiente. Los seis nombres se instalaron con `scripts/instalar-secretos-staging.ps1` (exit0); runtime remoto pendiente. Nombres: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, MEDIA_RECEIPT_KEY, MEDIA_RECEIPT_KEY_ID, ANONYMOUS_RATE_LIMIT_KEY y ANONYMOUS_RATE_LIMIT_KEY_ID. Sólo presencia acreditada, no valores/runtime.
+
+Auth staging configurado por `scripts/preparar-auth-staging.ps1 -Aplicar` (exit0) y GET confirmado: site_url `https://vibe-staging.vibemusicprofile.workers.dev`; allow-list sólo `/login` y `/nueva-contrasena`, sin comodines. Registro cerrado, confirmación obligatoria y anónimos desactivados. SMTP no acreditado. CORS aplicado (exit0) vía Wrangler al único bucket `vibe-staging-artist-media`, desde `scripts/r2-cors.staging.json`: origen exacto, PUT, headers Content-Type/If-None-Match, expose ETag, maxAge 600. GET remoto CORS confirmó exactamente esa regla; la validación integrada real detrás de Access sigue pendiente.
+
+Zero Trust Free seleccionado con autorización; términos y autorización de cargos por exceso del checkout sin aceptar. Pregunta específica pendiente, no hay plan activado ni cargo nuevo. El origen exacto ya está configurado; Access y los recorridos integrados siguen pendientes. Balance 1/27 completo, sólo el cierre 15 completo; otros 26 sin acreditar.
+
+## Historial previo y acciones pendientes
 # Decisiones vigentes del titular — 2026-11-05
 
 La migración empresarial y el despliegue en Cloudflare después de los controles
@@ -16,7 +26,12 @@ para menores; definir retención y monetización antes de habilitarlas; obtener
 revisión profesional de los documentos. Preparar e implementar el resto sigue
 siendo trabajo del agente, no una exigencia de intervención del titular.
 
-## Acción pendiente concreta — credencial R2 de staging (2026-11-09)
+## Historial — credencial R2 de staging (completada el 2026-11-09)
+
+El agente completó la creación, custodia cifrada e instalación con autorización
+posterior del titular. Conservar el procedimiento de abajo para una rotación
+futura; no volver a crear la credencial ahora. La rotación al terminar el encargo
+sigue solicitada por el titular.
 
 1. En Chrome con la cuenta de Vibe: Cloudflare (cuenta `5b647e532f3d4996206529d5595295f3`)
    → R2 Object Storage → Manage API tokens → Create API token.

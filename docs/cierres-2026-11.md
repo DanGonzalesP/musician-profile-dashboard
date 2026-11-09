@@ -1,3 +1,16 @@
+## Estado vigente — despliegue privado de staging (2026-11-09)
+
+CI [42708528618](https://github.com/vibemusicprofile-oss/musician-profile-dashboard/actions/runs/42708528618) sobre código `5d0f592`; 1/27 cierres completos, sólo el cierre 15 completo.
+
+Respaldo lógico DPAPI: DB 996912 bytes, roles 5900 bytes sin contraseñas; `restoreVerified:false`, cierre22 pendiente. 0071 ya estaba aplicada; no se reaplicó en esta operación; 0 usuarios/perfiles, Auth cerrado.
+
+
+Despliegue Linux OpenNext y dry run exitosos. Worker `vibe-staging`, cuenta `5b647e532f3d4996206529d5595295f3`, creado 2026-11-09T22:37:01.587252Z. Versión `b2660d02-d870-437e-b67f-16ebd185df3d`, despliegue `0e3dcb46-9388-4f81-bf10-053091484c35`. `workers_dev=false`, `preview_urls=false`, sin rutas ni HTTP remoto. Startup 23 ms; 109 assets; dos entradas de caché R2 y esquema D1 creados. Metadata confirma `DOQueueHandler` y bindings ASSETS/R2/D1/self/DO; export y binding `DOQueueHandler` confirmados; instanciación remota pendiente. Los seis nombres se instalaron con `scripts/instalar-secretos-staging.ps1` (exit0); runtime remoto pendiente. Nombres: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, MEDIA_RECEIPT_KEY, MEDIA_RECEIPT_KEY_ID, ANONYMOUS_RATE_LIMIT_KEY y ANONYMOUS_RATE_LIMIT_KEY_ID. Sólo presencia acreditada, no valores/runtime.
+
+Auth staging configurado por `scripts/preparar-auth-staging.ps1 -Aplicar` (exit0) y GET confirmado: site_url `https://vibe-staging.vibemusicprofile.workers.dev`; allow-list sólo `/login` y `/nueva-contrasena`, sin comodines. Registro cerrado, confirmación obligatoria y anónimos desactivados. SMTP no acreditado. CORS aplicado (exit0) vía Wrangler al único bucket `vibe-staging-artist-media`, desde `scripts/r2-cors.staging.json`: origen exacto, PUT, headers Content-Type/If-None-Match, expose ETag, maxAge 600. GET remoto CORS confirmó exactamente esa regla; la validación integrada real detrás de Access sigue pendiente.
+
+Zero Trust Free seleccionado con autorización; términos y autorización de cargos por exceso del checkout sin aceptar. Pregunta específica pendiente, no hay plan activado ni cargo nuevo. El origen exacto ya está configurado; Access y los recorridos integrados siguen pendientes. Balance 1/27 completo, sólo el cierre 15 completo; otros 26 sin acreditar.
+
 # Cierres pendientes de Vibe
 
 ## Avance del 9 de noviembre de 2026 (3) — continuidad y migraciones atómicas
@@ -356,16 +369,16 @@ No completa el rediseño integral, los cierres27 ni un despliegue.
 | 12 | WAV real convertido por navegador sobre Worker | Worker local verificado: WAV PCM real de medio segundo, FFmpeg real y MP3 decodificado; suite38/38, de las cuales solo2 prueban WAV (escritorio/móvil). Fallos/concurrencia/recuperación y staging remoto pendientes. |
 | 13 | Publicación autenticada e invalidación D1 integradas | Worker local revalidado con 0035: 38/38, cuatro etiquetas invalidadas en D1 y objetos de caché R2 comprobados; staging remoto pendiente. |
 | 14 | Baselines de píxeles revisados individualmente y aprobados | Pendiente |
-| 15 | Reducir las 22 advertencias sin desactivar reglas | Verificado localmente 2026-11-09: 22 → 18 → 13 medidas → **0**, techo `--max-warnings=0`, sin reglas apagadas; `pnpm qa` actual aprobado (525/525). Falta CI remoto. |
+| 15 | Reducir las 22 advertencias sin desactivar reglas | **Completo**: 22 → 18 → 13 medidas → 0; techo `--max-warnings=0`, sin reglas apagadas; CI 42708528618 aprobado (QA 525/54). |
 | 16 | Entrega preservada, commits/PR revisables, CI y protecciones | En curso |
-| 17 | Rotación de S3 R2 limitada al bucket de artistas, revocación comprobada | En curso: sustituta verificada con listado/HEAD y acceso a otros buckets denegado; primera clave revocada devuelve 403 |
+| 17 | Rotación de S3 R2 limitada al bucket de artistas, revocación comprobada | Rotación anterior documentada: sustituta verificada con listado/HEAD, buckets ajenos denegados y primera clave revocada con 403; no se repitió ahora. Credencial staging nueva autorizada, limitada a `vibe-staging-artist-media`; LIST/PUT/HEAD/GET/DELETE ficticio y cinco buckets ajenos denegados. Rotación final solicitada por el titular aún pendiente. |
 | 18 | Backup y comparación/aplicación ordenada de migraciones remotas | Parcial: respaldo cifrado nuevo, 58 tablas cotejadas y 0018–0037 aplicadas sin pérdida de filas principales sobre copia aislada. Origen sigue en0017; faltan compatibilidad final, corte coordinado y verificación remota. |
-| 19 | Variables, bindings, D1, WASM y CORS verificados en cuenta correcta | En curso: cuenta/perfil empresarial, D1 y WASM verificados; falta runtime y CORS integrado |
-| 20 | Staging con sesión/subida/publicación/permisos/suspensión/caché reales | Infraestructura preparada: tres buckets R2, WASM, D1, Supabase iyppeurjtbuydhjtraxf con0000–0070 y claves HMAC independientes. Registro público cerrado durante preparación. Faltan runtime, origen, R2 credenciales/CORS y recorridos finales. Ver docs/staging.md. |
+| 19 | Variables, bindings, D1, WASM y CORS verificados en cuenta correcta | Worker desplegado en privado; metadata confirma DOQueueHandler y bindings ASSETS/R2/D1/self/DO; D1/esquema y caché creados, 109 assets, startup 23 ms. Seis nombres de secretos presentes; valores/runtime no acreditados. CORS aplicado; GET remoto confirmó exactamente la regla; la validación integrada real detrás de Access sigue pendiente. |
+| 20 | Staging con sesión/subida/publicación/permisos/suspensión/caché reales | OpenNext dry run y despliegue Linux exitosos; Worker privado sin rutas ni HTTP remoto. Supabase staging 0071 ya estaba aplicada, 0 usuarios/perfiles, registro cerrado; dos entradas de caché R2 y esquema D1 creados. Origen exacto configurado; Access y validación integrada real pendientes. GET remoto CORS confirmó exactamente la regla. Ver docs/staging.md. |
 | 21 | Dominio, correo y recuperación con entrega y enlaces comprobados | Pendiente de identidad/remitente final |
 | 22 | Restauración DB y medios ensayada, RTO/RPO aceptados | Parcial: restauración local aislada de DB probada y contenido de58 tablas coincidente por SHA-256. Faltan restauración de archivos, copia independiente, ensayo operativo completo y RTO/RPO aceptados. |
 | 23 | Alertas probadas y responsables/procedimientos definidos | Pendiente |
-| 24 | Identidad legal, reclamaciones, privacidad y retención decididas y aplicadas | Parcial técnico: borradores legales, guarda provisional 18+ con constancia versionada en DB (0071, local) y exportación. Pendientes del titular: identidad legal, menores, retención, revisión profesional; 0071 sin aplicar en staging/producción. |
+| 24 | Identidad legal, reclamaciones, privacidad y retención decididas y aplicadas | Parcial técnico: guarda 18+ y constancia versionada 0071 ya estaba aplicada en staging; no se reaplicó en esta operación. Tabla privada y triggers; 0 usuarios/perfiles, Auth cerrado. Identidad legal, menores, retención y revisión profesional siguen pendientes del titular. |
 | 25 | Carga representativa y costes medidos, límites documentados | Pendiente |
 | 26 | Despliegue verificado y rollback compatible con migraciones ensayado | Pendiente |
 | 27 | Transferencia a cuenta empresarial con inventario y verificación | En curso: Supabase y GitHub transferidos; copia R2 de 67 objetos cotejada; quedan runtime, integración y corte |

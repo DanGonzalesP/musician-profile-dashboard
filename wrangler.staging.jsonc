@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // Recursos R2/D1 creados en la cuenta empresarial el 2026-11-06.
-  // Supabase staging preparado; sin Worker desplegado ni origen público configurado.
+  // Worker privado desplegado; el origen público sigue deshabilitado.
   "name": "vibe-staging",
   "account_id": "5b647e532f3d4996206529d5595295f3",
   "main": ".open-next/worker.js",

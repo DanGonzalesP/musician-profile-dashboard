@@ -1,4 +1,43 @@
+## Estado vigente — despliegue privado (2026-11-09)
+
+Worker `vibe-staging`, cuenta `5b647e532f3d4996206529d5595295f3`, creado 2026-11-09T22:37:01.587252Z. Versión `b2660d02-d870-437e-b67f-16ebd185df3d`, despliegue `0e3dcb46-9388-4f81-bf10-053091484c35`. OpenNext dry run y despliegue Linux exitosos; `workers_dev=false`, `preview_urls=false`, API confirma `enabled=false`, `previews_enabled=false`, `routes=[]` (2026-11-09T22:44:33.537Z); sin HTTP remoto. Startup 23 ms, 109 assets, dos entradas de caché R2 y esquema D1 creados. Metadata confirma `DOQueueHandler` y bindings ASSETS/R2/D1/self/DO; export y binding `DOQueueHandler` confirmados; instanciación remota pendiente.
+
+Seis nombres de secretos instalados con `scripts/instalar-secretos-staging.ps1` (exit0); runtime remoto pendiente. Auth configurado y confirmado por GET: origen `https://vibe-staging.vibemusicprofile.workers.dev`; allow-list sólo `/login` y `/nueva-contrasena`, registro cerrado, confirmación obligatoria, anónimos desactivados. SMTP no acreditado. CORS aplicado al bucket `vibe-staging-artist-media` para origen exacto, PUT, Content-Type/If-None-Match, ETag expuesto, maxAge 600; GET remoto confirmó exactamente esa regla.
+
+0071 ya estaba aplicada; no se reaplicó en esta operación; 0 usuarios/perfiles. Zero Trust Free seleccionado con autorización, pero checkout y autorización de cargos por exceso no aceptados; sin plan activo ni cargo nuevo. Origen exacto configurado; Access y validación integrada real pendientes. Balance 1/27 completo, sólo el cierre 15 completo; otros 26 sin acreditar.
 # Staging — Vibe
+
+## Operaciones repetibles del estado actual
+
+```powershell
+# Captura cifrada nueva; no restaura ni modifica el proyecto.
+powershell -NoProfile -File scripts/respaldar-staging.ps1
+# Consulta sin descifrar los valores de los secretos.
+powershell -NoProfile -File scripts/instalar-secretos-staging.ps1 -SoloVerificar
+# Consulta los retornos y mantiene el registro cerrado.
+powershell -NoProfile -File scripts/preparar-auth-staging.ps1
+# Lectura de la política efectiva; no crea credenciales administrativas S3.
+pnpm exec wrangler r2 bucket cors list vibe-staging-artist-media --config wrangler.staging.jsonc --profile vibe
+```
+
+Para una aplicación deliberada de los retornos exactos, usar
+`preparar-auth-staging.ps1 -Aplicar`. Para reponer la política de subidas:
+`pnpm exec wrangler r2 bucket cors set vibe-staging-artist-media --file scripts/r2-cors.staging.json --config wrangler.staging.jsonc --profile vibe`.
+Estos pasos no activan Access, el registro ni las rutas del Worker. CORS no
+concede acceso público al bucket: el PUT sigue requiriendo su firma temporal.
+Consultar [la referencia de R2](https://developers.cloudflare.com/r2/buckets/cors/)
+y [la configuración Auth](https://supabase.com/docs/reference/api/v1-update-auth-service-config).
+
+El build desplegado se hizo en la copia Linux aislada, con URL/clave pública
+`anon` del proyecto staging, origen exacto y `APP_VERSION=5d0f59211a213585e36dabbcceb045020d920a25`
+inyectados antes de compilar. La configuración raíz no contiene la clave pública
+ni sustituye ese paso: no ejecutar un despliegue directo desde ella sin preparar
+las variables de build y runtime del entorno. Los secretos se instalan por stdin,
+sin archivos de texto. Registros locales de esta ejecución, ignorados por Git:
+`.wrangler/auditoria/continuacion-codex-2026-11-09/staging-linux-build.log`,
+`staging-remote-deploy.log` y `staging-remote-metadata.json`.
+
+> Historial: las menciones posteriores a configuración pendiente reflejan estados anteriores.
 
 Nota de continuidad 2026-11-09: el aplicador
 `scripts/aplicar-migracion-staging.ps1` ahora prepara SQL e historial en una sola
@@ -6,7 +45,8 @@ transacción mediante `scripts/preparar-migracion-staging.mjs`, sin credenciales
 durante la preparación. Un bloqueo transaccional y una guarda interna exigen la
 versión inmediatamente anterior. Si falla SQL o historial, nada se confirma.
 Cinco pruebas en PostgreSQL efímero verifican también dos aplicadores simultáneos.
-Esto mejora el procedimiento; **no significa que 0071 se haya aplicado a staging**.
+Esto mejora el procedimiento; **el aplicador no se ejecutó contra staging en esta operación**.
+La consulta posterior confirmó que 0071 ya estaba aplicada.
 Conservar las comprobaciones de destino, respaldo y gates antes de ejecutarlo.
 
 Actualización 2026-11-06. Preparación del cierre 20, **no acreditado**.
@@ -34,14 +74,14 @@ decisión del titular antes de contratarlo.
 
 | Recurso | Destino de staging | Estado |
 |---|---|---|
-| Worker | `vibe-staging` | nombre propuesto |
-| Supabase Auth/Postgres | `Vibe Music Staging`, `iyppeurjtbuydhjtraxf` | creado en `sa-east-1`; migraciones `0000`–`0070` aplicadas |
+| Worker | `vibe-staging` | desplegado con OpenNext desde Linux; creado 2026-11-09T22:37:01.587252Z. Versión `b2660d02-d870-437e-b67f-16ebd185df3d`, despliegue `0e3dcb46-9388-4f81-bf10-053091484c35`; sin rutas, `workers_dev=false`, `preview_urls=false`, sin HTTP remoto. Startup 23 ms; 109 assets. Metadata confirma `DOQueueHandler` y bindings ASSETS/R2/D1/self/DO; export y binding `DOQueueHandler` confirmados; instanciación remota pendiente. |
+| Supabase Auth/Postgres | `Vibe Music Staging`, `iyppeurjtbuydhjtraxf` | 0071 ya estaba aplicada; 0 usuarios/perfiles; registro cerrado; no se reaplicó en esta operación |
 | R2 de artistas | `vibe-staging-artist-media` | creado; sin archivos subidos ni acceso público habilitado en esta operación |
-| R2 de caché | `vibe-staging-cache-incremental` | creado; sin archivos subidos |
+| R2 de caché | `vibe-staging-cache-incremental` | creado; dos entradas pobladas durante el despliegue |
 | R2 de WASM | `vibe-staging-static-assets` | creado; `ffmpeg-core.wasm` subido; lectura desde Worker pendiente |
-| D1 de etiquetas | `vibe-staging-cache-etiquetas` | creada: `37f4a26b-5d19-4143-a632-c52a2aba7dd5`; esquema inicial aplicado |
-| Durable Object | instancia del Worker staging | pendiente |
-| Origen HTTPS | exclusivo y con acceso definido | pendiente; no hay dominio elegido |
+| D1 de etiquetas | `vibe-staging-cache-etiquetas` | `37f4a26b-5d19-4143-a632-c52a2aba7dd5`; esquema creado |
+| Durable Object | export y binding `DOQueueHandler` | confirmados en metadata; instanciación runtime remota pendiente |
+| Origen HTTPS | `https://vibe-staging.vibemusicprofile.workers.dev` | configurado en build/Auth/CORS; publicación y protección Access pendientes. El dominio definitivo del producto sigue sin elegir |
 
 La [plantilla de Wrangler](../wrangler.staging.jsonc.example) incluye los
 bindings del adaptador actual y autorreferencia a `vibe-staging`. El UUID D1
@@ -76,8 +116,9 @@ queda cifrado con DPAPI en `.wrangler/supabase-empresa/staging-hmac.dpapi`.
 El script comprueba proyecto/organización, conserva las claves en reintentos
 y aborta si un identificador existente corresponde a otro secreto. No muestra
 valores ni respuestas de error que puedan contener SQL sensible.
-**Falta instalarlas como secretos del Worker staging** cuando se prepare el
-despliegue autorizado tras los gates; no se activó aplicación ni mantenimiento.
+Esas claves y la credencial R2 ya se instalaron como los seis secretos del Worker
+staging el 2026-11-09, por stdin. Presencia confirmada; comprobación en runtime
+remoto pendiente. El mantenimiento sigue desactivado.
 
 La API de administración confirmó la organización `gojxsdxguggjmcbkwbhb`
 (`Vibe`) en plan `free` y sólo el proyecto de producción antes de crear staging.

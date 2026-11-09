@@ -1,3 +1,22 @@
+## Estado vigente — despliegue privado de staging (2026-11-09)
+
+Rama `codex/cierre-integridad-media`; código desplegado `5d0f592`, cambios operativos
+en `74b1607` y `1d0d9de`. PR borrador #29:
+https://github.com/vibemusicprofile-oss/musician-profile-dashboard/pull/29.
+CI [42708528618](https://github.com/vibemusicprofile-oss/musician-profile-dashboard/actions/runs/42708528618): seis jobs exitosos; QA 525/54, DB 226/22 + `db:verify`, E2E público 122, visual 24 ARIA, auth 46 y visual auth 4. Worker auth 46 con WAV real y seis etiquetas D1; runtime D1/R2/DO/WASM. Unitarias 511→525; DB 221→226. Cierre15 completo. Balance 1/27 cierres completos.
+
+QA posterior a esos cambios: 536/536 unitarias en 55 archivos (525→536), tipos y
+lint sin errores ni advertencias; parser PowerShell sin errores en los tres
+scripts nuevos. No se repitieron build/E2E locales sin cambios de aplicación.
+
+Credencial R2 staging autorizada, limitada a `vibe-staging-artist-media`; verificación LIST/PUT/HEAD/GET/DELETE ficticio y cinco buckets ajenos denegados. Respaldo lógico en DPAPI, 996912 bytes DB + 5900 bytes roles sin contraseñas; `restoreVerified:false`, cierre22 pendiente. 0071 ya estaba aplicada en staging; no se reaplicó en esta operación; 0 usuarios/perfiles y Auth cerrado.
+Despliegue Linux OpenNext y dry run exitosos. Worker `vibe-staging`, cuenta `5b647e532f3d4996206529d5595295f3`, creado 2026-11-09T22:37:01.587252Z. Versión `b2660d02-d870-437e-b67f-16ebd185df3d`, despliegue `0e3dcb46-9388-4f81-bf10-053091484c35`. `workers_dev=false`, `preview_urls=false`, sin rutas ni HTTP remoto. Startup 23 ms; 109 assets; dos entradas de caché R2 y esquema D1 creados. Metadata confirma `DOQueueHandler` y bindings ASSETS/R2/D1/self/DO; export y binding `DOQueueHandler` confirmados; instanciación remota pendiente. Los seis nombres se instalaron con `scripts/instalar-secretos-staging.ps1` (exit0); runtime remoto pendiente. Nombres: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, MEDIA_RECEIPT_KEY, MEDIA_RECEIPT_KEY_ID, ANONYMOUS_RATE_LIMIT_KEY y ANONYMOUS_RATE_LIMIT_KEY_ID. Sólo presencia acreditada, no valores/runtime.
+
+Auth staging configurado por `scripts/preparar-auth-staging.ps1 -Aplicar` (exit0) y GET confirmado: site_url `https://vibe-staging.vibemusicprofile.workers.dev`; allow-list sólo `/login` y `/nueva-contrasena`, sin comodines. Registro cerrado, confirmación obligatoria y anónimos desactivados. SMTP no acreditado. CORS aplicado (exit0) vía Wrangler al único bucket `vibe-staging-artist-media`, desde `scripts/r2-cors.staging.json`: origen exacto, PUT, headers Content-Type/If-None-Match, expose ETag, maxAge 600. GET remoto CORS confirmó exactamente esa regla; la validación integrada real detrás de Access sigue pendiente.
+
+Zero Trust Free fue seleccionado con autorización, pero checkout añade términos y autorización de cargos por exceso; ambos sin aceptar. Pregunta específica pendiente; no hay plan activado ni cargo nuevo. El origen exacto ya está configurado; Access y los recorridos integrados siguen pendientes. Balance: 1/27 cierres completos, sólo el cierre 15 completo; los otros 26 sin acreditar.
+
+## Historial previo
 ## Continuidad vigente — retomada desde Claude (2026-11-09)
 
 - Base recuperada: `f3303fd`, rama `codex/cierre-integridad-media`. Claude ya
