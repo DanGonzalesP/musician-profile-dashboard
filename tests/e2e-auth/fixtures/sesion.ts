@@ -111,6 +111,9 @@ export async function crearUsuarioE2E(): Promise<UsuarioE2E> {
     email,
     password,
     email_confirm: true,
+    // Persona ficticia mayor de edad que acepta los documentos: sin esta
+    // constancia (0071) una cuenta nueva no puede crear perfil.
+    user_metadata: { vibe_legal: { terms_version: "2026-11-09", privacy_version: "2026-11-09", age_assurance: "adult_self_declared" } },
   })
   if (errorCrear || !creado.user) {
     throw new Error(`No se pudo crear el usuario de prueba: ${errorCrear?.message}`)
@@ -130,15 +133,25 @@ export async function crearUsuarioE2E(): Promise<UsuarioE2E> {
 }
 
 /**
- * Limpieza determinista. El borrado del perfil es explícito y no una cascada:
- * `profiles.user_id` no tiene clave foránea contra `auth.users` (sólo
- * `owner_user_id` la tiene), así que borrar la cuenta dejaría el perfil
- * individual huérfano. Es el mismo desajuste que documenta `0013` en
- * `eliminar_mi_cuenta_impl`. Todo lo demás cae por ON DELETE CASCADE.
+ * Limpieza determinista. El borrado del perfil es explícito: `profiles.user_id`
+ * no tiene clave foránea contra `auth.users` (sólo `owner_user_id` la tiene),
+ * así que borrar la cuenta dejaría el perfil individual huérfano. Además,
+ * `media_assets` sobrevive a la eliminación de auth y `products`/`services` no
+ * tienen cascada desde el perfil; se limpian antes de borrar sus padres.
  */
 export async function borrarUsuarioE2E(usuario: UsuarioE2E | undefined): Promise<void> {
   if (!usuario) return
   const admin = clienteAdministrativo()
+  await admin.from("media_assets").delete().eq("owner_user_id", usuario.id)
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id")
+    .or(`user_id.eq.${usuario.id},owner_user_id.eq.${usuario.id}`)
+  if (profiles?.length) {
+    const ids = profiles.map(profile => profile.id)
+    await admin.from("services").delete().in("profile_id", ids)
+    await admin.from("products").delete().in("seller_id", ids)
+  }
   await admin.from("profiles").delete().or(`user_id.eq.${usuario.id},owner_user_id.eq.${usuario.id}`)
   await admin.auth.admin.deleteUser(usuario.id).catch(() => {})
 }
@@ -284,6 +297,10 @@ const PIXEL = Buffer.from(
  */
 export async function aislarR2(page: Page): Promise<{ puts: string[] }> {
   const puts: string[] = []
+  // El almacén HTTPS local conserva bytes para el HEAD del servidor.
+  page.on("request", request => {
+    if (request.method() === "PUT" && new URL(request.url()).origin === "https://127.0.0.1:54998") puts.push(request.url())
+  })
 
   // ─── EL ORDEN DE REGISTRO IMPORTA ─────────────────────────────────────
   // Playwright resuelve con la ÚLTIMA ruta registrada que coincida, no con la

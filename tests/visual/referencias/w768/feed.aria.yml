@@ -6,9 +6,10 @@
     - /url: /login
   - link "Registrarse":
     - /url: /login?modo=registro
-  - button "Categorías" [pressed]
-  - button "Servicios"
-  - button "Productos"
+  - navigation "Secciones de Vibe":
+    - button "Descubrir" [pressed]
+    - button "Servicios"
+    - button "Productos"
   - group "Filtrar el feed":
     - button "Para ti" [pressed]
     - button "Autor"

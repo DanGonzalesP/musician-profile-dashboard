@@ -124,6 +124,18 @@ export async function aislarRedExterna(page: Page) {
     "base64"
   )
 
+  // Sólo los objetos declarados en datos.json. Esta suite comprueba render/CSP;
+  // la autorización y los bytes reales se verifican en e2e-auth/lectura-medios.
+  const mediosFixture = new Set(
+    [...JSON.stringify(DATOS).matchAll(/https:\/\/ejemplo\.r2\.dev\/([^"\s]+)/g)]
+      .map((match) => `/api/media/${match[1]}`)
+  )
+  await page.route("**/api/media/**", (route) => {
+    const url = new URL(route.request().url())
+    if (!["127.0.0.1", "localhost"].includes(url.hostname) || !mediosFixture.has(url.pathname)) return route.continue()
+    return route.fulfill({ status: 200, contentType: "image/png", body: PIXEL })
+  })
+
   await page.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, (route) => {
     const tipo = route.request().resourceType()
     if (tipo === "image" || tipo === "media" || tipo === "font") {

@@ -57,11 +57,23 @@ test.describe("Editor · recorrido completo hasta el perfil público", () => {
     await borrarUsuarioE2E(usuario)
   })
 
-  test("añadir, editar, reordenar, guardar borrador y publicar", async ({ page }) => {
+  test("añadir, editar, reordenar, guardar borrador y publicar", async ({ page, request }) => {
+    // Un visitante calienta la caché ANTES de publicar. Ver sólo la primera
+    // visita posterior no detectaría que una entrada previa quedó obsoleta.
+    for (let visita = 0; visita < 2; visita++) {
+      const perfilAnterior = await request.get(`/${usuario.username}`)
+      expect(perfilAnterior.status()).toBe(200)
+      expect(await perfilAnterior.text()).not.toContain(TITULO_EDITADO)
+    }
     const consola = vigilarConsola(page)
     await aislarR2(page)
     await iniciarSesion(page, usuario)
     await esperarEditorListo(page)
+
+    // El contacto admite teléfonos; no debe rechazarlos ni vaciarlos al guardar.
+    await page.locator('[data-bloque-de-lienzo="hero"]').click()
+    await page.getByPlaceholder("Ej. +51 987654321, @tuusuario o tu@correo.com").fill("+51 (999) 888-777")
+    await cerrarInspector(page)
 
     // ─── 1. Añadir un bloque ────────────────────────────────────────────
     const antes = await ordenDeBloques(page)
@@ -114,6 +126,10 @@ test.describe("Editor · recorrido completo hasta el perfil público", () => {
     await page.reload()
     await esperarEditorListo(page)
 
+    await page.locator('[data-bloque-de-lienzo="hero"]').click()
+    await expect(page.getByPlaceholder("Ej. +51 987654321, @tuusuario o tu@correo.com")).toHaveValue("+51 (999) 888-777")
+    await cerrarInspector(page)
+
     await expect(page.locator('[data-bloque-de-lienzo="crowdfunding"]')).toContainText(TITULO_ORIGINAL, {
       timeout: 30_000,
     })
@@ -138,8 +154,14 @@ test.describe("Editor · recorrido completo hasta el perfil público", () => {
     // ─── 6. Lo publicado se ve en el perfil público ─────────────────────
     // Se abre la URL pública como un visitante cualquiera. Esto recorre el
     // render en servidor, la caché por etiqueta y su invalidación al publicar.
+    // Comprobar también HTML sin JavaScript: la hidratación cliente ocultaba
+    // un permiso SQL ausente que impedía renderizar/cachear en el servidor.
+    const publicado = await request.get(`/${usuario.username}`)
+    expect(publicado.status()).toBe(200)
+    expect(await publicado.text()).toContain(TITULO_EDITADO)
     await page.goto(`/${usuario.username}`)
     await expect(page.getByText(TITULO_EDITADO)).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole("link", { name: /contactar/i }).filter({ visible: true })).toHaveAttribute("href", "https://wa.me/51999888777")
 
     // Y lo que quedó a medio camino NO se publicó: el título viejo no está.
     await expect(page.getByText(TITULO_ORIGINAL)).toHaveCount(0)
