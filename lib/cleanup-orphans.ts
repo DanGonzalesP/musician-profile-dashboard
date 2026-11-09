@@ -18,9 +18,8 @@
 //
 //   3. **Atribución obligatoria.** Un archivo SIN fila en `media_assets` no se
 //      puede razonar: no sabemos de quién es ni cuándo se subió. Por defecto se
-//      deja en paz y se reporta aparte. Solo se borra si quien ejecuta la
-//      limpieza lo pide explícitamente (`incluirSinAtribuir`), que es el modo
-//      que sirve para los históricos anteriores a la migración 0002.
+//      deja en paz y se reporta aparte, incluso si un cliente antiguo solicita
+//      incluirSinAtribuir. La propiedad debe acreditarse antes de borrar.
 //
 // El sesgo es deliberado y coincide con el de `media_assets`: preferir un
 // huérfano que ocupa espacio barato a un borrado irreversible de algo en uso.
@@ -40,7 +39,7 @@ export type EntradaClasificacion = {
   /** `Date.now()` inyectado, para que las pruebas no dependan del reloj. */
   ahora: number
   ventanaGraciaMs?: number
-  /** Borrar también lo que no tiene fila de propiedad. Por defecto, no. */
+  /** Compatibilidad de entrada; nunca permite borrar sin propiedad. */
   incluirSinAtribuir?: boolean
 }
 
@@ -63,14 +62,13 @@ export function clasificarClaves(entrada: EntradaClasificacion): Clasificacion {
     activos,
     ahora,
     ventanaGraciaMs = VENTANA_DE_GRACIA_MS,
-    incluirSinAtribuir = false,
   } = entrada
 
   const base = urlPublicaBase.replace(/\/+$/, "")
   const resultado: Clasificacion = { enUso: [], protegidasPorGracia: [], sinAtribuir: [], huerfanas: [] }
 
   for (const key of claves) {
-    if (haystack.includes(`${base}/${key}`)) {
+    if (haystack.includes(`${base}/${key}`) || haystack.includes(`/api/media/${key}`)) {
       resultado.enUso.push(key)
       continue
     }
@@ -78,8 +76,7 @@ export function clasificarClaves(entrada: EntradaClasificacion): Clasificacion {
     const creadoEn = activos.get(key)
     if (creadoEn === undefined) {
       // Sin dueño registrado. Es el caso de los archivos anteriores a 0002.
-      if (incluirSinAtribuir) resultado.huerfanas.push(key)
-      else resultado.sinAtribuir.push(key)
+      resultado.sinAtribuir.push(key)
       continue
     }
 

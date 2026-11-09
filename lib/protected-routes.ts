@@ -8,7 +8,7 @@
 // base y las rutas de API validan su propio token (ver lib/server-auth.ts).
 // Es la primera barrera, no la última.
 
-export const RUTAS_PROTEGIDAS = ["/dashboard", "/perfil", "/grupo", "/cleanup"] as const
+export const RUTAS_PROTEGIDAS = ["/dashboard", "/perfil", "/grupo", "/cleanup", "/admin"] as const
 
 /**
  * True si la ruta pedida cae bajo un prefijo protegido. El límite se respeta

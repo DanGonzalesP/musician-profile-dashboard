@@ -6,9 +6,9 @@
 // Productos (Tienda + rubros). Cada ítem tiene su ícono en una loseta con glow;
 // el activo se resalta con un fondo deslizante compartido (layoutId) y una
 // barra de acento a la izquierda. En móvil se colapsa a una fila horizontal
-// deslizable (carrusel lento automático) bajo el header.
+// de desplazamiento manual bajo las secciones. No se mueven los controles solos.
 
-import { useEffect, useRef, useState, type ComponentType } from "react"
+import type { ComponentType } from "react"
 import { motion } from "framer-motion"
 import { AudioWaveform } from "lucide-react"
 
@@ -35,39 +35,15 @@ export function FeedSidebar({
   onSelect: (id: string) => void
   heading?: string
 }) {
-  // ── Carrusel lento en móvil (ver comentario original): avanza solo y se
-  // pausa al tocar.
-  const mobileRowRef = useRef<HTMLDivElement | null>(null)
-  const [autoScrollPaused, setAutoScrollPaused] = useState(false)
-
-  useEffect(() => {
-    if (autoScrollPaused) return
-    const el = mobileRowRef.current
-    if (!el) return
-
-    let raf = 0
-    const SPEED_PX_PER_FRAME = 0.4
-
-    const step = () => {
-      if (el.scrollWidth > el.clientWidth) {
-        const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1
-        el.scrollLeft = atEnd ? 0 : el.scrollLeft + SPEED_PX_PER_FRAME
-      }
-      raf = requestAnimationFrame(step)
-    }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [autoScrollPaused])
-
   return (
     <>
       {/* ── Escritorio: panel vertical desplegado ─────────────────────── */}
       <aside
         aria-label="Filtrar el feed"
-        className="pointer-events-none absolute inset-y-0 left-0 z-40 hidden w-64 items-center pl-5 lg:flex"
+        className="pointer-events-none absolute bottom-6 left-0 top-24 z-40 hidden w-64 items-start pl-5 lg:flex"
       >
-        <nav className="pointer-events-auto w-full">
-          <div className="gradient-border-static relative max-h-[85dvh] overflow-y-auto rounded-3xl bg-card/55 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl scrollbar-thin">
+        <nav className="pointer-events-auto max-h-full w-full overflow-y-auto rounded-3xl scrollbar-thin">
+          <div className="gradient-border-static relative rounded-3xl bg-card/55 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl">
             <p className="flex items-center gap-1.5 px-3 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
               <AudioWaveform className="size-3" /> {heading}
             </p>
@@ -88,14 +64,9 @@ export function FeedSidebar({
         </nav>
       </aside>
 
-      {/* ── Móvil: fila horizontal deslizable (carrusel lento automático) ──
-          Va pegada bajo el header y por encima del disco (que arranca en
-          pt-36 en TrackScreen); el riel de secciones ya no compite por este
-          espacio porque ahora vive a la altura de las flechitas, ver
-          SectionTabs. ── */}
-      <div className="pointer-events-none absolute inset-x-0 top-20 z-40 sm:top-24 lg:hidden">
+      {/* Móvil: rubros debajo de las secciones, desplazados por la persona. */}
+      <div className="pointer-events-none absolute inset-x-0 top-32 z-40 lg:hidden">
         <div
-          ref={mobileRowRef}
           // `group`, no `tablist`: sus hijos son botones de alternancia
           // (`aria-pressed`), no pestañas (`role="tab"` + `aria-selected`), y
           // no controlan paneles. Con `tablist`, un lector de pantalla anuncia
@@ -104,9 +75,6 @@ export function FeedSidebar({
           // ANUNCIA, no lo que se ve: cero píxeles de diferencia.
           role="group"
           aria-label="Filtrar el feed"
-          onPointerDown={() => setAutoScrollPaused(true)}
-          onPointerUp={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
-          onPointerCancel={() => window.setTimeout(() => setAutoScrollPaused(false), 2500)}
           className="pointer-events-auto flex items-center gap-2 overflow-x-auto py-1 pb-2 px-4 scrollbar-none [&::-webkit-scrollbar]:hidden"
         >
           {items.map((item) => (
@@ -147,7 +115,7 @@ function SidebarItem({
       aria-pressed={selected}
       title={description}
       onClick={onClick}
-      className="group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors"
+      className="group relative flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
     >
       {selected && (
         <motion.span
@@ -162,7 +130,7 @@ function SidebarItem({
       <span
         className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-xl border transition-all duration-200 ${
           selected
-            ? "border-primary/50 bg-primary text-primary-foreground shadow-[0_0_18px_-4px_var(--primary)]"
+            ? "border-foreground bg-foreground text-background"
             : highlight
               ? "border-primary/30 bg-primary/10 text-primary group-hover:border-primary/50"
               : "border-border/70 bg-background/50 text-muted-foreground group-hover:border-primary/40 group-hover:text-foreground"
@@ -172,7 +140,7 @@ function SidebarItem({
       </span>
       <span className="relative z-10 min-w-0 flex-1">
         <span
-          className={`block truncate text-sm font-semibold transition-colors ${
+          className={`block text-sm font-semibold leading-tight transition-colors ${
             selected ? "text-foreground" : "text-foreground/80 group-hover:text-foreground"
           }`}
         >
@@ -185,7 +153,7 @@ function SidebarItem({
       {typeof count === "number" && count > 0 && (
         <span
           className={`relative z-10 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-            selected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
+            selected ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
           }`}
         >
           {count}
@@ -215,9 +183,9 @@ function MobileChip({
       aria-label={title ?? label}
       title={title ?? label}
       onClick={onClick}
-      className={`relative flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur transition-colors ${
+      className={`relative flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
         selected
-          ? "border-transparent text-primary-foreground"
+          ? "border-transparent text-background"
           : "border-border/70 bg-card/50 text-foreground/85 hover:border-primary/50"
       }`}
     >
@@ -225,7 +193,7 @@ function MobileChip({
         <motion.span
           layoutId="feed-sidebar-active-mobile"
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-          className="absolute inset-0 rounded-full bg-primary shadow-[0_0_20px_-4px_var(--primary)]"
+          className="absolute inset-0 rounded-full bg-foreground"
           aria-hidden="true"
         />
       )}

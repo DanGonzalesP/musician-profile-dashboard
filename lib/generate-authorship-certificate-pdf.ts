@@ -17,6 +17,7 @@ function formatTimestamp(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
     timeZoneName: "short",
+    timeZone: "America/Lima",
   })
 }
 
@@ -32,11 +33,9 @@ function slugify(text: string): string {
 }
 
 /**
- * Genera un "Certificado de Posesión de Obra Musical": un timestamp de la
- * huella SHA-256 del archivo, con la fecha real en que quedó registrado en
- * Supabase. Es evidencia de que el artista tenía este archivo exacto en su
- * poder en esa fecha — no un registro oficial de derechos de autor (eso
- * sigue siendo INDECOPI en Perú), y el PDF lo deja explícito.
+ * Constancia del registro interno de una huella declarada por el cliente.
+ * La fecha es la de inserción en la base; no acredita identidad, posesión,
+ * autoría ni un sellado de tiempo independiente.
  */
 export function generateAuthorshipCertificatePdf(input: CertificatePdfInput) {
   const doc = new jsPDF({ unit: "mm", format: "a4" })
@@ -56,12 +55,12 @@ export function generateAuthorshipCertificatePdf(input: CertificatePdfInput) {
   doc.setTextColor(24, 24, 27)
   doc.setFont("helvetica", "bold")
   doc.setFontSize(11)
-  doc.text("CERTIFICADO DE POSESIÓN DE OBRA MUSICAL", pageWidth / 2, y, { align: "center" })
+  doc.text("CONSTANCIA DE REGISTRO DE HUELLA DIGITAL", pageWidth / 2, y, { align: "center" })
   y += 6
   doc.setFont("helvetica", "normal")
   doc.setFontSize(9)
   doc.setTextColor(120, 120, 120)
-  doc.text("Prueba de autoría por marcado de tiempo (timestamping) — huella digital SHA-256", pageWidth / 2, y, {
+  doc.text("Registro interno de Vibe — huella SHA-256 declarada por el usuario", pageWidth / 2, y, {
     align: "center",
   })
 
@@ -74,7 +73,7 @@ export function generateAuthorshipCertificatePdf(input: CertificatePdfInput) {
   doc.setTextColor(30, 30, 30)
   doc.setFont("helvetica", "normal")
   doc.setFontSize(11)
-  doc.text("Se deja constancia de que la obra musical titulada", pageWidth / 2, y, { align: "center" })
+  doc.text("Se registró una huella digital asociada al título declarado", pageWidth / 2, y, { align: "center" })
 
   y += 12
   doc.setFont("helvetica", "bold")
@@ -85,7 +84,7 @@ export function generateAuthorshipCertificatePdf(input: CertificatePdfInput) {
 
   doc.setFont("helvetica", "normal")
   doc.setFontSize(11)
-  doc.text("se encontraba en posesión de", pageWidth / 2, y, { align: "center" })
+  doc.text("con el siguiente nombre de artista indicado en el perfil", pageWidth / 2, y, { align: "center" })
   y += 10
   doc.setFont("helvetica", "bold")
   doc.setFontSize(15)
@@ -94,7 +93,7 @@ export function generateAuthorshipCertificatePdf(input: CertificatePdfInput) {
 
   doc.setFont("helvetica", "normal")
   doc.setFontSize(11)
-  doc.text("desde el momento de su registro, el", pageWidth / 2, y, { align: "center" })
+  doc.text("Fecha del registro interno (hora de Perú)", pageWidth / 2, y, { align: "center" })
   y += 8
   doc.setFont("helvetica", "bold")
   doc.setFontSize(12)
@@ -119,7 +118,7 @@ export function generateAuthorshipCertificatePdf(input: CertificatePdfInput) {
   doc.setFontSize(8)
   doc.setTextColor(130, 130, 130)
   const disclaimer = doc.splitTextToSize(
-    "Este documento certifica que el archivo con la huella digital indicada fue registrado en la fecha señalada mediante esta plataforma. Constituye evidencia de posesión previa (timestamping), pero no reemplaza el registro oficial de derechos de autor ante INDECOPI ni sustituye asesoría legal profesional.",
+    "Esta constancia reproduce una huella declarada y su fecha de registro en Vibe. No acredita identidad, autoría, titularidad, posesión del archivo ni fecha de creación. No es un sellado de tiempo independiente ni un registro ante INDECOPI. El nombre y el título son datos declarados; Vibe no verifica los derechos sobre la obra. Su alcance probatorio requiere evaluación profesional.",
     pageWidth - margin * 2 - 20
   ) as string[]
   doc.text(disclaimer, pageWidth / 2, y, { align: "center" })
@@ -130,5 +129,5 @@ export function generateAuthorshipCertificatePdf(input: CertificatePdfInput) {
     align: "center",
   })
 
-  doc.save(`certificado-autoria-${slugify(input.songTitle)}.pdf`)
+  doc.save(`constancia-huella-${slugify(input.songTitle)}.pdf`)
 }

@@ -29,6 +29,7 @@ export interface AudioEngineState {
   playing: boolean
   currentTime: number
   duration: number
+  error?: string | null
 }
 
 type StateListener = (state: AudioEngineState) => void
@@ -88,15 +89,28 @@ function getEl(): HTMLAudioElement | null {
   if (el) return el
   const audio = new Audio()
   audio.preload = "auto"
-  audio.addEventListener("timeupdate", () => setState({ currentTime: audio.currentTime }))
-  audio.addEventListener("loadedmetadata", () => setState({ duration: audio.duration || 0 }))
-  audio.addEventListener("durationchange", () => setState({ duration: audio.duration || 0 }))
+  audio.addEventListener("timeupdate", () => {
+    if (state.url) setState({ currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : 0 })
+  })
+  const updateDuration = () => {
+    if (state.url) setState({ duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0 })
+  }
+  audio.addEventListener("loadedmetadata", updateDuration)
+  audio.addEventListener("durationchange", updateDuration)
   audio.addEventListener("play", () => {
+    // Los eventos ya encolados pueden llegar tras pause/stop/cambio de fuente.
+    if (!state.url || audio.paused) return
     setState({ playing: true })
     ensureLevelLoop()
   })
-  audio.addEventListener("pause", () => setState({ playing: false }))
+  audio.addEventListener("pause", () => {
+    if (audio.paused) setState({ playing: false })
+  })
+  audio.addEventListener("error", () => {
+    if (state.url && audio.error) setState({ playing: false, error: "No se pudo reproducir el audio. Comprueba tu conexión o vuelve a intentarlo." })
+  })
   audio.addEventListener("ended", () => {
+    if (!state.url || !audio.ended) return
     // Se rebobina a 0 para que un próximo Play sobre la misma pista arranque
     // desde el inicio en vez de quedar pegado al final.
     try {
@@ -126,18 +140,32 @@ function pauseForeignMedia() {
 
 function safePlay(element: HTMLAudioElement, myToken: number) {
   pauseForeignMedia()
+  // Un fallo de descarga/decodificación deja el elemento en error. Recargar
+  // la misma fuente permite un reintento real sin crear otro reproductor.
+  if (element.error) {
+    element.load()
+    setState({ currentTime: 0, duration: 0 })
+  }
   const p = element.play()
   if (p && typeof p.then === "function") {
     p.then(() => {
-      if (token === myToken) {
+      if (token === myToken && !element.paused && state.url) {
         setState({ playing: true })
         ensureLevelLoop()
       }
-    }).catch(() => {
+    }).catch((reason: unknown) => {
       // Rechazo típico (AbortError) cuando se cambia de src antes de que
       // resuelva play(): si ya no somos la reproducción vigente, se ignora
       // en silencio en vez de dejar el botón atascado.
-      if (token === myToken) setState({ playing: false })
+      if (token !== myToken) return
+      // El navegador bloqueó la reproducción automática (primera visita, sin
+      // gesto): no es un fallo de red ni del archivo. Queda en pausa y basta
+      // pulsar Reproducir; mostrar un error aquí confundía a cada visitante.
+      if (reason instanceof DOMException && reason.name === "NotAllowedError") {
+        setState({ playing: false })
+        return
+      }
+      setState({ playing: false, error: "No se pudo iniciar el audio. Pulsa reproducir para volver a intentarlo." })
     })
   }
 }
@@ -152,6 +180,7 @@ export function play(url: string, opts?: { onEnded?: () => void }) {
   onEndedCb = opts?.onEnded ?? null
 
   const myToken = ++token
+  setState({ error: null })
 
   if (state.url === url) {
     safePlay(element, myToken)
@@ -167,6 +196,8 @@ export function play(url: string, opts?: { onEnded?: () => void }) {
 }
 
 export function pause() {
+  // Una promesa play anterior no debe volver a marcar reproducción tras pausar.
+  token++
   if (!el) return
   el.pause()
   setState({ playing: false })
@@ -175,6 +206,7 @@ export function pause() {
 /** Reanuda la pista ya cargada. Opcionalmente re-registra el callback onEnded. */
 export function resume(opts?: { onEnded?: () => void }) {
   if (!el || !state.url) return
+  setState({ error: null })
   if (opts && "onEnded" in opts) onEndedCb = opts.onEnded ?? null
   const myToken = ++token
   safePlay(el, myToken)
@@ -194,11 +226,14 @@ export function toggle(url: string, opts?: { onEnded?: () => void }) {
 }
 
 export function seek(time: number) {
-  if (!el) return
+  if (!el || !state.url || !Number.isFinite(time)) return
+  const duration = el.duration
+  const target = Math.max(0, Number.isFinite(duration) && duration >= 0 ? Math.min(time, duration) : time)
   try {
-    el.currentTime = time
-  } catch {}
-  setState({ currentTime: time })
+    el.currentTime = target
+    // Reflejar la posición aceptada por el navegador, no una asignación fallida.
+    setState({ currentTime: el.currentTime })
+  } catch { /* Conserva la posición anterior si el medio aún no permite buscar. */ }
 }
 
 /** Detiene y descarga la pista actual por completo. */
@@ -212,7 +247,7 @@ export function stop() {
       el.load()
     } catch {}
   }
-  setState({ url: null, playing: false, currentTime: 0, duration: 0 })
+  setState({ url: null, playing: false, currentTime: 0, duration: 0, error: null })
 }
 
 export function isCurrent(url: string): boolean {

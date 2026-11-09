@@ -23,15 +23,32 @@
 // Uso: node tests/e2e/fixtures/servidor-supabase.mjs [puerto]
 
 import { createServer } from "node:http"
+import { createHmac, timingSafeEqual } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const PUERTO = Number(process.argv[2] ?? process.env.E2E_SUPABASE_PORT ?? 54999)
+const CLAVE_RATE_LIMIT = process.env.ANONYMOUS_RATE_LIMIT_KEY ?? ""
+const ID_CLAVE_RATE_LIMIT = process.env.ANONYMOUS_RATE_LIMIT_KEY_ID ?? ""
+const DOMINIO_RATE_LIMIT = "vibe-anonymous-rate-limit\n"
+const ventanasRateLimit = new Map()
 
 /** @type {Record<string, Record<string, unknown>[]>} */
 const DATOS = JSON.parse(readFileSync(join(AQUI, "datos.json"), "utf8"))
+
+// Control por IPC sólo al arrancarlo como hijo del smoke de Workers. No hay
+// endpoint HTTP de escritura ni cambio persistente de fixtures.
+process.on("message", (message) => {
+  if (message?.type !== "smoke-profile") return
+  const profile = DATOS.profiles.find(p => p.username === "artista_prueba")
+  profile.is_suspended = message.suspended === true
+  profile.content_version = Number(message.version)
+  const hero = DATOS.profile_blocks.find(b => b.profile_id === profile.id && b.block_type === "hero")
+  hero.content.tagline = `Publicación local ${profile.content_version}`
+  process.send?.({ type: "smoke-updated" })
+})
 
 // Las tablas que la app puede consultar. Una tabla ausente devuelve [] (que es
 // lo que devolvería Postgres con RLS cerrada), nunca un error de red.
@@ -271,7 +288,7 @@ function leerCuerpo(req) {
  * prueba deja de ser lo que corre en producción — por eso las reglas están
  * escritas acá igual de explícitas que en el .sql.
  */
-function descubrimientoPerfiles(tipo, limite) {
+function descubrimientoPerfiles(tipo, limite, conIdentidad = false, cursor) {
   const esProductos = tipo === "productos"
   if (!esProductos && tipo !== "servicios") return []
   const items = esProductos ? tabla("products") : tabla("services")
@@ -285,6 +302,7 @@ function descubrimientoPerfiles(tipo, limite) {
     if (!perfil || perfil.is_suspended === true || !perfil.username) continue
 
     const actual = porUsuario.get(perfil.username) ?? {
+      ...(conIdentidad ? { profile_id: perfil.id } : {}),
       username: perfil.username,
       display_name: perfil.display_name,
       profile_type: perfil.profile_type,
@@ -300,8 +318,10 @@ function descubrimientoPerfiles(tipo, limite) {
   }
 
   return [...porUsuario.values()]
+    .filter(row => !cursor || (cursor.total > 0 && typeof cursor.username === "string" &&
+      (row.total < cursor.total || (row.total === cursor.total && row.username > cursor.username))))
     .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username))
-    .slice(0, Math.max(Number(limite) || 60, 1))
+    .slice(0, Math.min(Math.max(Number(limite ?? 60), 1), 100))
 }
 
 // ─── HTTP ────────────────────────────────────────────────────────────────────
@@ -326,6 +346,56 @@ function responder(res, estado, cuerpo, extra = {}) {
     ...extra,
   })
   res.end(texto)
+}
+
+// Réplica de public_credit_approvals (0063): sólo solicitudes aceptadas que
+// coinciden campo a campo con un crédito interno visible de un perfil activo.
+// Los datos de prueba no tienen solicitudes, así que hoy devuelve [] y los
+// créditos externos siguen visibles, igual que en Postgres.
+function aprobacionesDeCreditos(perfilId) {
+  const perfiles = new Map((DATOS.profiles ?? []).map(p => [p.id, p]))
+  const perfil = perfiles.get(perfilId)
+  if (!perfil || perfil.is_suspended) return []
+  const creditos = (DATOS.profile_blocks ?? [])
+    .filter(b => b.profile_id === perfilId && b.block_type === "credits" && b.is_visible !== false)
+    .flatMap(b => Array.isArray(b.content?.credits) ? b.content.credits : [])
+  return (DATOS.credit_requests ?? []).filter(r => r.requester_profile_id === perfilId && r.status === "accepted" &&
+    perfiles.get(r.owner_profile_id)?.is_suspended === false &&
+    creditos.some(c => c?.sourceType === "internal" && c.requestId === r.id && c.id === r.requester_credit_id &&
+      c.ownerProfileId === r.owner_profile_id && c.songKey === r.song_key && c.title === r.song_title && c.role === r.role))
+    .map(r => ({ request_id: r.id, credit_id: r.requester_credit_id, owner_profile_id: r.owner_profile_id,
+      song_key: r.song_key, song_title: r.song_title, role: r.role }))
+}
+
+function consumirLimiteAnonimo(cuerpo) {
+  const denegado = { is_allowed: false, remaining: 0, retry_after: 60 }
+  if (!/^[0-9a-f]{64}$/.test(CLAVE_RATE_LIMIT) || !ID_CLAVE_RATE_LIMIT ||
+      typeof cuerpo?.p_payload !== "string" || typeof cuerpo?.p_signature !== "string" ||
+      !/^[0-9a-f]{64}$/.test(cuerpo.p_signature)) return denegado
+  const esperado = createHmac("sha256", Buffer.from(CLAVE_RATE_LIMIT, "hex"))
+    .update(DOMINIO_RATE_LIMIT + cuerpo.p_payload).digest()
+  const recibido = Buffer.from(cuerpo.p_signature, "hex")
+  if (recibido.length !== esperado.length || !timingSafeEqual(recibido, esperado)) return denegado
+  let payload
+  try { payload = JSON.parse(cuerpo.p_payload) } catch { return denegado }
+  const ahora = Math.floor(Date.now() / 1000)
+  if (payload?.version !== 1 || payload.keyId !== ID_CLAVE_RATE_LIMIT ||
+      !["oembed", "health"].includes(payload.bucket) ||
+      typeof payload.subject !== "string" || !/^[0-9a-f]{64}$/.test(payload.subject) ||
+      !Number.isInteger(payload.issuedAt) || Math.abs(ahora - payload.issuedAt) > 30) return denegado
+
+  const clave = `${payload.bucket}:${payload.subject}`
+  const limite = payload.bucket === "oembed" ? 30 : 60
+  let ventana = ventanasRateLimit.get(clave)
+  if (!ventana || ahora >= ventana.inicio + 60) {
+    ventana = { inicio: ahora, usados: 0 }
+    ventanasRateLimit.set(clave, ventana)
+  }
+  if (ventana.usados >= limite) {
+    return { is_allowed: false, remaining: 0, retry_after: Math.max(1, ventana.inicio + 60 - ahora) }
+  }
+  ventana.usados++
+  return { is_allowed: true, remaining: limite - ventana.usados, retry_after: 0 }
 }
 
 const servidor = createServer((req, res) => {
@@ -358,6 +428,20 @@ const servidor = createServer((req, res) => {
       return leerCuerpo(req).then((cuerpo) => {
         if (nombreFuncion === "descubrimiento_perfiles") {
           return responder(res, 200, descubrimientoPerfiles(cuerpo?.p_tipo, cuerpo?.p_limite))
+        }
+        if (nombreFuncion === "descubrimiento_perfiles_con_identidad") {
+          return responder(res, 200, descubrimientoPerfiles(cuerpo?.p_tipo, cuerpo?.p_limite, true))
+        }
+        if (nombreFuncion === "descubrimiento_perfiles_pagina") {
+          const cursor = cuerpo?.p_despues_total == null && cuerpo?.p_despues_username == null
+            ? undefined : { total: cuerpo?.p_despues_total, username: cuerpo?.p_despues_username }
+          return responder(res, 200, descubrimientoPerfiles(cuerpo?.p_tipo, cuerpo?.p_limite, true, cursor))
+        }
+        if (nombreFuncion === "public_credit_approvals") {
+          return responder(res, 200, aprobacionesDeCreditos(cuerpo?.p_profile_id))
+        }
+        if (nombreFuncion === "consume_anonymous_rate_limit") {
+          return responder(res, 200, consumirLimiteAnonimo(cuerpo))
         }
         return responder(res, 404, {
           code: "42883",
@@ -400,5 +484,6 @@ const servidor = createServer((req, res) => {
 })
 
 servidor.listen(PUERTO, "127.0.0.1", () => {
+  process.send?.({ type: "ready" })
   console.log(`[servidor-supabase] fixtures sirviendo en http://127.0.0.1:${PUERTO}`)
 })

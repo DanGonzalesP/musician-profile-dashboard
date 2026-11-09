@@ -15,6 +15,11 @@ export default function robots(): MetadataRoute.Robots {
         "/grupo/",
         "/cleanup",
         "/login",
+        // Administración y recuperación de cuenta: sin valor para buscadores.
+        "/admin",
+        "/recuperar",
+        "/nueva-contrasena",
+        "/confirmar-correo",
       ],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
@@ -8,8 +8,7 @@ import { Logo } from "@/components/logo";
 import ProfileMenu from "./ProfileMenu";
 import { supabase } from "@/lib/supabase";
 import { fetchMyProfiles, type MyProfileOption } from "@/lib/bands";
-import { fetchIncomingCreditRequests } from "@/lib/credit-requests";
-import { fetchUnreadQuestionCount } from "@/lib/profile-questions";
+import { useNotificationCount } from "@/lib/use-notification-count";
 
 export default function FeedHeader() {
   const { t } = useLocale();
@@ -20,64 +19,93 @@ export default function FeedHeader() {
   // No se deriva del nombre: el username lleva un sufijo aleatorio.
   const [personalUsername, setPersonalUsername] = useState("");
   const [bands, setBands] = useState<MyProfileOption[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { count: unreadCount, loading: countLoading } = useNotificationCount();
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const requestId = useRef(0);
 
   useEffect(() => {
     let active = true;
+    let authEventSeen = false;
 
-    const loadProfiles = async (id: string) => {
-      const profiles = await fetchMyProfiles(id);
-      if (!active) return;
-      const personal = profiles.find((p) => !p.isBand);
-      setPersonalDisplayName(personal?.displayName ?? "");
-      setPersonalUsername(personal?.username ?? "");
-      setBands(profiles.filter((p) => p.isBand));
+    const clearProfileData = () => {
+      setPersonalDisplayName("");
+      setPersonalUsername("");
+      setBands([]);
+      setProfilesLoaded(false);
+      setLoadError(false);
+    };
 
-      if (personal) {
-        const [creditRequests, unreadQuestions] = await Promise.all([
-          fetchIncomingCreditRequests(personal.id).catch(() => []),
-          fetchUnreadQuestionCount(personal.id).catch(() => 0),
-        ]);
-        if (!active) return;
-        setUnreadCount(creditRequests.filter((r) => r.status === "pending").length + unreadQuestions);
+    const loadProfiles = async (id: string, request: number) => {
+      try {
+        const profiles = await fetchMyProfiles(id);
+        if (!active || request !== requestId.current) return;
+        const personal = profiles.find((p) => !p.isBand);
+        setPersonalDisplayName(personal?.displayName ?? "");
+        setPersonalUsername(personal?.username ?? "");
+        setBands(profiles.filter((p) => p.isBand));
+        setProfilesLoaded(true);
+
+      } catch {
+        if (!active || request !== requestId.current) return;
+        clearProfileData();
+        setLoadError(true);
       }
     };
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!active) return;
-      const user = data.user;
-      setUserId(user?.id ?? null);
-      if (user) loadProfiles(user.id);
-      setCheckingSession(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      const user = session?.user ?? null;
-      setUserId(user?.id ?? null);
-      if (user) {
-        loadProfiles(user.id);
-      } else {
-        setPersonalDisplayName("");
-        setPersonalUsername("");
-        setBands([]);
-        setUnreadCount(0);
+    const loadSession = async () => {
+      const request = ++requestId.current;
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        if (!active || authEventSeen || request !== requestId.current) return;
+        const user = data.user;
+        setUserId(user?.id ?? null);
+        if (user) await loadProfiles(user.id, request);
+        else setLoadError(false);
+        setCheckingSession(false);
+      } catch {
+        if (!active || authEventSeen || request !== requestId.current) return;
+        setUserId(null);
+        setLoadError(true);
+        setCheckingSession(false);
       }
-    });
+    };
+
+    void loadSession();
+
+    let subscription: { unsubscribe: () => void } | undefined;
+    try {
+      const result = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!active) return;
+        authEventSeen = true;
+        const request = ++requestId.current;
+        const user = session?.user ?? null;
+        setUserId(user?.id ?? null);
+        clearProfileData();
+        setCheckingSession(false);
+        if (user) void loadProfiles(user.id, request);
+      });
+      subscription = result.data.subscription;
+    } catch {
+      // Igual que un fallo de la lectura inicial: se informa desde la cola de
+      // microtareas, fuera del cuerpo síncrono del efecto.
+      queueMicrotask(() => {
+        if (!active) return;
+        setLoadError(true);
+        setCheckingSession(false);
+      });
+    }
 
     return () => {
       active = false;
-      subscription.unsubscribe();
+      requestId.current += 1;
+      subscription?.unsubscribe();
     };
-  }, []);
+  }, [retryKey]);
 
-  // Antes se slugificaba el display_name — pero el username real no se deriva
-  // del nombre (lleva sufijo aleatorio), así que ese slug apuntaba a un perfil
-  // inexistente ("Error desconocido al cargar el perfil"). Se usa el username
-  // real; solo si aún no está disponible se cae al slug como último recurso.
-  const personalSlug = personalUsername || personalDisplayName.trim().toLowerCase().replace(/\s+/g, "-");
+  const personalSlug = personalUsername;
 
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-linear-to-b from-background/90 to-transparent px-6 py-4">
@@ -87,27 +115,37 @@ export default function FeedHeader() {
 
       {/* El selector de idioma ahora vive en Configuración, junto al tema. */}
       <div className="pointer-events-auto flex items-center gap-3">
+        {loadError && !checkingSession && (
+          <div role="alert" className="flex items-center gap-2 text-xs text-destructive">
+            <span>No se pudieron cargar tus perfiles.</span>
+            <button type="button" onClick={() => { setCheckingSession(true); setLoadError(false); setRetryKey((key) => key + 1); }} className="underline underline-offset-2">
+              Reintentar
+            </button>
+          </div>
+        )}
         {!checkingSession &&
           (userId ? (
             <>
               <Link
                 href="/perfil/notificaciones"
-                aria-label={t("feed_notifications_aria")}
-                title={t("feed_notifications_aria")}
+                aria-label={`${t("feed_notifications_aria")}: ${unreadCount === null ? t(countLoading ? "feed_notifications_loading" : "feed_notifications_unknown") : `${unreadCount} ${t("feed_notifications_pending")}`}`}
+                title={unreadCount === null ? t(countLoading ? "feed_notifications_loading" : "feed_notifications_unknown") : t("feed_notifications_aria")}
                 className="relative flex size-9 items-center justify-center rounded-full border border-border bg-card/70 text-foreground backdrop-blur transition-colors hover:bg-accent/40"
               >
                 <Bell className="size-4" />
-                {unreadCount > 0 && (
+                {(unreadCount === null || unreadCount > 0) && (
                   <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-                    {unreadCount}
+                    {unreadCount ?? (countLoading ? "…" : "?")}
                   </span>
                 )}
               </Link>
               <ProfileMenu
+                key={userId}
                 userId={userId}
                 personalDisplayName={personalDisplayName}
                 personalSlug={personalSlug}
                 bands={bands}
+                profilesLoaded={profilesLoaded}
               />
             </>
           ) : (

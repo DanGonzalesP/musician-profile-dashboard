@@ -6,9 +6,10 @@
     - /url: /login
   - link "Registrarse":
     - /url: /login?modo=registro
-  - button "Categorías" [pressed]
-  - button "Servicios"
-  - button "Productos"
+  - navigation "Secciones de Vibe":
+    - button "Descubrir" [pressed]
+    - button "Servicios"
+    - button "Productos"
   - group "Filtrar el feed":
     - button "Para ti" [pressed]
     - button "Autor"
@@ -21,14 +22,23 @@
     - button "Músico"
     - button "Grupos"
   - button "Reproducir"
-  - text: /Pista Publica de Prueba Artista de Prueba 0:\d+/
+  - text: Pista Publica de Prueba
+  - link "Ver perfil de Artista de Prueba":
+    - /url: /artista_prueba
+    - text: ""
+  - alert: No se pudo reproducir el audio. Comprueba tu conexión y vuelve a intentarlo. Si continúa, el archivo puede no estar disponible.
+  - button "Reintentar reproducción"
+  - text: /0:\d+/
   - slider "Progreso de la canción": "0"
   - text: /0:\d+/
   - button "Guardar canción"
   - button "Reproducir"
   - button "Ver comentarios"
+  - heading "Llegaste al final del contenido cargado" [level=2]
+  - paragraph: Puedes cambiar de filtro o actualizar para buscar nuevas publicaciones.
+  - button "Actualizar feed"
   - button "Contenido anterior" [disabled]
-  - button "Siguiente contenido" [disabled]
+  - button "Siguiente contenido"
   - button "Compartir"
 - alert
 - region "Consentimiento de analítica":

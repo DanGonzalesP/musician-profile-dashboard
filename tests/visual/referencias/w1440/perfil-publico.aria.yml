@@ -5,6 +5,7 @@
   - img "Artista de Prueba"
   - heading "Artista de Prueba" [level=2]
   - text: Lima, Peru
+  - button "Compartir"
   - button "Preguntarle al artista sobre esto"
   - link "Merch y servicios":
     - /url: /artista_prueba/tienda
@@ -19,3 +20,12 @@
   - text: /0:\d+/
   - button "Preguntarle al artista sobre esto"
   - button "Reportar"
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"

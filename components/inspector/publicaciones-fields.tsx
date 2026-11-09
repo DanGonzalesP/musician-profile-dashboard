@@ -196,6 +196,7 @@ export function PublicacionesFields({
         key={activeRow}
         label="Publicación"
         count={rowIndices.length}
+        itemsVersion={JSON.stringify([activeRow, items])}
         onAdd={addItem}
         onRemove={removeItem}
         addLabel="Agregar"

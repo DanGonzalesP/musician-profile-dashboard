@@ -6,7 +6,8 @@ import {
   type OembedMetadata,
   type OembedProvider,
 } from "@/lib/oembed"
-import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
+import { respuesta429 } from "@/lib/rate-limit"
+import { checkAnonymousRateLimit, anonymousLimitUnavailable } from "@/lib/anonymous-rate-limit"
 import { idDePeticion, logError, logWarn } from "@/lib/log"
 
 // Autocompletado de metadatos (título, artista principal, miniatura) al
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
     // Esta ruta no exige sesión (solo lee metadata publica), así que el
     // límite va por IP: 30 por minuto alcanza de sobra para pegar enlaces en
     // el editor, y corta el uso como proxy gratuito hacia terceros.
-    const limite = checkRateLimit(identificarSolicitante(request), 30, 60)
+    const limite = await checkAnonymousRateLimit(request, "oembed")
+    if (limite.unavailable) return anonymousLimitUnavailable()
     if (!limite.permitido) return respuesta429(limite.reintentarEn)
 
     const { searchParams } = new URL(request.url)

@@ -71,7 +71,13 @@ comprobarDocker()
 // `supabase start` imprime las claves locales aunque termine bien. Se silencia
 // su stdout: no hay razón para copiar credenciales —aunque sean de juguete— a
 // los registros de CI, donde quedan indexadas para siempre.
-correr(["start"], { ocultarSalida: true, descripcion: "Levantando Supabase local" })
+// Para auditar únicamente DDL en una copia aislada no hacen falta API, Auth,
+// Studio ni correo. La reconstrucción y db lint siguen siendo los mismos.
+const soloDb = process.argv.includes("--solo-db")
+const inicio = soloDb ? ["start", "--exclude",
+  "gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
+] : ["start"]
+correr(inicio, { ocultarSalida: true, descripcion: "Levantando Supabase local" })
 
 // La prueba de fuego: tirar la base y reconstruirla solo con las migraciones.
 // Si alguna migración no es idempotente, depende de datos previos, o el
@@ -83,7 +89,7 @@ correr(["db", "reset", "--local", "--no-seed"], {
 // El linter de Supabase detecta lo que las pruebas no ven: políticas de RLS
 // que se anulan entre sí, funciones `security definer` sin `search_path` fijo,
 // tablas expuestas sin RLS. `--fail-on error` lo convierte en un gate.
-correr(["db", "lint", "--local", "--schema", "public", "--level", "warning", "--fail-on", "error"], {
+correr(["db", "lint", "--local", "--schema", "public,private", "--level", "warning", "--fail-on", "error"], {
   descripcion: "Auditando el esquema (db lint)",
 })
 

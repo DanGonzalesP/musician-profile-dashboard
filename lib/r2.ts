@@ -5,6 +5,10 @@ import { S3Client } from "@aws-sdk/client-s3"
 
 export const r2Client = new S3Client({
   region: "auto",
+  // La firma se genera antes de recibir el cuerpo (PUT directo del navegador).
+  // El checksum automático de un Body ausente representa cero bytes y haría
+  // incompatible la firma con el archivo real. Se verificará tamaño/ETag al finalizar.
+  requestChecksumCalculation: "WHEN_REQUIRED",
   endpoint: process.env.R2_ENDPOINT!,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
@@ -13,6 +17,6 @@ export const r2Client = new S3Client({
 })
 
 export const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
-// Esta sí es pública a propósito: es la URL desde donde cualquiera puede
-// leer (GET) los archivos ya subidos, se usa en <img>/<audio> del perfil.
-export const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL!
+// Origen histórico: permite reconocer URLs persistidas antes de la entrega
+// privada. Los renders las convierten a /api/media; no habilita lectura R2.
+export const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? ""

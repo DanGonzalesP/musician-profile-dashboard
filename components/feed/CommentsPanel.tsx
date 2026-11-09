@@ -6,14 +6,16 @@
 // al reproductor. En pantallas chicas, donde no entra una tercera columna,
 // se abre como bottom sheet con el botón de comentarios del rail.
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import Link from "next/link"
-import { AnimatePresence, motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { Loader2, MessageCircle, Send, X } from "lucide-react"
 import { useLocale } from "@/components/locale-provider"
-import { addTrackComment, fetchTrackComments, type TrackComment } from "@/lib/track-comments"
-import { addPostComment, fetchPostComments, type PostComment } from "@/lib/post-comments"
+import { addTrackComment, deleteTrackComment, fetchTrackComments, type TrackComment } from "@/lib/track-comments"
+import { addPostComment, deletePostComment, fetchPostComments, type PostComment } from "@/lib/post-comments"
 import { supabase } from "@/lib/supabase"
+import { COMMENT_PAGE_SIZE } from "@/lib/comment-pagination"
+import type { CursorFeed } from "@/lib/feed/keyset"
 
 // Un elemento comentable del feed — canción o publicación. Cada uno vive en
 // su propia tabla (feed_comments / feed_post_comments, ver lib/track-comments
@@ -38,7 +40,6 @@ export default function CommentsPanel({
   isSample,
   mobileOpen,
   onCloseMobile,
-  onCountChange,
 }: {
   // null = sin canción/publicación activa con comentarios
   target: CommentTarget | null
@@ -46,55 +47,207 @@ export default function CommentsPanel({
   // Controla la hoja inferior en móvil; en escritorio el panel siempre está visible.
   mobileOpen: boolean
   onCloseMobile: () => void
-  onCountChange: (id: string, count: number) => void
 }) {
   const { t, locale } = useLocale()
+  const reducedMotion = useReducedMotion()
   const [comments, setComments] = useState<Comment[]>([])
-  const [loading, setLoading] = useState(false)
-  const [hasSession, setHasSession] = useState(false)
-  const [draft, setDraft] = useState("")
+  const [loading, setLoading] = useState(() => Boolean(target && !isSample))
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null)
+  const hasSession = Boolean(viewerUserId)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteUncertain, setDeleteUncertain] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const targetKey = target ? `${target.kind}:${target.id}` : ""
+  const targetId = target?.id
+  const targetKind = target?.kind
+  const draft = drafts[targetKey] ?? ""
+  const setDraft = (value: string) => setDrafts(previous => ({ ...previous, [targetKey]: value }))
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreFailed, setMoreFailed] = useState(false)
+  const cursor = useRef<CursorFeed | null>(null)
+  const moreLock = useRef(false)
+  const [reload, setReload] = useState(0)
+  const sendLock = useRef(false)
+  const generation = useRef(0)
+  const readController = useRef<AbortController | null>(null)
+  const requests = useRef(new Map<string, { content: string; id: string }>())
   const [sending, setSending] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
+  const mobileDialog = useRef<HTMLDialogElement>(null)
+  const mobileClose = useRef<HTMLButtonElement>(null)
+  const desktopPanel = useRef<HTMLElement>(null)
+  const mobileTitleId = useId()
+
+  // Cada destino/recarga es una lectura nueva: su estado inicial se fija al
+  // renderizar (patrón de React para ajustar estado ante un cambio de props),
+  // no síncronamente desde el efecto que lanza la consulta.
+  const requestKey = `${targetKind ?? ""}:${targetId ?? ""}:${isSample ? 1 : 0}:${reload}`
+  const [loadedKey, setLoadedKey] = useState(requestKey)
+  if (loadedKey !== requestKey) {
+    setLoadedKey(requestKey)
+    setComments([])
+    setErrorMessage("")
+    setSuccessMessage("")
+    setLoadFailed(false)
+    setHasMore(false)
+    setLoadingMore(false)
+    setMoreFailed(false)
+    setLoading(Boolean(targetId && targetKind && !isSample))
+  }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setHasSession(Boolean(data.user)))
+    if (!mobileOpen) return
+    const dialog = mobileDialog.current
+    if (!dialog) return
+    // La columna de escritorio siempre está montada: se captura una vez por efecto.
+    const panel = desktopPanel.current
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const desktop = window.matchMedia("(min-width: 1024px)")
+    const previousOverflow = document.body.style.overflow
+    const syncViewport = () => {
+      if (desktop.matches) {
+        const wasOpen = dialog.open
+        dialog.close()
+        document.body.style.overflow = previousOverflow
+        if (wasOpen || opener) panel?.focus({ preventScroll: true })
+      } else {
+        if (!dialog.open) dialog.showModal()
+        document.body.style.overflow = "hidden"
+        mobileClose.current?.focus({ preventScroll: true })
+      }
+    }
+    syncViewport()
+    desktop.addEventListener("change", syncViewport)
+    return () => {
+      desktop.removeEventListener("change", syncViewport)
+      dialog.close()
+      document.body.style.overflow = previousOverflow
+      if (opener?.isConnected && opener.getClientRects().length > 0) opener.focus({ preventScroll: true })
+      else if (panel?.isConnected) panel.focus({ preventScroll: true })
+    }
+  }, [mobileOpen])
+
+  useEffect(() => {
+    let previousUser: string | null | undefined
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const userId = session?.user.id ?? null
+      if (userId === previousUser) return
+      previousUser = userId
+      generation.current += 1
+      readController.current?.abort()
+      setViewerUserId(userId)
+      setDrafts({})
+      requests.current.clear()
+      setErrorMessage("")
+      setReload(value => value + 1)
+    })
+    return () => { generation.current += 1; subscription.unsubscribe() }
   }, [])
 
   useEffect(() => {
-    if (!target || isSample) {
-      setComments([])
-      return
-    }
+    const current = ++generation.current
+    const controller = new AbortController()
+    readController.current = controller
     let active = true
-    setLoading(true)
-    const fetchComments = target.kind === "track" ? fetchTrackComments : fetchPostComments
-    fetchComments(target.id).then((list) => {
-      if (!active) return
-      setComments(list)
-      setLoading(false)
-      onCountChange(target.id, list.length)
-    })
-    return () => {
-      active = false
+    cursor.current = null
+    moreLock.current = false
+    if (!targetId || !targetKind || isSample) {
+      return () => { controller.abort(); generation.current += 1 }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target?.kind, target?.id, isSample])
+    const fetchComments = targetKind === "track" ? fetchTrackComments : fetchPostComments
+    void fetchComments(targetId, undefined, controller.signal).then(list => {
+      if (!active || current !== generation.current) return
+      setComments(list)
+      setDeleteUncertain(false)
+      const last = list[list.length - 1]
+      cursor.current = last ? { id: last.id, createdAt: last.createdAt } : null
+      setHasMore(list.length === COMMENT_PAGE_SIZE)
+      setLoading(false)
+    }).catch(() => {
+      if (!active || current !== generation.current) return
+      setLoadFailed(true)
+      setLoading(false)
+    })
+    return () => { active = false; generation.current += 1; controller.abort() }
+  }, [targetKind, targetId, isSample, reload])
 
   const handleSend = async () => {
-    if (!target || !draft.trim() || sending) return
+    if (!target || isSample || !viewerUserId || !draft.trim() || sendLock.current || moreLock.current || loading || loadFailed) return
+    sendLock.current = true
+    const current = generation.current
+    const sentKey = targetKey
+    const content = draft.trim()
     setSending(true)
     setErrorMessage("")
     try {
-      const comment =
-        target.kind === "track" ? await addTrackComment(target.id, draft) : await addPostComment(target.id, draft)
-      setComments((prev) => [comment, ...prev])
-      onCountChange(target.id, comments.length + 1)
-      setDraft("")
+      let request = requests.current.get(sentKey)
+      if (!request || request.content !== content) {
+        request = { content, id: crypto.randomUUID() }
+        requests.current.set(sentKey, request)
+      }
+      const comment = target.kind === "track"
+        ? await addTrackComment(target.id, content, request.id, viewerUserId)
+        : await addPostComment(target.id, content, request.id, viewerUserId)
+      if (current !== generation.current) return
+      requests.current.delete(sentKey)
+      setComments(previous => [comment, ...previous.filter(row => row.id !== comment.id)])
+      setDrafts(previous => ({ ...previous, [sentKey]: "" }))
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : t("feed_comments_error"))
+      if (current === generation.current) setErrorMessage(err instanceof Error ? err.message : t("feed_comments_error"))
     } finally {
+      sendLock.current = false
       setSending(false)
+    }
+  }
+
+  const loadOlder = async () => {
+    if (!target || isSample || !cursor.current || !hasMore || moreLock.current || sendLock.current || loading || loadFailed) return
+    moreLock.current = true
+    const current = generation.current
+    setLoadingMore(true)
+    setMoreFailed(false)
+    try {
+      const fetchComments = target.kind === "track" ? fetchTrackComments : fetchPostComments
+      const list = await fetchComments(target.id, cursor.current, readController.current?.signal)
+      if (current !== generation.current) return
+      setComments(previous => {
+        const seen = new Set(previous.map(comment => comment.id))
+        return [...previous, ...list.filter(comment => !seen.has(comment.id))]
+      })
+      const last = list[list.length - 1]
+      if (last) cursor.current = { id: last.id, createdAt: last.createdAt }
+      setHasMore(list.length === COMMENT_PAGE_SIZE)
+    } catch {
+      if (current === generation.current) setMoreFailed(true)
+    } finally {
+      if (current === generation.current) { moreLock.current = false; setLoadingMore(false) }
+    }
+  }
+
+  const handleDelete = async (comment: Comment) => {
+    if (!target || !viewerUserId || comment.userId !== viewerUserId || sendLock.current || moreLock.current || loading || loadFailed || deleteUncertain) return
+    if (!window.confirm(t("feed_comments_delete_confirm"))) return
+    sendLock.current = true
+    const current = generation.current
+    setDeletingId(comment.id)
+    setErrorMessage("")
+    setSuccessMessage("")
+    try {
+      if (target.kind === "track") await deleteTrackComment(comment.id, target.id, viewerUserId)
+      else await deletePostComment(comment.id, target.id, viewerUserId)
+      if (current !== generation.current) return
+      setComments(previous => previous.filter(row => row.id !== comment.id))
+      setSuccessMessage(t("feed_comments_deleted"))
+    } catch {
+      if (current !== generation.current) return
+      setDeleteUncertain(true)
+      setErrorMessage(t("feed_comments_delete_error"))
+    } finally {
+      sendLock.current = false
+      setDeletingId(null)
     }
   }
 
@@ -106,8 +259,13 @@ export default function CommentsPanel({
         ) : isSample ? (
           <EmptyState text={t("feed_comments_sample")} />
         ) : loading ? (
-          <div className="flex justify-center py-10 text-muted-foreground">
+          <div role="status" aria-label={t("feed_comments_loading")} className="flex justify-center py-10 text-muted-foreground">
             <Loader2 className="size-6 animate-spin" />
+          </div>
+        ) : loadFailed ? (
+          <div role="alert" className="text-sm text-destructive">
+            <p>{t("feed_comments_load_error")}</p>
+            <button type="button" onClick={() => setReload(value => value + 1)} className="mt-3 min-h-11 rounded-lg border border-current px-3">{t("feed_comments_retry")}</button>
           </div>
         ) : comments.length === 0 ? (
           <EmptyState text={t("feed_comments_empty")} />
@@ -115,7 +273,7 @@ export default function CommentsPanel({
           comments.map((comment) => (
             <motion.article
               key={comment.id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex gap-3"
             >
@@ -132,32 +290,47 @@ export default function CommentsPanel({
                 <p className="mt-0.5 whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/90">
                   {comment.content}
                 </p>
+                {comment.userId === viewerUserId && <button type="button"
+                  disabled={sending || loadingMore || deletingId !== null || deleteUncertain}
+                  onClick={() => void handleDelete(comment)} className="min-h-11 text-xs text-muted-foreground underline disabled:opacity-50">
+                  {deletingId === comment.id ? t("feed_comments_deleting") : t("feed_comments_delete")}
+                </button>}
               </div>
             </motion.article>
           ))
         )}
+        {!loading && !loadFailed && hasMore && <div className="space-y-2 text-center">
+          {moreFailed && <p role="alert" className="text-sm text-destructive">{t("feed_comments_older_error")}</p>}
+          <button type="button" disabled={loadingMore || sending || deletingId !== null} onClick={() => void loadOlder()} className="min-h-11 rounded-lg border border-border px-3 text-sm disabled:opacity-50">
+            {loadingMore ? t("feed_comments_loading") : moreFailed ? t("feed_comments_retry") : t("feed_comments_load_older")}
+          </button>
+        </div>}
       </div>
 
       <footer className="border-t border-border/60 p-4">
+        {successMessage && <p role="status" className="mb-2 text-xs text-foreground">{successMessage}</p>}
+        {!loading && !loadFailed && comments.length > 0 && <p role="status" className="mb-2 text-xs text-muted-foreground">{t("feed_comments_loaded", { count: comments.length })}</p>}
+        {target && !isSample && <button type="button" disabled={loading || sending || loadingMore || deletingId !== null} onClick={() => setReload(value => value + 1)} className="mb-2 min-h-11 text-xs text-primary underline disabled:opacity-50">{t("feed_comments_refresh")}</button>}
         {errorMessage && (
-          <p className="mb-2 text-xs font-medium text-destructive">{errorMessage}</p>
+          <p role="alert" className="mb-2 text-xs font-medium text-destructive">{errorMessage}</p>
         )}
         {!target || isSample ? null : hasSession ? (
           <div className="flex items-center gap-2">
             <input
-              ref={inputRef}
               type="text"
+              aria-label={t("feed_comments_placeholder")}
+              disabled={sending}
               value={draft}
               maxLength={500}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void handleSend() } }}
               placeholder={t("feed_comments_placeholder")}
               className="flex-1 rounded-2xl border border-input bg-card/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
             <button
               type="button"
               onClick={handleSend}
-              disabled={!draft.trim() || sending}
+              disabled={!draft.trim() || sending || loadingMore || loading || loadFailed || deletingId !== null}
               aria-label={t("feed_comments_send")}
               className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
             >
@@ -180,6 +353,8 @@ export default function CommentsPanel({
     <>
       {/* ── Escritorio: columna fija a la derecha, siempre abierta ────── */}
       <aside
+        ref={desktopPanel}
+        tabIndex={-1}
         aria-label={t("feed_comments_title")}
         className="hidden h-dvh w-80 shrink-0 flex-col border-l border-border/60 bg-background/95 backdrop-blur-2xl lg:flex xl:w-96"
       >
@@ -190,9 +365,9 @@ export default function CommentsPanel({
             <p className="flex items-center gap-2 text-sm font-bold text-foreground">
               <MessageCircle className="size-4 text-primary" />
               {t("feed_comments_title")}
-              {target && (
+              {target && !loading && !loadFailed && (
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-bold tabular-nums text-muted-foreground">
-                  {comments.length}
+                  {comments.length}{hasMore ? "+" : ""}
                 </span>
               )}
             </p>
@@ -203,55 +378,51 @@ export default function CommentsPanel({
       </aside>
 
       {/* ── Móvil: bottom sheet abierta con el botón de comentarios ───── */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <div className="lg:hidden">
-            <motion.button
-              type="button"
-              aria-label={t("common_close")}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={onCloseMobile}
-              className="fixed inset-0 z-50 cursor-default bg-black/40 backdrop-blur-[2px]"
-            />
-
-            <motion.aside
-              role="dialog"
-              aria-label={t("feed_comments_title")}
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 340, damping: 34 }}
-              className="fixed inset-x-0 bottom-0 z-50 flex h-[75dvh] flex-col rounded-t-3xl border-t border-border/60 bg-background/95 shadow-2xl backdrop-blur-2xl"
-            >
+      {mobileOpen && (
+        <dialog
+          ref={mobileDialog}
+          aria-labelledby={mobileTitleId}
+          onCancel={event => { event.preventDefault(); onCloseMobile() }}
+          onClick={event => {
+            if (event.target !== event.currentTarget) return
+            const bounds = event.currentTarget.getBoundingClientRect()
+            if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onCloseMobile()
+          }}
+          className="fixed inset-x-0 top-auto bottom-0 m-0 h-[75dvh] max-h-[85dvh] w-full max-w-none overflow-hidden rounded-t-3xl border border-border/60 bg-background/95 p-0 text-foreground shadow-2xl backdrop:bg-black/40 backdrop:backdrop-blur-sm"
+        >
+          <motion.div
+            initial={reducedMotion ? false : { y: "100%" }}
+            animate={{ y: 0 }}
+            transition={{ type: "spring", stiffness: 340, damping: 34 }}
+            className="flex h-full flex-col"
+          >
               <header className="flex items-center justify-between border-b border-border/60 px-5 py-4">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <h2 id={mobileTitleId} className="flex items-center gap-2 text-sm font-bold text-foreground">
                     <MessageCircle className="size-4 text-primary" />
                     {t("feed_comments_title")}
-                    {target && (
+                    {target && !loading && !loadFailed && (
                       <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-bold tabular-nums text-muted-foreground">
-                        {comments.length}
+                        {comments.length}{hasMore ? "+" : ""}
                       </span>
                     )}
-                  </p>
+                  </h2>
                   {target && <p className="mt-0.5 truncate text-xs text-muted-foreground">{target.title}</p>}
                 </div>
                 <button
+                  ref={mobileClose}
                   type="button"
                   onClick={onCloseMobile}
                   aria-label={t("common_close")}
-                  className="flex size-9 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:text-foreground"
+                  className="flex size-11 items-center justify-center rounded-xl border border-border/60 text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <X className="size-4" />
                 </button>
               </header>
               {body}
-            </motion.aside>
-          </div>
-        )}
-      </AnimatePresence>
+          </motion.div>
+        </dialog>
+      )}
     </>
   )
 }

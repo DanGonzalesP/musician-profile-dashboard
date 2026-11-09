@@ -1,0 +1,3 @@
+# Cloudflare Workers permite como máximo 25 MiB por archivo estático.
+# El WASM se sirve desde el bucket R2 privado VIBE_STATIC_ASSETS.
+ffmpeg/ffmpeg-core.wasm

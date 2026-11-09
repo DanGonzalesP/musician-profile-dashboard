@@ -1,13 +1,15 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ensureOwnProfile } from "@/lib/ensure-profile";
+import { legalDeclaration } from "@/lib/legal-acceptance";
 import { useLocale } from "@/components/locale-provider";
 import { LogoMark } from "@/components/logo";
+import { SITE_URL } from "@/lib/site";
 
 export default function LoginPage() {
   return (
@@ -22,8 +24,11 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const sending = useRef(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState("");
   const [exitoMensaje, setExitoMensaje] = useState("");
+  const [perfilPendiente, setPerfilPendiente] = useState(false);
   const searchParams = useSearchParams();
   const [isRegistering, setIsRegistering] = useState(searchParams.get("modo") === "registro");
   // El middleware manda acá con ?redirect=<ruta> cuando alguien intenta
@@ -32,49 +37,91 @@ function LoginForm() {
   // ajeno tras iniciar sesión (phishing con la marca de Vibe).
   const redirectParam = searchParams.get("redirect");
   const destino =
-    redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+    redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//") && !/[\\\u0000-\u0020]/.test(redirectParam)
       ? redirectParam
       : "/dashboard";
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [declaraMayoria, setDeclaraMayoria] = useState(false);
   const router = useRouter();
+
+  const completarAcceso = async () => {
+    setPerfilPendiente(true);
+    setPassword("");
+    setShowPassword(false);
+    // Reconsultar la identidad: el reintento no repite el alta ni conserva
+    // credenciales o un usuario de una sesión anterior.
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw new Error("auth");
+    if (!data.user) {
+      setPerfilPendiente(false);
+      setIsRegistering(false);
+      setErrorMensaje(t("auth_error_connection"));
+      return;
+    }
+    const perfil = await ensureOwnProfile(data.user);
+    if (!perfil) {
+      setErrorMensaje(t("auth_profile_pending"));
+      return;
+    }
+    router.push(destino);
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isRegistering && !aceptaTerminos) {
+    const declaracion = legalDeclaration(aceptaTerminos, declaraMayoria);
+    if (!perfilPendiente && isRegistering && !aceptaTerminos) {
       setErrorMensaje("Debes aceptar los Términos y la Política de Privacidad para crear tu cuenta.");
       return;
     }
+    if (!perfilPendiente && isRegistering && !declaracion) {
+      setErrorMensaje("Por ahora Vibe sólo admite cuentas de personas mayores de edad. Confirma que tienes 18 años o más.");
+      return;
+    }
+    if (sending.current) return;
+    sending.current = true;
     setLoading(true);
     setErrorMensaje("");
     setExitoMensaje("");
-
-    if (isRegistering) {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setErrorMensaje(error.message || t("auth_error_generic"));
-        setLoading(false);
-      } else if (data.session && data.user) {
-        // Confirmación de correo desactivada: la sesión ya existe. Se crea
-        // la fila de perfil de inmediato y la cuenta entra directo al panel.
-        await ensureOwnProfile(data.user);
-        router.push(destino);
-      } else {
-        // Confirmación de correo activada: hay que revisar la bandeja antes
-        // de poder iniciar sesión (el perfil lo crea el trigger de la DB).
-        setExitoMensaje(t("auth_success_check_email"));
-        setIsRegistering(false);
-        setLoading(false);
+    try {
+      if (perfilPendiente) {
+        await completarAcceso();
+        return;
       }
-    } else {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setErrorMensaje(t("auth_error_invalid_credentials"));
-        setLoading(false);
+      if (isRegistering) {
+        // La base guarda esta declaración una sola vez como constancia (0071).
+        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: {
+          emailRedirectTo: `${SITE_URL.replace(/\/$/, "")}/login`,
+          data: { vibe_legal: declaracion },
+        } });
+        if (error) {
+          setErrorMensaje(t("auth_error_generic"));
+          return;
+        }
+        if (data.session && data.user) {
+          await completarAcceso();
+        } else {
+          setExitoMensaje(t("auth_success_check_email"));
+          setIsRegistering(false);
+          setPassword("");
+          setShowPassword(false);
+        }
       } else {
-        // Red de seguridad para cuentas creadas antes del trigger de la DB.
-        if (data.user) await ensureOwnProfile(data.user);
-        router.push(destino);
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) {
+          setErrorMensaje(t("auth_error_invalid_credentials"));
+          return;
+        }
+        if (!data.user || !data.session) {
+          setErrorMensaje(t("auth_error_connection"));
+          return;
+        }
+        await completarAcceso();
       }
+    } catch {
+      setErrorMensaje(t("auth_error_connection"));
+    } finally {
+      sending.current = false;
+      setLoading(false);
     }
   };
 
@@ -92,20 +139,32 @@ function LoginForm() {
         <div className="w-full rounded-2xl border border-border bg-card p-6 shadow-xl space-y-6">
           <header className="text-center">
             <LogoMark className="mx-auto mb-2 size-10" />
-            <h2 className="text-xl font-bold">
+            <h1 className="text-xl font-bold">
               {isRegistering ? t("auth_register_title") : t("auth_login_title")}
-            </h2>
+            </h1>
             <p className="text-xs text-muted-foreground mt-1">
               {isRegistering ? t("auth_register_subtitle") : t("auth_login_subtitle")}
             </p>
           </header>
 
-          <form onSubmit={handleAuth} className="space-y-4">
+          <form onSubmit={handleAuth} aria-busy={loading} className="space-y-4">
+            {perfilPendiente ? (
+              <div className="space-y-4">
+                <p role="status" className="text-sm text-muted-foreground">{t("auth_profile_pending")}</p>
+                <button type="submit" disabled={loading} className="w-full min-h-11 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                  {loading ? t("auth_submit_processing") : t("auth_profile_retry")}
+                </button>
+              </div>
+            ) : <>
             <div>
-              <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
+              <label htmlFor="auth-email" className="block text-xs font-medium mb-1.5 text-muted-foreground">
                 {t("auth_email_label")}
               </label>
               <input
+                id="auth-email"
+                name="email"
+                autoComplete="email"
+                disabled={loading}
                 type="email"
                 required
                 value={email}
@@ -116,17 +175,24 @@ function LoginForm() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
+              <label htmlFor="auth-password" className="block text-xs font-medium mb-1.5 text-muted-foreground">
                 {t("auth_password_label")}
               </label>
               <input
-                type="password"
+                id="auth-password"
+                name="password"
+                autoComplete={isRegistering ? "new-password" : "current-password"}
+                disabled={loading}
+                type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("auth_password_placeholder")}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary"
               />
+              <button type="button" disabled={loading} aria-controls="auth-password" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)} className="mt-1 min-h-11 rounded px-2 text-xs text-foreground underline focus-visible:outline-2 focus-visible:outline-primary">
+                {showPassword ? t("auth_hide_password") : t("auth_show_password")}
+              </button>
             </div>
 
             {/* Sólo al iniciar sesión: en el formulario de registro no hay
@@ -139,6 +205,9 @@ function LoginForm() {
                 >
                   {t("auth_forgot_link")}
                 </Link>
+                <Link href="/confirmar-correo" className="mt-3 block text-[11px] text-muted-foreground hover:text-primary hover:underline">
+                  {t("auth_confirmation_title")}
+                </Link>
               </div>
             )}
 
@@ -146,6 +215,8 @@ function LoginForm() {
               <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-muted-foreground">
                 <input
                   type="checkbox"
+                  disabled={loading}
+                  required
                   checked={aceptaTerminos}
                   onChange={(e) => setAceptaTerminos(e.target.checked)}
                   className="mt-0.5 size-3.5 shrink-0 accent-[var(--primary)]"
@@ -165,6 +236,27 @@ function LoginForm() {
               </label>
             )}
 
+            {isRegistering && (
+              <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-muted-foreground">
+                <input
+                  type="checkbox"
+                  disabled={loading}
+                  required
+                  checked={declaraMayoria}
+                  onChange={(e) => setDeclaraMayoria(e.target.checked)}
+                  aria-describedby="auth-edad-nota"
+                  className="mt-0.5 size-3.5 shrink-0 accent-[var(--primary)]"
+                />
+                <span>
+                  Tengo 18 años o más.{" "}
+                  <span id="auth-edad-nota">
+                    La participación de menores todavía no está habilitada mientras definimos las
+                    autorizaciones y protecciones que requiere.
+                  </span>
+                </span>
+              </label>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -177,27 +269,30 @@ function LoginForm() {
                 : t("auth_submit_login")}
             </button>
 
+            </>}
             {errorMensaje && (
-              <p className="text-center text-xs font-semibold text-destructive mt-2">{errorMensaje}</p>
+              <p role="alert" className="text-center text-xs font-semibold text-destructive mt-2">{errorMensaje}</p>
             )}
             {exitoMensaje && (
-              <p className="text-center text-xs font-semibold text-emerald-500 mt-2">{exitoMensaje}</p>
+              <p role="status" className="text-center text-xs font-semibold text-foreground mt-2">{exitoMensaje}</p>
             )}
           </form>
 
-          <div className="text-center pt-2 border-t border-border">
+          {!perfilPendiente && <div className="text-center pt-2 border-t border-border">
             <button
               type="button"
+              disabled={loading}
               onClick={() => {
+                setShowPassword(false);
                 setIsRegistering(!isRegistering);
                 setErrorMensaje("");
                 setExitoMensaje("");
               }}
-              className="text-xs text-primary hover:underline focus:outline-none"
+              className="min-h-11 rounded px-2 text-xs text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
             >
               {isRegistering ? t("auth_toggle_to_login") : t("auth_toggle_to_register")}
             </button>
-          </div>
+          </div>}
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground">

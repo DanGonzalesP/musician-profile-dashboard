@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 import { Check } from "lucide-react"
 import {
   ACCENT_OPTIONS,
   type AccentColor,
-  getStoredAccent,
+  accentPreference,
   setStoredAccent,
 } from "@/lib/theme"
 
@@ -51,15 +51,10 @@ export function AccentSwatches({
  * este navegador (localStorage, igual que el modo oscuro/claro).
  */
 export function AppAccentCard() {
-  const [accent, setAccent] = useState<AccentColor>("rojo")
-
-  useEffect(() => {
-    setAccent(getStoredAccent())
-  }, [])
+  const accent = useSyncExternalStore(accentPreference.subscribe, accentPreference.getSnapshot, accentPreference.getServerSnapshot)
 
   const handleChange = (next: AccentColor) => {
     setStoredAccent(next)
-    setAccent(next)
   }
 
   return (

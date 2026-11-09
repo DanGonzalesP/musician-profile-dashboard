@@ -5,6 +5,7 @@ import { Disc3, Pause, Play } from "lucide-react";
 import type { SingleData } from "@/lib/blocks";
 import * as audioEngine from "@/lib/audio-engine";
 import { useLocale } from "@/components/locale-provider";
+import { AudioPlaybackError } from "@/components/audio-playback-error";
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -192,6 +193,7 @@ export function FeaturedSingleBlock({ data }: { data: SingleData }) {
           barra más grandes para poder buscar cómodamente dentro de la pista.
           Arrancan ocultos y solo se muestran al tocar el disco (ver expanded). */}
       <div className={`sm:hidden ${expanded ? "block" : "hidden"}`}>{controls(true)}</div>
+      {isCurrent && engine.error && <AudioPlaybackError onRetry={togglePlay} />}
     </div>
   );
 }

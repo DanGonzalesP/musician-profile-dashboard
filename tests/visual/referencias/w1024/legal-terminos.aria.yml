@@ -16,14 +16,18 @@
     - link "Normas de comunidad":
       - /url: /legal/comunidad
 - main:
+  - complementary "Estado de los documentos legales":
+    - paragraph: Documentos en preparación
+    - paragraph: Estos textos son borradores para el lanzamiento de Vibe en Perú. Falta confirmar al titular responsable, los plazos de conservación y las condiciones para menores de edad, y completar la revisión legal. No representan una política definitiva de lanzamiento.
   - article:
     - heading "Términos y Condiciones" [level=1]
-    - paragraph: Bienvenido a Vibe. Estos Términos regulan el uso de la plataforma (el sitio web, el editor de perfiles, el feed, la tienda y todos los servicios asociados). Al crear una cuenta o usar Vibe, aceptas estos Términos. Si no estás de acuerdo, no uses la plataforma.
+    - paragraph: /Versión del \d+-\d+-\d+/
+    - paragraph: "Este borrador describe las condiciones propuestas para Vibe: el sitio web, el editor de perfiles, el feed, la tienda y los servicios asociados. La versión definitiva deberá identificar al titular responsable y las condiciones aprobadas antes del lanzamiento público."
     - heading "1. Qué es Vibe" [level=2]
     - paragraph: Vibe es una plataforma para que músicos de cualquier rubro (autores, compositores, arreglistas, directores, productores, ingenieros de mezcla, intérpretes y grupos) publiquen su música, su trayectoria y sus publicaciones, vendan productos y ofrezcan servicios, y para que cualquier persona descubra ese contenido.
     - heading "2. Tu cuenta" [level=2]
     - list:
-      - listitem: /Debes tener al menos \d+ años \(o la edad mínima legal en tu país\) para crear una cuenta\. Para vender productos o servicios debes tener capacidad legal para contratar\./
+      - listitem: /Mientras se definen las autorizaciones y medidas de protección que requiere la participación de menores de edad, crear una cuenta exige declarar que tienes \d+ años o más\. Guardamos la fecha, la versión de estos documentos y esa declaración como constancia\. Para vender productos o servicios se requiere capacidad legal para contratar\./
       - listitem: Eres responsable de mantener la confidencialidad de tu contraseña y de toda la actividad que ocurra en tu cuenta.
       - listitem: La información de tu perfil debe ser veraz. No puedes hacerte pasar por otra persona, artista o agrupación.
       - listitem: Los perfiles de grupo musical son gestionados por su creador y por los integrantes que él invite; el creador responde por la página del grupo.
@@ -59,7 +63,7 @@
     - heading "6. Retiro de contenido y terminación" [level=2]
     - paragraph: Podemos retirar contenido o suspender cuentas que infrinjan estos Términos, las Normas de Comunidad o la ley, con o sin aviso previo según la gravedad. Tú puedes eliminar tu contenido o tu cuenta cuando quieras. Aplicamos una política de infractores reincidentes en materia de derechos de autor.
     - heading "7. Propiedad de la plataforma" [level=2]
-    - paragraph: El software, el diseño, el logotipo y la marca Vibe son de nuestra propiedad o de nuestros licenciantes. Estos Términos no te otorgan ningún derecho sobre ellos.
+    - paragraph: Vibe es el nombre provisional del proyecto. Su disponibilidad y protección como marca están pendientes de evaluación; este documento no afirma que exista una marca registrada. El software, los diseños y los recursos de terceros mantienen sus licencias correspondientes.
     - heading "8. Descargo de responsabilidad" [level=2]
     - paragraph: La plataforma se ofrece “tal cual” y “según disponibilidad”. En la medida máxima permitida por la ley, no garantizamos disponibilidad ininterrumpida ni ausencia de errores, y no respondemos por pérdidas derivadas de transacciones entre usuarios, contenido de terceros o causas fuera de nuestro control razonable.
     - heading "9. Cambios a estos Términos" [level=2]
@@ -67,7 +71,16 @@
     - heading /\d+\. Ley aplicable y contacto/ [level=2]
     - paragraph:
       - text: "Estos Términos se rigen por las leyes de la Perú, sin perjuicio de las protecciones de consumidor que te correspondan en tu país de residencia. Consultas:"
-      - link "danielgonzales200427@gmail.com":
-        - /url: mailto:danielgonzales200427@gmail.com
+      - link /[^@ ]+@[^@ ]+/:
+        - /url: /mailto:[^@ ]+@[^@ ]+/
       - text: .
-  - paragraph: "/Última actualización: \\d+ de julio de \\d+\\. Estos documentos son una base preparada para una plataforma de música con contenido de usuarios; no constituyen asesoría legal — antes del lanzamiento conviene que un abogado los revise para tu caso concreto\\./"
+  - paragraph: "/Última actualización: 6 de noviembre de \\d+\\. Estos documentos son una base preparada para una plataforma de música con contenido de usuarios; no constituyen asesoría legal — antes del lanzamiento conviene que un abogado los revise para tu caso concreto\\./"
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"

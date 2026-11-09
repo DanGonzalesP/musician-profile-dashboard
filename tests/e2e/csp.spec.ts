@@ -70,6 +70,9 @@ const esperarQueLaImagenCargue = async (imagen: Locator) => {
 const miniatura = (page: Page, fuente: string): Locator =>
   page.locator(`img[src="${fuente}"]`).first()
 
+const urlMediaFixture = (fuente: string): string =>
+  `/api/media/${new URL(fuente).pathname.slice(1)}`
+
 // F4 — TikTok era el único proveedor admitido cuya miniatura no tenía host en
 // `img-src`: `lib/oembed.ts` acepta sus enlaces, `app/api/oembed/route.ts`
 // devuelve el `thumbnail_url` de su CDN, `block-inspector.tsx` lo guarda en
@@ -124,11 +127,11 @@ test("la tarjeta de TikTok de Publicaciones se pinta al abrir su pestaña", asyn
   await expect
     .poll(async () => {
       await pestaña.click()
-      return miniatura(page, EMBED_TIKTOK_PUBLICACION.thumbnail).count()
+      return miniatura(page, urlMediaFixture(EMBED_TIKTOK_PUBLICACION.thumbnail)).count()
     })
     .toBeGreaterThan(0)
 
-  await esperarQueLaImagenCargue(miniatura(page, EMBED_TIKTOK_PUBLICACION.thumbnail))
+  await esperarQueLaImagenCargue(miniatura(page, urlMediaFixture(EMBED_TIKTOK_PUBLICACION.thumbnail)))
 
   expect(violaciones).toEqual([])
 })

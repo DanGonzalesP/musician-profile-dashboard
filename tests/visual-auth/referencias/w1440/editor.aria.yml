@@ -8,23 +8,25 @@
   - link "Panel Admin":
     - /url: /perfil/dashboard
   - button "Vista previa"
+  - button "Descargar borrador"
   - link "Ver mi perfil":
     - /url: /instantanea_editor
   - button "Publicar"
+  - status: Contenido cargado. Tus próximos cambios se guardarán como borrador.
 - complementary:
   - heading "Bloques" [level=2]
   - paragraph: Perfil
-  - button "Agregar bloque Banner Principal" [disabled]
-  - button "Agregar bloque Trayectoria"
-  - button "Agregar bloque Publicaciones"
+  - button "Agregar bloque Banner Principal" [disabled]: Banner Principal
+  - button "Agregar bloque Trayectoria": Trayectoria
+  - button "Agregar bloque Publicaciones": Publicaciones
   - paragraph: Música
-  - button "Agregar bloque Lanzamiento Actual"
-  - button "Agregar bloque Lista de Canciones"
-  - button "Agregar bloque Créditos y Colaboraciones"
+  - button "Agregar bloque Lanzamiento Actual": Lanzamiento Actual
+  - button "Agregar bloque Lista de Canciones": Lista de Canciones
+  - button "Agregar bloque Créditos y Colaboraciones": Créditos y Colaboraciones
   - paragraph: Comercio
-  - button "Agregar bloque Meta de Producción"
-  - button "Agregar bloque Tienda de Merch"
-  - button "Agregar bloque Servicios"
+  - button "Agregar bloque Meta de Producción": Meta de Producción
+  - button "Agregar bloque Tienda de Merch": Tienda de Merch
+  - button "Agregar bloque Servicios": Servicios
 - main:
   - text: Banner Principal
   - button "Editar bloque"
@@ -42,41 +44,18 @@
   - button "Editar bloque"
   - button "Eliminar bloque"
   - text: Discografía
+  - button "Pausar movimiento automático"
   - button "Digital Ethereal Ejemplo Digital Ethereal":
     - img "Digital Ethereal"
-    - text: ""
+    - text: Ejemplo
     - paragraph: Digital Ethereal
   - button "Analog Sessions Ejemplo Analog Sessions":
     - img "Analog Sessions"
-    - text: ""
+    - text: Ejemplo
     - paragraph: Analog Sessions
   - button "Midnight Frequencies Ejemplo Midnight Frequencies":
     - img "Midnight Frequencies"
-    - text: ""
-    - paragraph: Midnight Frequencies
-  - button "Digital Ethereal Ejemplo Digital Ethereal":
-    - img "Digital Ethereal"
-    - text: ""
-    - paragraph: Digital Ethereal
-  - button "Analog Sessions Ejemplo Analog Sessions":
-    - img "Analog Sessions"
-    - text: ""
-    - paragraph: Analog Sessions
-  - button "Midnight Frequencies Ejemplo Midnight Frequencies":
-    - img "Midnight Frequencies"
-    - text: ""
-    - paragraph: Midnight Frequencies
-  - button "Digital Ethereal Ejemplo Digital Ethereal":
-    - img "Digital Ethereal"
-    - text: ""
-    - paragraph: Digital Ethereal
-  - button "Analog Sessions Ejemplo Analog Sessions":
-    - img "Analog Sessions"
-    - text: ""
-    - paragraph: Analog Sessions
-  - button "Midnight Frequencies Ejemplo Midnight Frequencies":
-    - img "Midnight Frequencies"
-    - text: ""
+    - text: Ejemplo
     - paragraph: Midnight Frequencies
   - text: Soltar aquí
 - complementary:
@@ -92,9 +71,10 @@
   - text: Foto de perfil
   - button "Cambiar imagen":
     - img "Vista previa"
-  - button "Acomodar imagen"
+  - button "Acomodar imagen": Acomodar
   - text: Banner de fondo
   - button "Subir banner"
+  - group: Crear un banner con IA
   - text: ¿Qué eres?
   - button "Autor"
   - button "Compositor"

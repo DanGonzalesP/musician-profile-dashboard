@@ -28,7 +28,7 @@
 // nada que no resuelvan estas ~120 líneas.
 
 import { KNOWN_BLOCK_TYPES } from "./blocks"
-import { isSafeUrl, URL_FIELD_NAMES } from "./safe-url"
+import { isSafeUrlField, URL_FIELD_NAMES } from "./safe-url"
 
 /** La lista canónica, como `Set` para consultarla en O(1). */
 export const TIPOS_DE_BLOQUE_VALIDOS: ReadonlySet<string> = new Set<string>(KNOWN_BLOCK_TYPES)
@@ -135,7 +135,7 @@ export function enlacesPeligrosos(valor: unknown, ruta = "content", encontrados:
       // Campo de enlace: tiene que pasar el mismo filtro que aplica
       // `sanitizeUrlFields` al publicar (https, http, mailto, tel, relativa).
       if (CLAVES_DE_ENLACE.has(clave)) {
-        if (!isSafeUrl(v)) encontrados.push(rutaHija)
+        if (!isSafeUrlField(clave, v)) encontrados.push(rutaHija)
         continue
       }
       // Campo de media: solo se prohíben los esquemas que nunca son legítimos.

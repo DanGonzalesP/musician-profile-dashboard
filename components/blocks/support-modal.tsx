@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { Heart, X } from "lucide-react"
 import { useLocale } from "@/components/locale-provider"
 
@@ -19,25 +19,36 @@ export function SupportModal({
   const [selected, setSelected] = useState<number | null>(SUGGESTED_AMOUNTS[1])
   const [customAmount, setCustomAmount] = useState("")
   const [confirmed, setConfirmed] = useState(false)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
+  const descriptionId = useId()
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    dialog?.showModal()
+    return () => dialog?.close()
+  }, [])
 
   const amount = customAmount.trim() !== "" ? Number(customAmount) : selected ?? 0
-  const isValid = amount > 0
+  const isValid = Number.isFinite(amount) && amount > 0 && amount <= Number.MAX_SAFE_INTEGER / 100 && Number(amount.toFixed(2)) === amount
 
   function handleConfirm() {
-    if (!isValid) return
+    if (!isValid || confirmed) return
     onConfirm(amount)
     setConfirmed(true)
-    setTimeout(onClose, 1400)
   }
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <dialog ref={dialogRef} aria-labelledby={titleId} aria-describedby={descriptionId}
+      onCancel={event => { event.preventDefault(); onClose() }}
+      onClick={event => { if (event.target === event.currentTarget) onClose() }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-sm overflow-y-auto rounded-2xl border border-border bg-card p-0 text-foreground shadow-2xl backdrop:bg-black/70">
       <div
         className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
+          <h3 id={titleId} className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
             <Heart className="size-5 text-primary" />
             {t("modal_title")}
           </h3>
@@ -45,14 +56,16 @@ export function SupportModal({
             type="button"
             onClick={onClose}
             aria-label={t("common_close")}
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            autoFocus
+            className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
           </button>
         </div>
+        <p id={descriptionId} className="mb-4 text-xs leading-relaxed text-muted-foreground">{t("modal_intro")}</p>
 
         {confirmed ? (
-          <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <div role="status" className="flex flex-col items-center gap-2 py-6 text-center">
             <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Heart className="size-6" />
             </span>
@@ -61,8 +74,6 @@ export function SupportModal({
           </div>
         ) : (
           <>
-            <p className="mb-4 text-xs leading-relaxed text-muted-foreground">{t("modal_intro")}</p>
-
             <p className="mb-2 text-xs font-medium text-muted-foreground">{t("modal_choose_amount")}</p>
             <div className="mb-3 grid grid-cols-4 gap-2">
               {SUGGESTED_AMOUNTS.map((value) => (
@@ -73,7 +84,8 @@ export function SupportModal({
                     setSelected(value)
                     setCustomAmount("")
                   }}
-                  className={`rounded-lg border px-2 py-2 text-sm font-medium transition-colors ${
+                  aria-pressed={selected === value && customAmount.trim() === ""}
+                  className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-medium transition-colors ${
                     selected === value && customAmount.trim() === ""
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-foreground hover:bg-accent"
@@ -90,7 +102,8 @@ export function SupportModal({
               </span>
               <input
                 type="number"
-                min="1"
+                min="0.01"
+                step="0.01"
                 value={customAmount}
                 onChange={(e) => {
                   setCustomAmount(e.target.value)
@@ -114,6 +127,6 @@ export function SupportModal({
           </>
         )}
       </div>
-    </div>
+    </dialog>
   )
 }

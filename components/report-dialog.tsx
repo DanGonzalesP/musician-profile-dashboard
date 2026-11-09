@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { Flag, Loader2, X } from "lucide-react"
 import { crearReporte, REPORT_REASONS, type ReportReason, type ReportTargetType } from "@/lib/moderation"
 
@@ -30,11 +30,23 @@ export function ReportDialog({
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [error, setError] = useState("")
+  const envioActivo = useRef(false)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const id = useId()
+
+  useEffect(() => {
+    if (!abierto) return
+    const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const dialog = dialogRef.current
+    dialog?.showModal()
+    return () => { dialog?.close(); anterior?.focus() }
+  }, [abierto])
 
   const esCopyright = motivo === "derechos_de_autor"
 
   const enviar = async () => {
-    if (enviando) return
+    if (envioActivo.current || enviado) return
+    envioActivo.current = true
     setEnviando(true)
     setError("")
     try {
@@ -48,25 +60,26 @@ export function ReportDialog({
         reporterEmail: correo,
       })
       setEnviado(true)
+      setDetalles("")
+      setCorreo("")
+      setJuramento(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo enviar el reporte.")
     } finally {
+      envioActivo.current = false
       setEnviando(false)
     }
   }
 
   const cerrar = () => {
+    if (envioActivo.current) return
     setAbierto(false)
-    setTimeout(() => {
-      setEnviado(false)
-      setError("")
-      setDetalles("")
-      setJuramento(false)
-    }, 200)
+    setEnviado(false)
+    setError("")
   }
 
-  if (!abierto) {
-    return (
+  return (
+    <>
       <button
         type="button"
         onClick={() => setAbierto(true)}
@@ -75,26 +88,25 @@ export function ReportDialog({
         <Flag className="size-3" />
         Reportar
       </button>
-    )
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-card p-5 shadow-2xl sm:rounded-2xl">
+    {abierto && <dialog
+      ref={dialogRef}
+      aria-labelledby={`${id}-titulo`}
+      className="fixed inset-0 z-50 m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+      onCancel={event => { event.preventDefault(); cerrar() }}
+    >
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h2 className="text-base font-bold">Reportar contenido</h2>
-          <button type="button" onClick={cerrar} aria-label="Cerrar" className="text-muted-foreground hover:text-foreground">
+          <h2 id={`${id}-titulo`} className="text-base font-bold">Reportar contenido</h2>
+          <button type="button" onClick={cerrar} disabled={enviando} aria-label="Cerrar" className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:text-foreground disabled:opacity-50">
             <X className="size-4" />
           </button>
         </div>
 
         {enviado ? (
           <div className="space-y-3 py-2">
-            <p className="text-sm font-semibold text-emerald-500">Reporte recibido.</p>
+            <p role="status" className="text-sm font-semibold text-emerald-500">Reporte recibido.</p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Lo vamos a revisar. Si dejaste un correo, te escribimos con la decisión. En los
-              reclamos por derechos de autor, el perfil reportado tiene derecho a presentar una
-              contranotificación antes de que se tome una medida definitiva.
+              El reporte quedó registrado para revisión. Enviarlo no retira automáticamente
+              el contenido ni significa que se haya tomado una decisión.
             </p>
             <button
               type="button"
@@ -105,10 +117,12 @@ export function ReportDialog({
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <form className="space-y-3" aria-busy={enviando} onSubmit={event => { event.preventDefault(); void enviar() }}>
             <div>
-              <label className="mb-1 block text-xs text-muted-foreground">¿Qué ocurre?</label>
+              <label htmlFor={`${id}-motivo`} className="mb-1 block text-xs text-muted-foreground">¿Qué ocurre?</label>
               <select
+                id={`${id}-motivo`}
+                disabled={enviando}
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value as ReportReason)}
                 className="w-full rounded-lg border border-input bg-background p-2.5 text-sm"
@@ -125,8 +139,12 @@ export function ReportDialog({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Detalles</label>
+              <label htmlFor={`${id}-detalles`} className="mb-1 block text-xs text-muted-foreground">Detalles</label>
               <textarea
+                id={`${id}-detalles`}
+                disabled={enviando}
+                required
+                minLength={10}
                 value={detalles}
                 onChange={(e) => setDetalles(e.target.value)}
                 rows={4}
@@ -142,10 +160,14 @@ export function ReportDialog({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs text-muted-foreground">
-                Tu correo {esCopyright ? "(necesario para responderte)" : "(opcional)"}
+              <label htmlFor={`${id}-correo`} className="mb-1 block text-xs text-muted-foreground">
+                Tu correo (opcional, para contacto sobre el reporte)
               </label>
               <input
+                id={`${id}-correo`}
+                disabled={enviando}
+                maxLength={320}
+                autoComplete="email"
                 type="email"
                 value={correo}
                 onChange={(e) => setCorreo(e.target.value)}
@@ -158,6 +180,7 @@ export function ReportDialog({
               <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-[11px] leading-snug text-muted-foreground">
                 <input
                   type="checkbox"
+                  disabled={enviando}
                   checked={juramento}
                   onChange={(e) => setJuramento(e.target.checked)}
                   className="mt-0.5 size-3.5 shrink-0"
@@ -170,20 +193,19 @@ export function ReportDialog({
               </label>
             )}
 
-            {error && <p className="text-xs font-semibold text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-xs font-semibold text-destructive">{error}</p>}
 
             <button
-              type="button"
-              onClick={enviar}
+              type="submit"
               disabled={enviando || detalles.trim().length < 10 || (esCopyright && !juramento)}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
             >
               {enviando && <Loader2 className="size-4 animate-spin" />}
-              Enviar reporte
+              {enviando ? "Enviando reporte…" : "Enviar reporte"}
             </button>
-          </div>
+          </form>
         )}
-      </div>
-    </div>
+    </dialog>}
+    </>
   )
 }

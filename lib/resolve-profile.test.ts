@@ -11,6 +11,8 @@ const results: Record<string, Record<string, { data: Row; error?: unknown }>> = 
   username_history: {},
 }
 
+const signals: AbortSignal[] = []
+
 function builder(table: string) {
   let column = ""
   let value = ""
@@ -19,6 +21,11 @@ function builder(table: string) {
     eq: (_col: string, val: string) => {
       column = _col
       value = val
+      return chain
+    },
+    // Cada consulta lleva su señal de cancelación antes de pedir una fila.
+    abortSignal: (signal: AbortSignal) => {
+      signals.push(signal)
       return chain
     },
     maybeSingle: async () => {
@@ -69,8 +76,17 @@ describe("resolveProfileByUsername — caso límite de perfil inexistente", () =
     expect(r?.redirectTo).toBe("nova_reyes")
   })
 
-  it("propaga un error real de la base en vez de tragárselo", async () => {
+  it("propaga un error real de la base (sin su detalle interno) en vez de tragárselo", async () => {
     results.profiles["explota"] = { data: null, error: new Error("db down") }
-    await expect(resolveProfileByUsername("explota")).rejects.toThrow("db down")
+    const fallo = resolveProfileByUsername("explota")
+    await expect(fallo).rejects.toThrow("No se pudo consultar el perfil.")
+    await expect(fallo).rejects.not.toThrow("db down")
+  })
+
+  it("cada consulta usa una señal de cancelación", async () => {
+    signals.length = 0
+    await resolveProfileByUsername("nadie_aqui")
+    expect(signals.length).toBeGreaterThan(0)
+    expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
   })
 })

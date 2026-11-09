@@ -8,10 +8,12 @@ import { type Block, type TracksData, type CreditsData, createBlock, dbBlockToBl
 import { type CatalogProduct, type CatalogService, fetchCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
-import { fetchDraft } from "@/lib/draft";
+import { readEditorState } from "@/lib/editor-persistence";
+import { getActiveBandId, getEffectiveBandRole } from "@/lib/bands";
 import { ArrowLeft } from "lucide-react";
 
 type LoadingState = "loading" | "error" | "success";
+export type PreviewContent = { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] };
 
 // Contenido de la vista previa del borrador — se usa tanto en la página
 // standalone (/perfil/preview) como embebido DIRECTAMENTE (sin iframe) en el
@@ -21,20 +23,31 @@ type LoadingState = "loading" | "error" | "success";
 // esté dentro de otro iframe (frame-ancestors/X-Frame-Options revisan TODA
 // la cadena de ancestros, no solo el padre inmediato) — renderizar el mismo
 // componente en el propio documento evita el problema de raíz.
-export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean }) {
+export function PerfilPreviewContent({ embedded = false, content }: { embedded?: boolean; content?: PreviewContent }) {
   const router = useRouter();
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [services, setServices] = useState<CatalogService[]>([]);
+  const [loadedBlocks, setBlocks] = useState<Block[]>([]);
+  const [loadedProducts, setProducts] = useState<CatalogProduct[]>([]);
+  const [loadedServices, setServices] = useState<CatalogService[]>([]);
   const [state, setState] = useState<LoadingState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [profileName, setProfileName] = useState("");
+  const blocks = content?.blocks ?? loadedBlocks;
+  const products = content?.products ?? loadedProducts;
+  const services = content?.services ?? loadedServices;
 
   useEffect(() => {
+    // El modal usa el contenido vivo del editor: incluye cambios pendientes,
+    // archivos locales y el grupo activo, sin releer otro perfil de la base.
+    if (content) return;
+    let active = true;
     async function cargarBorrador() {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-          router.push("/login");
+        if (!active) return;
+        if (authError) throw authError;
+        if (!user) {
+          router.replace("/login");
           return;
         }
 
@@ -43,8 +56,9 @@ export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean 
         // perfil semilla PROFILE_ID, compartido entre cuentas.
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, display_name")
           .eq("user_id", user.id)
+          .eq("profile_type", "artist")
           .maybeSingle();
 
         if (profileError) throw profileError;
@@ -52,15 +66,30 @@ export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean 
           throw new Error("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.");
         }
 
-        const profileId = profile.id;
+        let profileId = profile.id;
+        let name = profile.display_name || "Mi perfil";
+        const selectedBandId = getActiveBandId(user.id);
+        if (selectedBandId) {
+          const role = await getEffectiveBandRole(selectedBandId, user.id);
+          if (!role) throw new Error("Sin acceso al grupo seleccionado");
+          const { data: band, error: bandError } = await supabase.from("profiles")
+            .select("id, display_name").eq("id", selectedBandId).eq("profile_type", "band").maybeSingle();
+          if (bandError || !band) throw new Error("No se pudo cargar el grupo seleccionado");
+          profileId = band.id;
+          name = band.display_name || "Mi grupo";
+        }
 
         type PreviewDraft = { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] };
-        const draft = (await fetchDraft(profileId)) as PreviewDraft | null;
+        const { draft_content } = await readEditorState(profileId);
+        const draft = draft_content as PreviewDraft | null;
+        let nextContent: PreviewContent;
 
         if (draft) {
-          setBlocks(mergePublicacionesEmbeds((draft.blocks ?? []).filter((b) => isKnownBlockType(b.type))));
-          setProducts((draft.products ?? []).map(normalizeDraftProduct));
-          setServices((draft.services ?? []).map(normalizeDraftService));
+          nextContent = {
+            blocks: mergePublicacionesEmbeds((draft.blocks ?? []).filter((b) => isKnownBlockType(b.type))),
+            products: (draft.products ?? []).map(normalizeDraftProduct),
+            services: (draft.services ?? []).map(normalizeDraftService),
+          };
         } else {
           const { data: dbBlocks, error: blocksError } = await supabase
             .from("profile_blocks")
@@ -71,28 +100,32 @@ export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean 
           if (blocksError) throw blocksError;
 
           const validDbBlocks = (dbBlocks ?? []).filter((b) => isKnownBlockType(b.block_type));
-          setBlocks(
+          const nextBlocks =
             validDbBlocks.length > 0
               ? mergePublicacionesEmbeds(validDbBlocks.map((b) => dbBlockToBlock(b)))
-              : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
-          );
+              : [createBlock("hero"), createBlock("tracks"), createBlock("merch")];
 
           const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId);
-          setProducts(catalogProducts);
-          setServices(catalogServices);
+          nextContent = { blocks: nextBlocks, products: catalogProducts, services: catalogServices };
         }
 
+        if (!active) return;
+        setBlocks(nextContent.blocks);
+        setProducts(nextContent.products);
+        setServices(nextContent.services);
+        setProfileName(name);
         setState("success");
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Error desconocido al cargar la vista previa";
-        setErrorMessage(message);
+      } catch {
+        if (!active) return;
+        setErrorMessage("No pudimos cargar la vista previa del perfil seleccionado. Revisa tu conexión y tu acceso al grupo, o vuelve al editor para elegir otro perfil.");
         setState("error");
       }
     }
-    cargarBorrador();
-  }, [router]);
+    void cargarBorrador();
+    return () => { active = false; };
+  }, [router, content, retry]);
 
-  if (state === "loading") {
+  if (!content && state === "loading") {
     return (
       <div className="min-h-screen bg-background text-foreground">
         {!embedded && (
@@ -110,10 +143,13 @@ export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean 
     );
   }
 
-  if (state === "error") {
+  if (!content && state === "error") {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-foreground">
-        <p className="text-sm font-semibold text-destructive">{errorMessage}</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-foreground">
+        <h1 className="text-xl font-semibold">Vista previa no disponible</h1>
+        <p role="alert" className="max-w-lg text-sm text-destructive">{errorMessage}</p>
+        <button type="button" className="min-h-11 rounded-lg border px-4" onClick={() => { setState("loading"); setErrorMessage(null); setRetry(value => value + 1); }}>Reintentar</button>
+        <Link href="/dashboard" className="inline-flex min-h-11 items-center text-primary underline">Volver al editor</Link>
       </div>
     );
   }
@@ -129,6 +165,7 @@ export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean 
         </div>
       )}
       <main className="mx-auto flex max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8 animate-fade-in">
+        {!embedded && <p className="text-sm text-muted-foreground">{profileName} · Esta vista muestra el contenido guardado. Para ver cambios pendientes y archivos locales, abre la vista previa dentro del editor.</p>}
         {blocks.map((block) => {
           const tracksData = blocks.find((b) => b.type === "tracks")?.data as TracksData | undefined;
           const creditsData = blocks.find((b) => b.type === "credits")?.data as CreditsData | undefined;
@@ -136,6 +173,7 @@ export function PerfilPreviewContent({ embedded = false }: { embedded?: boolean 
             <BlockRenderer
               key={block.id}
               block={block}
+              allowSupportDemo
               products={products}
               services={services}
               albumCovers={tracksData?.albums.map((a) => a.cover).filter(Boolean) ?? []}

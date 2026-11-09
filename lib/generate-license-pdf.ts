@@ -34,10 +34,8 @@ function slugify(text: string): string {
 }
 
 /**
- * Arma y descarga un PDF con la redacción formal de una licencia de uso
- * directo de obra musical, apoyada en el D. Leg. 822 (el propio titular de
- * derechos puede autorizar directamente el uso de su obra, sin pasar por una
- * sociedad de gestión colectiva como APDAYC). No sustituye asesoría legal.
+ * Borrador de autorización con datos declarados, pendiente de completar,
+ * revisar y firmar. No verifica titularidad ni contratos de gestión colectiva.
  */
 export function generateLicensePdf(input: LicensePdfInput) {
   const doc = new jsPDF({ unit: "mm", format: "a4" })
@@ -53,11 +51,11 @@ export function generateLicensePdf(input: LicensePdfInput) {
   doc.setTextColor(255, 255, 255)
   doc.setFont("helvetica", "bold")
   doc.setFontSize(15)
-  doc.text("LICENCIA DE USO DIRECTO DE OBRA MUSICAL", pageWidth / 2, 14, { align: "center" })
+  doc.text("BORRADOR DE LICENCIA DE OBRA MUSICAL", pageWidth / 2, 14, { align: "center" })
   doc.setFont("helvetica", "normal")
   doc.setFontSize(8.5)
   doc.text(
-    "Autorización directa del titular de derechos de autor — al margen de gestión colectiva",
+    "Modelo para completar y revisar — generar este PDF no concede una autorización",
     pageWidth / 2,
     21,
     { align: "center" }
@@ -104,18 +102,21 @@ export function generateLicensePdf(input: LicensePdfInput) {
   paragraph(
     `EL LICENCIANTE: ${displayName || "___________"}, identificado con DNI N° ${
       input.artistDni || "___________"
-    }, en su calidad de autor, intérprete y titular de los derechos patrimoniales sobre las obras musicales detalladas en la cláusula III.`
+    }. Debe indicar y acreditar en qué calidad actúa y qué derechos está facultado para autorizar sobre las obras de la cláusula III. Vibe no verifica esas facultades.`
   )
   paragraph(
     `EL LICENCIATARIO: ${input.organizerName || "___________"}, en calidad de organizador, representante o responsable del local o evento donde se hará uso de dichas obras.`
   )
 
-  heading("II. OBJETO Y BASE LEGAL")
+  heading("II. ALCANCE POR COMPLETAR")
   paragraph(
-    "De conformidad con el Decreto Legislativo N° 822, Ley sobre el Derecho de Autor, el titular de los derechos patrimoniales de una obra puede autorizar directamente su explotación, sin intermediación de una sociedad de gestión colectiva, cuando dicha autorización es expresa, específica y se encuentra debidamente documentada, como en el presente caso. En virtud de ello, EL LICENCIANTE otorga a EL LICENCIATARIO autorización expresa, no exclusiva e intransferible para el uso en vivo y/o la reproducción pública de las obras señaladas en la cláusula III, durante el evento y periodo indicados en la cláusula IV."
+    "Antes de firmar, las partes deben precisar el evento y local, territorio, modalidades de uso, derechos comprendidos, remuneración o gratuidad y condiciones. La autorización que acuerden sólo podrá abarcar los derechos que el licenciante esté facultado para conceder. Deben revisar contratos de cesión, representación o gestión colectiva y permisos de coautores, intérpretes, productores u otros titulares que correspondan. Este modelo no declara una exención frente a APDAYC ni frente a otras entidades o titulares."
   )
+  paragraph("Evento y local: ____________________  Territorio: ____________________")
+  paragraph("Usos y derechos autorizados: ________________________________________")
+  paragraph("Remuneración o gratuidad y condiciones: ______________________________")
 
-  heading("III. OBRAS AUTORIZADAS")
+  heading("III. OBRAS PROPUESTAS")
   if (input.songs.length === 0) {
     paragraph("(No se seleccionaron canciones específicas para esta licencia)")
   } else {
@@ -129,12 +130,12 @@ export function generateLicensePdf(input: LicensePdfInput) {
       ? `desde el ${formatDate(input.eventDate)} hasta el ${formatDate(input.eventEndDate)}`
       : `el día ${formatDate(input.eventDate)}`
   paragraph(
-    `La presente autorización rige exclusivamente para el evento realizado ${periodText}, y no se extiende a usos posteriores, grabaciones comerciales, retransmisiones ni distribución fuera del contexto aquí autorizado.`
+    `Período propuesto: ${periodText}. Si las partes acuerdan y firman una autorización, deberán confirmar su alcance y vigencia. Este borrador no incluye por sí mismo permisos para grabaciones, retransmisiones, distribución u otros usos no acordados expresamente.`
   )
 
   heading("V. DECLARACIÓN")
   paragraph(
-    "Ambas partes declaran conocer y aceptar los términos de la presente licencia, la cual queda acreditada mediante la firma de sus representantes a continuación."
+    "Espacio para firma una vez completado y revisado el acuerdo. La generación o descarga del documento y su registro en Vibe no equivalen a firma, aceptación de las partes ni verificación de derechos. Conservar la versión final firmada y los documentos que acrediten las facultades del licenciante."
   )
 
   ensureSpace(40)

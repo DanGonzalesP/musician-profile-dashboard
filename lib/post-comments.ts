@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase"
-import { traducirErrorDeEscritura } from "@/lib/rate-limit-errors"
+import { expresionKeyset, type CursorFeed } from "@/lib/feed/keyset"
+import { COMMENT_PAGE_SIZE } from "@/lib/comment-pagination"
+import { deleteOwnFeedComment, saveFeedComment } from "@/lib/save-feed-comment"
 
 // Comentarios de las publicaciones del feed (fotos/videos) — tabla
 // feed_post_comments (origen: supabase/legacy/feed_post_comments_table.sql). Hermana de
@@ -35,16 +37,19 @@ function mapRow(row: CommentRow): PostComment {
   }
 }
 
-export async function fetchPostComments(postId: string): Promise<PostComment[]> {
-  const { data, error } = await supabase
+export async function fetchPostComments(postId: string, cursor?: CursorFeed, signal?: AbortSignal): Promise<PostComment[]> {
+  let query = supabase
     .from("feed_post_comments")
     .select("id, post_id, user_id, author_name, content, created_at")
     .eq("post_id", postId)
-    .order("created_at", { ascending: false })
-    .limit(100)
+    .order("created_at", { ascending: false }).order("id", { ascending: false })
+    .limit(COMMENT_PAGE_SIZE)
+  if (cursor) query = query.or(expresionKeyset(cursor))
+  const deadline = AbortSignal.timeout(15000)
+  const { data, error } = await query.abortSignal(signal ? AbortSignal.any([signal, deadline]) : deadline)
 
-  if (error) return []
-  return (data as CommentRow[]).map(mapRow)
+  if (error) throw new Error("No se pudieron cargar los comentarios.")
+  return ((data ?? []) as CommentRow[]).map(mapRow)
 }
 
 /** Conteo de comentarios por publicación, para los contadores del rail de acciones. */
@@ -63,35 +68,11 @@ export async function fetchPostCommentCounts(postIds: string[]): Promise<Record<
   return counts
 }
 
-export async function addPostComment(postId: string, content: string): Promise<PostComment> {
-  const clean = content.trim()
-  if (!clean) throw new Error("Escribe un comentario primero.")
+export async function addPostComment(postId: string, content: string, requestId?: string, expectedUserId?: string): Promise<PostComment> {
+  const saved = await saveFeedComment("post", postId, content, requestId, expectedUserId)
+  return { ...saved, postId }
+}
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("Inicia sesión para comentar.")
-
-  // author_name lo escribe un TRIGGER en la base a partir del perfil real de
-  // quien comenta (ver 0004_lock_remaining_rls.sql). Antes lo mandaba el
-  // cliente, así que cualquiera podía firmar un comentario con el nombre de
-  // otro artista: RLS solo validaba user_id, nunca el nombre mostrado.
-  const { data, error } = await supabase
-    .from("feed_post_comments")
-    .insert({ post_id: postId, user_id: user.id, content: clean })
-    .select("id, post_id, user_id, author_name, content, created_at")
-    .single()
-
-  if (error) {
-    // El trigger de limite (migracion 0011) se traduce a un mensaje amable;
-    // el resto de errores conserva el manejo de siempre.
-    throw new Error(
-      traducirErrorDeEscritura(
-        error,
-        "comentario",
-        error.message.includes("feed_post_comments")
-          ? "Los comentarios aún no están activados. Verifica las migraciones versionadas de Supabase."
-          : error.message
-      )
-    )
-  }
-  return mapRow(data as CommentRow)
+export async function deletePostComment(commentId: string, postId: string, expectedUserId?: string): Promise<void> {
+  await deleteOwnFeedComment("post", commentId, postId, expectedUserId)
 }

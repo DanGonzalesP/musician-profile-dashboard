@@ -56,19 +56,22 @@ export type ResolvedProfile = {
  * username_history para que los enlaces y QR ya compartidos sigan llevando
  * al lugar correcto.
  */
-export async function resolveProfileByUsername(rawUsername: string): Promise<ResolvedProfile | null> {
+export async function resolveProfileByUsername(rawUsername: string, signal?: AbortSignal): Promise<ResolvedProfile | null> {
   const username = rawUsername.trim().toLowerCase()
   if (!isValidUsername(username)) return null
+  const timeout = AbortSignal.timeout(15_000)
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, profile_type, unified_profile")
+    .select("id, username, display_name, profile_type, unified_profile, is_suspended")
     .eq("username", username)
-    .maybeSingle()
+    .abortSignal(requestSignal).maybeSingle()
 
-  if (error) throw error
+  if (error) throw new Error("No se pudo consultar el perfil.")
 
   if (profile) {
+    if (profile.is_suspended === true) return null
     return {
       id: profile.id,
       username: profile.username,
@@ -80,21 +83,23 @@ export async function resolveProfileByUsername(rawUsername: string): Promise<Res
 
   // ¿Es un username antiguo? Se busca el perfil que lo tuvo y se devuelve
   // con redirectTo para que la página haga el redirect al actual.
-  const { data: historic } = await supabase
+  const { data: historic, error: historyError } = await supabase
     .from("username_history")
     .select("profile_id")
     .eq("old_username", username)
-    .maybeSingle()
+    .abortSignal(requestSignal).maybeSingle()
 
+  if (historyError) throw new Error("No se pudo consultar el enlace anterior del perfil.")
   if (!historic) return null
 
-  const { data: current } = await supabase
+  const { data: current, error: currentError } = await supabase
     .from("profiles")
-    .select("id, username, display_name, profile_type, unified_profile")
+    .select("id, username, display_name, profile_type, unified_profile, is_suspended")
     .eq("id", historic.profile_id)
-    .maybeSingle()
+    .abortSignal(requestSignal).maybeSingle()
 
-  if (!current) return null
+  if (currentError) throw new Error("No se pudo consultar el perfil actual.")
+  if (!current || current.is_suspended === true) return null
 
   return {
     id: current.id,
@@ -114,11 +119,12 @@ export async function resolveProfileByUsername(rawUsername: string): Promise<Res
 export async function isUsernameAvailable(username: string): Promise<boolean> {
   if (!isValidUsername(username)) return false
 
-  const [{ data: taken }, { data: historic }, { data: reserved }] = await Promise.all([
+  const [{ data: taken, error: takenError }, { data: historic, error: historicError }, { data: reserved, error: reservedError }] = await Promise.all([
     supabase.from("profiles").select("id").eq("username", username).maybeSingle(),
     supabase.from("username_history").select("profile_id").eq("old_username", username).maybeSingle(),
     supabase.from("reserved_usernames").select("name").eq("name", username).maybeSingle(),
   ])
 
+  if (takenError || historicError || reservedError) throw new Error("No se pudo comprobar la disponibilidad del nombre de usuario.")
   return !taken && !historic && !reserved
 }

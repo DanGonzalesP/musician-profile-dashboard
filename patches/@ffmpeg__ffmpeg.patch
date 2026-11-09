@@ -1,3 +1,15 @@
+diff --git a/dist/esm/classes.js b/dist/esm/classes.js
+--- a/dist/esm/classes.js
++++ b/dist/esm/classes.js
+@@ -102,7 +102,7 @@
+     load = ({ classWorkerURL, ...config } = {}, { signal } = {}) => {
+         if (!this.#worker) {
+             this.#worker = classWorkerURL ?
+-                new Worker(new URL(classWorkerURL, import.meta.url), {
++                new Worker(/* webpackIgnore: true */ new globalThis.URL(classWorkerURL, import.meta.url), {
+                     type: "module",
+                 }) :
+                 // We need to duplicated the code here to enable webpack
 diff --git a/dist/esm/worker.js b/dist/esm/worker.js
 index cca2a6116bab5349cfa35bc1dba0b6e696af91ee..19f066de7fbb26376658f5c619729230f9c8f110 100644
 --- a/dist/esm/worker.js

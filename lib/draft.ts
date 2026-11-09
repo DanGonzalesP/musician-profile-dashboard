@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { rewriteMediaUrls } from "@/lib/media-url"
 
 // Borrador del editor visual (bloques + productos + servicios sin publicar).
 //
@@ -11,6 +12,7 @@ import { supabase } from "@/lib/supabase"
 // publish usen exactamente la misma forma de leer/escribir.
 
 export type DraftContent = {
+  catalog_base_version?: number | null
   blocks?: unknown[]
   products?: unknown[]
   services?: unknown[]
@@ -19,9 +21,8 @@ export type DraftContent = {
 /**
  * Lee el borrador de un perfil. Devuelve null si no hay borrador guardado.
  *
- * Nunca lanza por "la tabla no existe": si la migración 0003 todavía no
- * corrió, se registra en consola y se devuelve null — lo publicado sigue
- * cargando normalmente, que es el comportamiento que ya tenía el editor.
+ * Una lectura fallida no equivale a un borrador vacío: el editor no debe
+ * sobrescribir trabajo existente con el contenido de respaldo.
  */
 export async function fetchDraft(profileId: string): Promise<DraftContent | null> {
   const { data, error } = await supabase
@@ -31,11 +32,10 @@ export async function fetchDraft(profileId: string): Promise<DraftContent | null
     .maybeSingle()
 
   if (error) {
-    console.error("No se pudo leer el borrador; verifica las migraciones versionadas:", error)
-    return null
+    throw new Error("No se pudo leer el borrador. Recarga la página antes de editar.")
   }
 
-  return (data?.draft_content as DraftContent | null) ?? null
+  return rewriteMediaUrls((data?.draft_content as DraftContent | null) ?? null)
 }
 
 /**

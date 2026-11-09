@@ -23,6 +23,12 @@ const PUERTO_SUPABASE = Number(process.env.E2E_SUPABASE_PORT ?? 54999)
 const baseURL = `http://127.0.0.1:${PORT}`
 const urlSupabaseFalso = `http://127.0.0.1:${PUERTO_SUPABASE}`
 const CI = !!process.env.CI
+// Exclusivas del entorno E2E; nunca se heredan credenciales del proceso padre.
+const CLAVE_RATE_LIMIT_E2E = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+const envRateLimitE2E = {
+  ANONYMOUS_RATE_LIMIT_KEY: CLAVE_RATE_LIMIT_E2E,
+  ANONYMOUS_RATE_LIMIT_KEY_ID: "e2e-fixture-v1",
+}
 
 // La anon key es de relleno a propósito: el servidor de fixtures no valida
 // JWT. Que no haya ninguna clave real en juego es parte del diseño.
@@ -31,6 +37,7 @@ const envRelleno = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "clave-de-relleno-para-e2e",
   NEXT_PUBLIC_R2_PUBLIC_URL: "https://ejemplo.r2.dev",
   NEXT_PUBLIC_SITE_URL: baseURL,
+  ...envRateLimitE2E,
 }
 
 export default defineConfig({
@@ -65,6 +72,7 @@ export default defineConfig({
       // suite falla por todos lados sin que nada del repositorio esté mal.
       reuseExistingServer: false,
       timeout: 30_000,
+      env: envRateLimitE2E,
     },
     {
       command: `pnpm exec next dev -p ${PORT}`,

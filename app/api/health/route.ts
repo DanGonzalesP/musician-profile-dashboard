@@ -2,11 +2,13 @@ import { NextResponse } from "next/server"
 import { HeadBucketCommand } from "@aws-sdk/client-s3"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { r2Client, R2_BUCKET_NAME } from "@/lib/r2"
-import { checkRateLimit, identificarSolicitante, respuesta429 } from "@/lib/rate-limit"
+import { respuesta429 } from "@/lib/rate-limit"
+import { checkAnonymousRateLimit, anonymousLimitUnavailable } from "@/lib/anonymous-rate-limit"
 import { idDePeticion, logError } from "@/lib/log"
 
 // Endpoint de salud (P-23). Responde si la app puede hablar con sus dos
-// dependencias duras: Supabase (Postgres + Auth) y Cloudflare R2. Sin esto no
+// dependencias duras: lectura de Supabase y Cloudflare R2. No verifica los
+// flujos de inicio de sesión. Sin esto no
 // hay forma automática de saber si "la app está viva pero no puede leer nada".
 //
 // LO QUE NO FILTRA, a propósito: ni el nombre del bucket, ni la URL de
@@ -25,11 +27,22 @@ export const dynamic = "force-dynamic"
 // la librería. 3 s es de sobra para un ping a cualquiera de los dos.
 const TIMEOUT_MS = 3000
 
-function conTimeout<T>(promesa: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promesa,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
-  ])
+async function conTimeout<T>(operacion: (signal: AbortSignal) => PromiseLike<T>, ms: number): Promise<T> {
+  const controller = new AbortController()
+  let temporizador: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      new Promise<never>((_, reject) => {
+        temporizador = setTimeout(() => {
+          reject(new Error("timeout"))
+          controller.abort()
+        }, ms)
+      }),
+      operacion(controller.signal),
+    ])
+  } finally {
+    clearTimeout(temporizador)
+  }
 }
 
 async function comprobarSupabase(): Promise<boolean> {
@@ -37,7 +50,7 @@ async function comprobarSupabase(): Promise<boolean> {
   // ejercita la conexión + RLS reales. [] sin error = sano (base vacía).
   const supabase = createServerSupabase()
   const { error } = await conTimeout(
-    Promise.resolve(supabase.from("profiles").select("id").limit(1)),
+    (signal) => supabase.from("profiles").select("id").limit(1).abortSignal(signal),
     TIMEOUT_MS
   )
   return !error
@@ -46,7 +59,10 @@ async function comprobarSupabase(): Promise<boolean> {
 async function comprobarR2(): Promise<boolean> {
   // HeadBucket es la operación más barata: no lista ni descarga nada, sólo
   // confirma que las credenciales sirven y el bucket existe.
-  await conTimeout(r2Client.send(new HeadBucketCommand({ Bucket: R2_BUCKET_NAME })), TIMEOUT_MS)
+  await conTimeout(
+    (signal) => r2Client.send(new HeadBucketCommand({ Bucket: R2_BUCKET_NAME }), { abortSignal: signal }),
+    TIMEOUT_MS
+  )
   return true
 }
 
@@ -56,7 +72,8 @@ export async function GET(request: Request) {
   // El health se puede consultar sin sesión, así que lleva su propio límite
   // por IP: 60/min alcanza para cualquier monitor honesto y corta el uso como
   // ariete de fuerza bruta contra las dependencias.
-  const limite = checkRateLimit(`health:${identificarSolicitante(request)}`, 60, 60)
+  const limite = await checkAnonymousRateLimit(request, "health")
+  if (limite.unavailable) return anonymousLimitUnavailable()
   if (!limite.permitido) return respuesta429(limite.reintentarEn)
 
   const [supabaseOk, r2Ok] = await Promise.all([

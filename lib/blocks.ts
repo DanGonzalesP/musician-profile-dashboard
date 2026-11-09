@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react"
+import { rewriteMediaUrls } from "@/lib/media-url"
 import { GalleryVerticalEnd, ListMusic, Store, GraduationCap, Disc3, Rocket, Users, Sparkles, GalleryHorizontalEnd } from "lucide-react"
 
 // PROFILE_ID (el perfil semilla "00000000-...") se eliminó a propósito.
@@ -161,10 +162,8 @@ export type CrowdfundingData = {
   title: string
   description: string
   targetAmount: string
-  // currentAmount, backerCount y hypeCount son bases de referencia: el fan
-  // ve el total sumando sus propias interacciones de la sesión encima de
-  // esta base, pero esos incrementos nunca se guardan (simulación sin
-  // pasarela real).
+  // Bases declaradas por el artista, no conciliación de pagos. Sólo la vista
+  // previa suma interacciones simuladas locales; no se guardan ni cobran.
   currentAmount: string
   daysLeft: string
   chosenStudio: string
@@ -503,7 +502,7 @@ export function normalizeBlockData(
   raw: unknown,
   opts?: { isBand?: boolean }
 ): BlockData {
-  const content = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  const content = rewriteMediaUrls(raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
 
   switch (type) {
     case "hero":
@@ -664,7 +663,8 @@ function normalizeCreditItem(raw: unknown, index: number): CreditItem {
   // en "external" + "accepted" — se siguen mostrando igual que antes, sin
   // necesitar aprobación de nadie.
   const sourceType: CreditSourceType = c.sourceType === "internal" ? "internal" : "external"
-  const status: CreditStatus = CREDIT_STATUSES.includes(c.status as CreditStatus) ? (c.status as CreditStatus) : "accepted"
+  const status: CreditStatus = CREDIT_STATUSES.includes(c.status as CreditStatus)
+    ? (c.status as CreditStatus) : sourceType === "internal" ? "pending" : "accepted"
   return {
     id: String(c.id ?? `credit-${index + 1}`),
     sourceType,

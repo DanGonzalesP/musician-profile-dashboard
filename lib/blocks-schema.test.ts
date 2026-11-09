@@ -122,6 +122,24 @@ describe("validarBloqueParaPersistir — lo que sí rechaza", () => {
 })
 
 describe("enlaces peligrosos — defensa en profundidad con safe-url", () => {
+  it.each(["+51 (999) 888-777", "@artista_prueba", "artista@example.invalid"])(
+    "acepta contacto %s sin convertir otros campos en contactos", (contactUrl) => {
+      const content = { contactUrl }
+      expect(validarBloqueParaPersistir(bloque({ content })).ok).toBe(true)
+      expect(sanitizeUrlFields(content)).toEqual(content)
+      if (!contactUrl.includes(".")) {
+        expect(validarBloqueParaPersistir(bloque({ content: { href: contactUrl } })).ok).toBe(false)
+      }
+    },
+  )
+
+  it.each(["javascript:alert(1)", "java\tscript:alert(1)", "data:text/html,x", "vbscript:msgbox(1)", "file:///x", "blob:https://example.invalid/x"])(
+    "rechaza contacto peligroso %s antes de guardar", (contactUrl) => {
+      expect(validarBloqueParaPersistir(bloque({ content: { contactUrl } })).ok).toBe(false)
+      expect(sanitizeUrlFields({ contactUrl })).toEqual({ contactUrl: "" })
+    },
+  )
+
   it("rechaza javascript: en un campo de enlace", () => {
     const r = validarBloqueParaPersistir(
       bloque({ content: { socials: [{ platform: "instagram", href: "javascript:alert(1)" }] } })

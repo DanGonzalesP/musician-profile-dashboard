@@ -6,7 +6,6 @@
 // es un directorio para explorar quién vende u ofrece qué.
 
 import Link from "next/link"
-import { motion } from "framer-motion"
 import { ArrowUpRight, SearchX, Store, Users } from "lucide-react"
 import type { DiscoveryProfile } from "@/lib/feed/discovery"
 
@@ -14,19 +13,28 @@ export function DiscoveryGrid({
   profiles,
   kind,
   emptyLabel,
+  onReset,
 }: {
   profiles: DiscoveryProfile[]
   kind: "productos" | "servicios"
   emptyLabel: string
+  onReset?: () => void
 }) {
   if (profiles.length === 0) {
     return (
-      <div className="flex min-h-[50vh] w-full items-center justify-center px-6">
+      <div className="flex min-h-64 w-full items-center justify-center px-6 pb-24">
         <div className="max-w-sm text-center">
           <span className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-border bg-card/50 text-muted-foreground">
             <SearchX className="size-6" />
           </span>
-          <p className="mt-4 text-sm text-muted-foreground">{emptyLabel}</p>
+          <h2 className="mt-4 text-lg font-semibold">{onReset ? "No hay coincidencias para mostrar" : "No hay perfiles para mostrar"}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{emptyLabel}</p>
+          {onReset && (
+            <button type="button" onClick={onReset}
+              className="mt-5 min-h-11 rounded-xl bg-foreground px-5 py-2 text-sm font-semibold text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              Ver {kind === "servicios" ? "todos los servicios" : "todos los productos"}
+            </button>
+          )}
         </div>
       </div>
     )
@@ -36,21 +44,18 @@ export function DiscoveryGrid({
 
   return (
     <div className="grid grid-cols-1 gap-4 px-4 pb-24 pt-2 sm:grid-cols-2 sm:px-6 xl:grid-cols-3">
-      {profiles.map((p, i) => {
+      {profiles.map((p) => {
         const initial = p.displayName.trim().charAt(0).toUpperCase() || "?"
         return (
-          <motion.div
+          <div
             key={p.profileId}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.3) }}
           >
             <Link
               href={`/${p.slug}/tienda`}
-              className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card/50 p-5 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_16px_40px_-16px_var(--primary)]"
+              className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card/50 p-5 backdrop-blur transition-colors hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <div className="flex items-center gap-3">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-foreground text-lg font-bold text-background">
                   {initial}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -67,18 +72,18 @@ export function DiscoveryGrid({
               </div>
 
               <div className="flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2.5 py-0.5 text-[11px] font-semibold text-foreground">
                   <Store className="size-3" />
                   {p.count} {p.count === 1 ? countWord[0] : countWord[1]}
                 </span>
               </div>
 
-              <span className="mt-auto inline-flex items-center gap-1 pt-1 text-xs font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="mt-auto inline-flex items-center gap-1 pt-1 text-xs font-semibold text-foreground">
                 Ver {kind === "productos" ? "tienda" : "servicios"}
                 <ArrowUpRight className="size-3.5" />
               </span>
             </Link>
-          </motion.div>
+          </div>
         )
       })}
     </div>

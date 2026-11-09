@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { fetchMyProfiles, getActiveBandId, setActiveBandId, type MyProfileOption } from "@/lib/bands"
 import { Loader2, User, Users } from "lucide-react"
@@ -18,16 +18,23 @@ const ROLE_LABELS: Record<MyProfileOption["role"], string> = {
  * resuelve el perfil activo (y el rol efectivo) desde cero en cada carga, así
  * que un reload simple es suficiente y evita duplicar esa lógica acá.
  */
-export function ProfileSwitcher() {
+export function ProfileSwitcher({ disabled = false, onBeforeReload }: { disabled?: boolean; onBeforeReload?: () => (() => void) }) {
   const [userId, setUserId] = useState<string | null>(null)
   const [options, setOptions] = useState<MyProfileOption[]>([])
   const [activeId, setActiveId] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
+  const [retry, setRetry] = useState(0)
+  const switchLock = useRef(false)
 
   useEffect(() => {
+    let active = true
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
+      try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (!active) return
+      if (error) throw error
       if (!user) {
         setLoading(false)
         return
@@ -35,27 +42,53 @@ export function ProfileSwitcher() {
       setUserId(user.id)
 
       const profiles = await fetchMyProfiles(user.id)
+      if (!active) return
       setOptions(profiles)
 
       const personal = profiles.find((p) => !p.isBand)
       const selectedBandId = getActiveBandId(user.id)
       const stillValid = selectedBandId && profiles.some((p) => p.id === selectedBandId)
       setActiveId(stillValid ? selectedBandId! : personal?.id ?? "")
-      setLoading(false)
+      } catch {
+        if (active) setErrorMessage("No pudimos cargar tus perfiles.")
+      } finally {
+        if (active) setLoading(false)
+      }
     }
-    load()
-  }, [])
+    void load()
+    return () => { active = false }
+  }, [retry])
 
   // Sin bandas: no hay nada que alternar, no se muestra nada — el panel
   // personal sigue exactamente igual que antes de este cambio.
-  if (loading || !userId || options.length <= 1) return null
+  if (loading) return <span role="status" className="text-xs text-muted-foreground">Cargando perfiles…</span>
+  if (errorMessage) return <div role="alert" className="text-xs text-destructive">
+    {errorMessage}
+    <button type="button" disabled={disabled} className="ml-2 min-h-11 underline" onClick={() => { setErrorMessage(""); setLoading(true); setRetry(value => value + 1) }}>Reintentar</button>
+  </div>
+  if (!userId || options.length <= 1) return null
 
   const handleChange = (id: string) => {
-    setActiveId(id)
-    setSwitching(true)
+    if (disabled || switchLock.current || id === activeId) return
     const selected = options.find((p) => p.id === id)
-    setActiveBandId(userId, selected?.isBand ? id : null)
-    window.location.reload()
+    if (!selected || !window.confirm("¿Cambiar de perfil? Se perderán los cambios sin guardar y los archivos locales que todavía no hayas publicado.")) return
+    switchLock.current = true
+    setSwitching(true)
+    let restoreUnloadWarning: (() => void) | undefined
+    try {
+      setActiveBandId(userId, selected.isBand ? id : null)
+      // La confirmación anterior ya autoriza descartar los cambios locales.
+      // Evita un segundo aviso que pueda cancelar la recarga después de
+      // haber cambiado el perfil seleccionado en el almacenamiento.
+      restoreUnloadWarning = onBeforeReload?.()
+      setActiveId(id)
+      window.location.reload()
+    } catch {
+      restoreUnloadWarning?.()
+      switchLock.current = false
+      setSwitching(false)
+      setErrorMessage("No pudimos cambiar de perfil. Conserva tus cambios e inténtalo de nuevo.")
+    }
   }
 
   return (
@@ -69,7 +102,7 @@ export function ProfileSwitcher() {
       )}
       <select
         value={activeId}
-        disabled={switching}
+        disabled={switching || disabled}
         onChange={(e) => handleChange(e.target.value)}
         aria-label="Cambiar entre tu perfil personal y tus grupos musicales"
         className="bg-transparent text-xs font-medium text-foreground outline-none disabled:cursor-wait disabled:opacity-60"

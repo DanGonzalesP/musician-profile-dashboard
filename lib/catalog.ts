@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { mediaUrl } from "@/lib/media-url"
 
 // ─── Catálogo completo de la tienda del músico ────────────────────────────
 // Un producto puede ser CUALQUIER cosa que un músico venda, sea cual sea su
@@ -20,6 +21,7 @@ export type ProductVariantGroup = {
 
 export type CatalogProduct = {
   id: string
+  revision?: string
   name: string
   price: string
   currency: string
@@ -37,6 +39,7 @@ export type CatalogProduct = {
 
 export type CatalogService = {
   id: string
+  revision?: string
   title: string
   price: string
   currency: string
@@ -213,13 +216,13 @@ export function newService(): CatalogService {
  */
 export function normalizeDraftProduct(raw: unknown): CatalogProduct {
   const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
-  const images = Array.isArray(p.images) ? p.images.map(String).filter(Boolean) : []
+  const images = Array.isArray(p.images) ? p.images.map(String).filter(Boolean).map(mediaUrl) : []
   return {
     id: String(p.id ?? crypto.randomUUID()),
     name: String(p.name ?? ""),
     price: p.price != null ? String(p.price) : "0.00",
     currency: typeof p.currency === "string" && p.currency ? p.currency : "USD",
-    imageUrl: typeof p.imageUrl === "string" ? p.imageUrl : images[0],
+    imageUrl: typeof p.imageUrl === "string" ? mediaUrl(p.imageUrl) : images[0],
     images,
     description: typeof p.description === "string" ? p.description : "",
     category: typeof p.category === "string" && p.category ? p.category : "otro",
@@ -248,7 +251,7 @@ export function normalizeDraftService(raw: unknown): CatalogService {
     deliveryTime: typeof s.deliveryTime === "string" ? s.deliveryTime : "",
     features: normalizeFeatures(s.features),
     bookingUrl: typeof s.bookingUrl === "string" ? s.bookingUrl : "",
-    imageUrl: typeof s.imageUrl === "string" ? s.imageUrl : "",
+    imageUrl: typeof s.imageUrl === "string" ? mediaUrl(s.imageUrl) : "",
     isActive: s.isActive === undefined || s.isActive === null ? true : Boolean(s.isActive),
     isFeatured: Boolean(s.isFeatured),
   }
@@ -256,14 +259,23 @@ export function normalizeDraftService(raw: unknown): CatalogService {
 
 type Row = Record<string, unknown>
 
+/** Missing versions must never turn a guarded write into an unconditional one. */
+export function requireCatalogRevision(item: { revision?: string }): string {
+  if (!item.revision || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.revision)) {
+    throw new Error("Recarga el catálogo antes de modificarlo.")
+  }
+  return item.revision
+}
+
 // `rowToProduct`/`rowToService` se exportan para que el perfil público mapee
 // las filas que ya vienen resueltas del servidor (F10) con EXACTAMENTE la
 // misma función que usaba al pedirlas desde el navegador. Dos mapeos distintos
 // para la misma fila es la forma más silenciosa de cambiar la UX sin querer.
 export function rowToProduct(p: Row): CatalogProduct {
-  const images = Array.isArray(p.images_urls) ? (p.images_urls as unknown[]).map(String).filter(Boolean) : []
+  const images = Array.isArray(p.images_urls) ? (p.images_urls as unknown[]).map(String).filter(Boolean).map(mediaUrl) : []
   return {
     id: String(p.id),
+    revision: typeof p.revision === "string" ? p.revision : undefined,
     name: String(p.title ?? ""),
     price: p.price != null ? String(p.price) : "",
     currency: typeof p.currency === "string" && p.currency ? p.currency : "USD",
@@ -283,6 +295,7 @@ export function rowToProduct(p: Row): CatalogProduct {
 export function rowToService(s: Row): CatalogService {
   return {
     id: String(s.id),
+    revision: typeof s.revision === "string" ? s.revision : undefined,
     title: String(s.title ?? ""),
     price: s.price != null ? String(s.price) : "",
     currency: typeof s.currency === "string" && s.currency ? s.currency : "USD",
@@ -295,31 +308,40 @@ export function rowToService(s: Row): CatalogService {
     deliveryTime: typeof s.delivery_time === "string" ? s.delivery_time : "",
     features: normalizeFeatures(s.features),
     bookingUrl: typeof s.booking_url === "string" ? s.booking_url : "",
-    imageUrl: typeof s.image_url === "string" ? s.image_url : "",
+    imageUrl: typeof s.image_url === "string" ? mediaUrl(s.image_url) : "",
     isActive: s.is_active === undefined || s.is_active === null ? true : Boolean(s.is_active),
     isFeatured: Boolean(s.is_featured),
   }
 }
 
-export async function fetchCatalog(profileId: string) {
+export async function fetchCatalog(profileId: string, accessToken?: string, signal?: AbortSignal) {
+  const timeout = AbortSignal.timeout(15_000)
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
   // select("*"): las columnas nuevas pueden no existir todavía (migración
   // pendiente) — pidiendo todo, lo que falte simplemente llega undefined y
   // el mapeo aplica valores por defecto.
-  const [{ data: productRows, error: productsError }, { data: serviceRows, error: servicesError }] = await Promise.all([
-    supabase
+  const productsQuery = supabase
       .from("products")
       .select("*")
       .eq("seller_id", profileId)
-      .order("position_index", { ascending: true }),
-    supabase
+      .order("position_index", { ascending: true })
+  const servicesQuery = supabase
       .from("services")
       .select("*")
       .eq("profile_id", profileId)
-      .order("position_index", { ascending: true }),
+      .order("position_index", { ascending: true })
+  if (accessToken) {
+    productsQuery.setHeader("Authorization", `Bearer ${accessToken}`)
+    servicesQuery.setHeader("Authorization", `Bearer ${accessToken}`)
+  }
+  productsQuery.abortSignal(requestSignal)
+  servicesQuery.abortSignal(requestSignal)
+  const [{ data: productRows, error: productsError }, { data: serviceRows, error: servicesError }] = await Promise.all([
+    productsQuery,
+    servicesQuery,
   ])
 
-  if (productsError) throw productsError
-  if (servicesError) throw servicesError
+  if (productsError || servicesError) throw new Error("No se pudo cargar el catálogo.")
 
   const products: CatalogProduct[] = (productRows ?? []).map(rowToProduct)
   const services: CatalogService[] = (serviceRows ?? []).map(rowToService)
@@ -337,7 +359,7 @@ function productImages(p: CatalogProduct): string[] {
   return images.filter(Boolean)
 }
 
-function productFullPayload(p: CatalogProduct, profileId: string, i: number) {
+export function productFullPayload(p: CatalogProduct, profileId: string, i: number) {
   const images = productImages(p)
   return {
     seller_id: profileId,
@@ -358,7 +380,7 @@ function productFullPayload(p: CatalogProduct, profileId: string, i: number) {
   }
 }
 
-function serviceFullPayload(s: CatalogService, profileId: string, i: number) {
+export function serviceFullPayload(s: CatalogService, profileId: string, i: number) {
   return {
     profile_id: profileId,
     title: s.title,

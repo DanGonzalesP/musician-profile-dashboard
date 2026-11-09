@@ -26,6 +26,7 @@ export type DiscoveryProfile = {
 //
 /** Filas tal como las devuelve el RPC de 0012. */
 export type FilaDescubrimiento = {
+  profile_id?: string | null
   username?: string | null
   display_name?: string | null
   profile_type?: string | null
@@ -46,7 +47,7 @@ export function mapearFilasRpc(filas: FilaDescubrimiento[], keyName: string): Di
       : []
 
     salida.push({
-      profileId: `${keyName}-${username}`,
+      profileId: fila.profile_id || `${keyName}-${username}`,
       displayName: (fila.display_name ?? "").trim() || username,
       slug: username,
       roles: parseMusicianRoles(fila.musician_roles),
@@ -62,25 +63,41 @@ export function mapearFilasRpc(filas: FilaDescubrimiento[], keyName: string): Di
 }
 
 /** Cuántos perfiles se muestran en el carrusel de descubrimiento. */
-const DISCOVERY_PROFILE_LIMIT = 60
+export const DISCOVERY_PROFILE_LIMIT = 60
+export type DiscoveryCursor = { count: number; slug: string }
 
 async function fetchDesdeRpc(
   tipo: "productos" | "servicios",
-  keyName: string
+  keyName: string,
+  cursor?: DiscoveryCursor,
+  signal?: AbortSignal,
 ): Promise<DiscoveryProfile[]> {
-  const { data, error } = await supabase.rpc("descubrimiento_perfiles", {
+  if (cursor && (!Number.isSafeInteger(cursor.count) || cursor.count < 1 || !cursor.slug)) {
+    throw new Error("Cursor de descubrimiento inválido")
+  }
+  const deadline = AbortSignal.timeout(15_000)
+  const { data, error } = await supabase.rpc("descubrimiento_perfiles_pagina", {
     p_tipo: tipo,
     p_limite: DISCOVERY_PROFILE_LIMIT,
-  })
+    ...(cursor ? { p_despues_total: cursor.count, p_despues_username: cursor.slug } : {}),
+  }).abortSignal(signal ? AbortSignal.any([signal, deadline]) : deadline)
   if (error) throw error
   if (!Array.isArray(data)) throw new Error("Respuesta inválida del descubrimiento")
+  // Nunca sustituir la identidad real por el alias en la carga de producción:
+  // los bloqueos del visitante se aplican por UUID, incluso al renombrar perfiles.
+  if (data.some(row => !row || typeof row.profile_id !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.profile_id) ||
+    typeof row.username !== "string" || !row.username.trim() ||
+    !Number.isSafeInteger(Number(row.total)) || Number(row.total) < 1)) {
+    throw new Error("No se pudieron identificar los perfiles del descubrimiento")
+  }
   return mapearFilasRpc(data as FilaDescubrimiento[], keyName)
 }
 
-export async function fetchProductSellers(): Promise<DiscoveryProfile[]> {
-  return fetchDesdeRpc("productos", "prod")
+export async function fetchProductSellers(cursor?: DiscoveryCursor, signal?: AbortSignal): Promise<DiscoveryProfile[]> {
+  return fetchDesdeRpc("productos", "prod", cursor, signal)
 }
 
-export async function fetchServiceProviders(): Promise<DiscoveryProfile[]> {
-  return fetchDesdeRpc("servicios", "serv")
+export async function fetchServiceProviders(cursor?: DiscoveryCursor, signal?: AbortSignal): Promise<DiscoveryProfile[]> {
+  return fetchDesdeRpc("servicios", "serv", cursor, signal)
 }

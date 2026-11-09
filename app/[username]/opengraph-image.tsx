@@ -1,6 +1,9 @@
 import { ImageResponse } from "next/og"
+import { NextRequest } from "next/server"
+import { GET as readMedia } from "@/app/api/media/[...key]/route"
+import { mediaKeyFromUrl } from "@/lib/media-url"
+import { mediaHeaders } from "@/lib/media-delivery"
 import { fetchProfileMeta } from "@/lib/supabase-server"
-import { fotoSocialPermitida } from "@/lib/imagen-social"
 import { SITE_NAME } from "@/lib/site"
 
 // Tarjeta social por perfil (P-19).
@@ -14,19 +17,30 @@ import { SITE_NAME } from "@/lib/site"
 // lema y su ubicación sobre el fondo oscuro de la marca. Si tiene foto, se usa
 // de fondo; si no, la composición sola ya es una tarjeta digna.
 //
-// La generación es cacheada por Next junto con la ruta, así que no se paga una
-// composición por cada vez que alguien pega el enlace.
+// Se compone tras comprobar el estado actual; no se cachea una copia de medios
+// que podría seguir siendo pública después de suspender el perfil.
 
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 export const alt = "Tarjeta del perfil"
+export const dynamic = "force-dynamic"
 
 // SEGURIDAD — el fondo de la tarjeta lo DESCARGA el servidor al componerla, y
 // la URL sale del JSONB del hero, que lo escribe el artista. Sin filtro esta
-// ruta es un SSRF. El criterio (origen exacto del bucket, sólo https,
-// fail-closed sin bucket configurado) vive en lib/imagen-social.ts, probado.
-function fotoPermitida(url: string | undefined): string | undefined {
-  return fotoSocialPermitida(url, process.env.NEXT_PUBLIC_R2_PUBLIC_URL)
+// ruta es un SSRF. Sólo se extrae la key de una URL reconocida y se utiliza
+// la misma autorización anónima de la entrega privada.
+async function fotoPermitida(url: string | undefined): Promise<string | undefined> {
+  const key = mediaKeyFromUrl(url)
+  if (!key?.startsWith("images/")) return undefined
+  // Llamada interna anónima: ni SSRF, ni origen público, ni sesión del visitante.
+  const response = await readMedia(new NextRequest("https://vibe.invalid/api/media/" + key),
+    { params: Promise.resolve({ key: key.split("/") }) })
+  const type = response.headers.get("content-type")
+  if (!response.ok || !type?.startsWith("image/") || Number(response.headers.get("content-length")) > 10 * 1024 * 1024) {
+    await response.body?.cancel()
+    return undefined
+  }
+  return `data:${type};base64,${Buffer.from(await response.arrayBuffer()).toString("base64")}`
 }
 
 type Props = { params: Promise<{ username: string }> }
@@ -38,7 +52,7 @@ export default async function Image({ params }: Props) {
   const nombre = perfil?.displayName || username
   const lema = perfil?.tagline?.trim() || perfil?.bio?.trim() || ""
   const ubicacion = perfil?.location?.trim() || ""
-  const foto = fotoPermitida(perfil?.banner) ?? fotoPermitida(perfil?.image)
+  const foto = await fotoPermitida(perfil?.banner) ?? await fotoPermitida(perfil?.image)
 
   return new ImageResponse(
     (
@@ -81,6 +95,6 @@ export default async function Image({ params }: Props) {
         </div>
       </div>
     ),
-    size
+    { ...size, headers: mediaHeaders() }
   )
 }

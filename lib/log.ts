@@ -162,7 +162,11 @@ export function logWarn(ruta: string, mensaje: string, campos?: CamposLog) {
 }
 
 export function logError(ruta: string, mensaje: string, error: unknown, campos?: CamposLog) {
-  emitir("error", ruta, mensaje, { ...campos, error: redactar(error), resultado: "error" })
+  // Los errores de Postgres/R2 pueden incluir filas, nombres o letras inéditas
+  // en message/details. Ninguna expresión regular puede reconocer toda PII.
+  const code = error && typeof error === "object" && "code" in error ? error.code : undefined
+  const codigo = typeof code === "string" && /^(?:[0-9A-Z]{5}|PGRST\d{3}|PT\d{3})$/.test(code) ? code : undefined
+  emitir("error", ruta, mensaje, { ...campos, error: { codigo, omitido: true }, resultado: "error" })
 }
 
 /**
@@ -185,10 +189,11 @@ export function logError(ruta: string, mensaje: string, error: unknown, campos?:
  *     también sea rastreable dentro de su propio registro.
  */
 export function idDePeticion(request: Request): string {
-  return (
-    request.headers.get("cf-ray") ??
-    request.headers.get("x-request-id") ??
-    globalThis.crypto?.randomUUID?.() ??
-    `req-${Date.now().toString(36)}`
-  )
+  // Son cabeceras de entrada, no texto fiable. Sólo se conservan formatos
+  // acotados de correlación; nunca se usan como identidad o autorización.
+  const ray = request.headers.get("cf-ray")
+  if (ray && /^[a-f0-9]{16}(?:-[a-z]{3})?$/i.test(ray)) return ray
+  const requestId = request.headers.get("x-request-id")
+  if (requestId && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(requestId)) return requestId
+  return globalThis.crypto?.randomUUID?.() ?? `req-${Date.now().toString(36)}`
 }

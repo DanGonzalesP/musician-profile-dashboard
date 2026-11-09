@@ -22,10 +22,9 @@ delete process.env.NO_COLOR
 // es de una máquina local.
 //
 // ─── LO ÚNICO QUE SE SIMULA ES LA FRONTERA EXTERNA ────────────────────────
-// R2 es el único tercero que se intercepta, y sólo en el navegador: el PUT
-// firmado que sube el archivo. La autenticación, la base, el rate limit, RLS y
-// las rutas de API son todas de verdad. Simular R2 evita escribir objetos que
-// después nadie borra; simular cualquier otra cosa sería probar el mock.
+// Un servidor HTTPS local almacena el PUT y responde al HEAD del servidor.
+// Implementa condiciones de escritura, pero no valida firmas S3 ni demuestra
+// comportamiento de Cloudflare. Auth, base, rate limit, RLS y API son reales.
 
 const PORT = Number(process.env.E2E_AUTH_PORT ?? 3200)
 const baseURL = `http://127.0.0.1:${PORT}`
@@ -41,14 +40,14 @@ const urlSupabase = process.env.SUPABASE_TEST_URL ?? "http://127.0.0.1:54321"
 const anonKey = process.env.SUPABASE_TEST_ANON_KEY ?? ""
 
 // R2 de mentira. No apunta a ningún bucket real y no necesita hacerlo: el
-// firmado del AWS SDK es criptografía local, sin red. El PUT que el navegador
-// hace contra este origen lo intercepta `aislarR2()`.
+// firmado del AWS SDK es criptografía local. PUT y HEAD llegan al fixture;
+// `aislarR2()` registra las subidas e intercepta sólo las lecturas públicas.
 //
 // Tienen que estar las cinco, o `/api/upload-url` responde 503 por su propia
 // comprobación fail-closed (lib/r2-config.ts) y la prueba de subida no
 // probaría la subida, sino el fail-closed. Ese caso tiene su propia prueba.
 const entornoR2 = {
-  R2_ENDPOINT: "https://r2-de-prueba.localhost",
+  R2_ENDPOINT: "https://127.0.0.1:54998",
   R2_ACCESS_KEY_ID: "clave-de-prueba-sin-valor-real",
   R2_SECRET_ACCESS_KEY: "secreto-de-prueba-sin-valor-real",
   R2_BUCKET_NAME: "vibe-e2e",
@@ -78,6 +77,7 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
     actionTimeout: 15_000,
+    ignoreHTTPSErrors: true, // Únicamente certificado efímero del fixture local.
   },
 
   projects: [
@@ -85,8 +85,13 @@ export default defineConfig({
     { name: "chromium-mobile", use: { ...devices["Pixel 5"] } },
   ],
 
-  webServer: {
-    command: `pnpm exec next dev -p ${PORT}`,
+  webServer: [{
+    command: "node tests/e2e-auth/fixtures/servidor-r2.mjs",
+    url: "https://127.0.0.1:54998/health",
+    ignoreHTTPSErrors: true,
+    reuseExistingServer: false,
+  }, {
+    command: `node scripts/servidor-editor-e2e.mjs ${PORT}`,
     url: `${baseURL}/legal`,
     // Nunca reutilizar un servidor de una corrida anterior: serviría código y
     // variables viejas y la suite fallaría por todos lados sin que nada del
@@ -100,5 +105,5 @@ export default defineConfig({
       NEXT_PUBLIC_SITE_URL: baseURL,
       ...entornoR2,
     },
-  },
+  }],
 })

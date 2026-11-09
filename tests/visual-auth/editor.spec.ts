@@ -46,6 +46,9 @@ test.beforeAll(async () => {
     email: USUARIO.email,
     password: USUARIO.password,
     email_confirm: true,
+    // Persona ficticia mayor de edad que acepta los documentos: sin esta
+    // constancia (0071) una cuenta nueva no puede crear perfil.
+    user_metadata: { vibe_legal: { terms_version: "2026-11-09", privacy_version: "2026-11-09", age_assurance: "adult_self_declared" } },
   })
   if (error || !creado.user) throw new Error(`No se pudo crear el usuario fijo: ${error?.message}`)
 

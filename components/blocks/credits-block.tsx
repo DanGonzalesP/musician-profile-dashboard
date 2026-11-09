@@ -42,10 +42,8 @@ export function CreditsBlock({ data }: { data: CreditsData }) {
 }
 
 // ---------------------------------------------------------------------------
-// Carrusel vertical con auto-scroll infinito (AutoScrollCarousel, eje "y"):
-// las tarjetas se desplazan solas hacia arriba en loop sin fin y el usuario
-// puede además deslizar a mano. Se pausa al pasar el mouse, al interactuar, o
-// cuando hay una tarjeta expandida reproduciendo un embed.
+// Carrusel vertical: una sola copia por crédito/reproductor, avance automático
+// opcional y controles manuales. Se pausa al interactuar o expandir una tarjeta.
 // ---------------------------------------------------------------------------
 
 function VerticalCreditsCarousel({ credits, t }: { credits: CreditItem[]; t: Translate }) {
@@ -157,7 +155,7 @@ function CreditCard({
         <button
           type="button"
           onClick={onToggle}
-          aria-label={t("credits_open_aria")}
+          aria-label={`${t(expanded ? "credits_close_aria" : "credits_open_aria")}: ${title}`}
           aria-expanded={expanded}
           className="block w-full cursor-pointer text-left transition-opacity hover:opacity-90"
         >

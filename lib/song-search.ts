@@ -1,12 +1,6 @@
 import { supabase } from "@/lib/supabase"
 
-// Búsqueda de canciones ya publicadas en la plataforma (bloque "tracks" de
-// CUALQUIER artista) para la opción "Colaboración con artista de la
-// plataforma" del Bloque 4. No hay una tabla normalizada de canciones —
-// viven dentro del content JSONB de profile_blocks — así que se trae el
-// contenido visible de esos bloques y se filtra en el cliente. Para el
-// tamaño actual de la plataforma es suficiente; si el catálogo crece mucho
-// convendría mover esto a una función de Postgres con búsqueda indexada.
+// La base filtra antes de limitar; el navegador recibe sólo coincidencias.
 export type PlatformSongResult = {
   songKey: string
   title: string
@@ -15,47 +9,45 @@ export type PlatformSongResult = {
   ownerDisplayName: string
 }
 
-type AlbumRow = { id?: string; title?: string; tracks?: { title?: string }[] }
-type BlockRow = {
-  id: string
-  profile_id: string
-  content: { albums?: AlbumRow[] } | null
-  profiles: { display_name: string | null } | null
+type SongRow = {
+  song_key: string
+  title: string
+  album_title: string
+  owner_profile_id: string
+  owner_display_name: string
 }
 
-export async function searchPlatformSongs(query: string, excludeProfileId?: string): Promise<PlatformSongResult[]> {
-  const q = query.trim().toLowerCase()
+function isSongRow(value: unknown): value is SongRow {
+  if (!value || typeof value !== "object") return false
+  const row = value as Record<string, unknown>
+  return typeof row.song_key === "string" && row.song_key.length > 0 &&
+    typeof row.title === "string" && row.title.trim().length > 0 &&
+    typeof row.album_title === "string" && typeof row.owner_display_name === "string" &&
+    typeof row.owner_profile_id === "string" &&
+    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(row.owner_profile_id)
+}
+
+export async function searchPlatformSongs(query: string, excludeProfileId?: string, signal?: AbortSignal): Promise<PlatformSongResult[]> {
+  const q = query.trim()
   if (q.length < 2) return []
+  if (q.length > 200) throw new Error("Usa hasta 200 caracteres para buscar canciones.")
 
-  const { data, error } = await supabase
-    .from("profile_blocks")
-    .select("id, profile_id, content, profiles!inner(display_name)")
-    .in("block_type", ["tracks"])
-    .eq("is_visible", true)
+  const request = supabase.rpc("buscar_canciones_publicadas", {
+    p_consulta: q,
+    p_excluir_perfil: excludeProfileId ?? null,
+  })
 
-  if (error) throw error
-
-  const rows = (data ?? []) as unknown as BlockRow[]
-  const results: PlatformSongResult[] = []
-
-  for (const row of rows) {
-    if (excludeProfileId && row.profile_id === excludeProfileId) continue
-    const albums = Array.isArray(row.content?.albums) ? row.content!.albums! : []
-    for (const album of albums) {
-      const tracks = Array.isArray(album.tracks) ? album.tracks : []
-      tracks.forEach((track, i) => {
-        const title = String(track?.title ?? "").trim()
-        if (!title || !title.toLowerCase().includes(q)) return
-        results.push({
-          songKey: `${row.id}:${album.id ?? "album"}:${i}`,
-          title,
-          albumTitle: String(album.title ?? ""),
-          ownerProfileId: row.profile_id,
-          ownerDisplayName: row.profiles?.display_name || "Artista desconocido",
-        })
-      })
-    }
+  const timeout = AbortSignal.timeout(15_000)
+  request.abortSignal(signal ? AbortSignal.any([signal, timeout]) : timeout)
+  const { data, error } = await request
+  if (error || !Array.isArray(data) || data.length > 20 || !data.every(isSongRow)) {
+    throw new Error("No se pudo buscar canciones.")
   }
-
-  return results.slice(0, 20)
+  return (data as SongRow[]).map(row => ({
+    songKey: row.song_key,
+    title: row.title,
+    albumTitle: row.album_title,
+    ownerProfileId: row.owner_profile_id,
+    ownerDisplayName: row.owner_display_name,
+  }))
 }

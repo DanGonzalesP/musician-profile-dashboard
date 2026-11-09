@@ -1,20 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 import { Moon, Sun } from "lucide-react"
-import { type Theme, getStoredTheme, setStoredTheme } from "@/lib/theme"
+import { type Theme, themePreference, setStoredTheme } from "@/lib/theme"
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark")
-
-  useEffect(() => {
-    setTheme(getStoredTheme())
-  }, [])
+  const theme = useSyncExternalStore(themePreference.subscribe, themePreference.getSnapshot, themePreference.getServerSnapshot)
 
   function toggle() {
     const next: Theme = theme === "dark" ? "light" : "dark"
     setStoredTheme(next)
-    setTheme(next)
   }
 
   return (
@@ -28,6 +23,7 @@ export function ThemeToggle() {
       <button
         type="button"
         role="switch"
+        aria-label="Modo claro"
         aria-checked={theme === "light"}
         onClick={toggle}
         className={`relative flex h-8 w-16 shrink-0 items-center rounded-full transition-colors ${

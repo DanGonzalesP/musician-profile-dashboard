@@ -16,6 +16,9 @@
     - link "Normas de comunidad":
       - /url: /legal/comunidad
 - main:
+  - complementary "Estado de los documentos legales":
+    - paragraph: Documentos en preparación
+    - paragraph: Estos textos son borradores para el lanzamiento de Vibe en Perú. Falta confirmar al titular responsable, los plazos de conservación y las condiciones para menores de edad, y completar la revisión legal. No representan una política definitiva de lanzamiento.
   - heading "Centro legal" [level=1]
   - paragraph: Vibe es una plataforma donde los músicos publican su obra, venden sus productos y ofrecen sus servicios. Estos documentos explican cómo funciona todo eso de forma justa y segura para artistas y fans.
   - 'link "Términos y Condiciones Las reglas de uso de Vibe: tu cuenta, tu contenido, la tienda y los servicios."':
@@ -38,4 +41,13 @@
     - /url: /legal/comunidad
     - paragraph: Normas de Comunidad
     - paragraph: Lo que esperamos de cada artista y fan para que la plataforma sea un buen escenario.
-  - paragraph: "/Última actualización: \\d+ de julio de \\d+\\. Estos documentos son una base preparada para una plataforma de música con contenido de usuarios; no constituyen asesoría legal — antes del lanzamiento conviene que un abogado los revise para tu caso concreto\\./"
+  - paragraph: "/Última actualización: 6 de noviembre de \\d+\\. Estos documentos son una base preparada para una plataforma de música con contenido de usuarios; no constituyen asesoría legal — antes del lanzamiento conviene que un abogado los revise para tu caso concreto\\./"
+- alert
+- region "Consentimiento de analítica":
+  - paragraph:
+    - text: Usamos métricas de uso anónimas y agregadas para saber qué partes de Vibe se usan. No hay publicidad ni rastreo entre sitios. Puedes decir que no y la plataforma funciona igual.
+    - link "Leer la política de cookies":
+      - /url: /legal/cookies
+    - text: .
+  - button "Solo lo necesario"
+  - button "Aceptar métricas"

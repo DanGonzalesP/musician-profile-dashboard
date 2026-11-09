@@ -4,6 +4,30 @@ Cierra **P-32**. Cuánto se guarda cada cosa y cuándo se borra. Base legal: Ley
 29733 (Perú, protección de datos personales) y GDPR arts. 5.1.e (limitación del
 plazo) y 17 (derecho de supresión).
 
+## Comprobantes de creación de servicios — implementación preparada, 2026-11-06
+
+Las migraciones `0052` y `0053` están preparadas, **sin aplicar ni verificar**.
+Estas notas describen su comportamiento previsto, no un cierre de retención.
+
+- `private.service_creation_requests` conserva el actor, el perfil, la clave de
+  solicitud, la huella SHA-256 del contenido y el identificador numérico del servicio.
+  No duplica la descripción, las imágenes ni el cuerpo original de la solicitud.
+- El comprobante permanece después de retirar un servicio, para que repetir una
+  solicitud antigua no vuelva a crearlo. No tiene vencimiento automático mientras
+  existan la cuenta y el perfil; introducir uno requiere definir también hasta
+  cuándo puede recuperarse una solicitud sin riesgo de duplicación.
+- Las claves foráneas a `auth.users` y `profiles` usan `ON DELETE CASCADE`.
+  El protocolo de supresión existente elimina esos registros una vez completada
+  la retirada de archivos; no se añade una vía alternativa de borrado de cuentas.
+- La exportación de formato 5 incluye los comprobantes cuyo actor es `auth.uid()`:
+  solicitud, perfil, servicio como texto y huella hexadecimal. Ser administrador
+  del mismo perfil no concede acceso a los comprobantes de otros actores.
+- La tabla privada no tiene permisos directos para usuarios. La exportación usa
+  una función limitada a la identidad autenticada, sin aceptar un actor por parámetro.
+- Falta comprobar cascadas, aislamiento entre actores, exportación y restauración
+  de respaldos en la etapa final. Esto no amplía las afirmaciones históricas de
+  cierre que aparecen más abajo ni resuelve la retención de los respaldos.
+
 ## Principio
 
 No se guarda nada más tiempo del necesario para el fin por el que se recogió.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { normalizeBlockData, getSongOptions, type HeroData, type TracksData } from "@/lib/blocks";
@@ -13,6 +13,21 @@ import { Loader2 } from "lucide-react";
 
 export default function HerramientasLegalesPage() {
   const router = useRouter();
+  const [owner, setOwner] = useState<string | null>(null);
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setOwner(session?.user.id ?? null);
+      if (!session) router.replace("/login");
+    });
+    return () => subscription.unsubscribe();
+  }, [router]);
+  if (!owner) return <LayoutAdmin><p role="status" className="p-8">Comprobando sesión…</p></LayoutAdmin>;
+  return <LegalAccount key={owner} ownerUserId={owner} />;
+}
+
+function LegalAccount({ ownerUserId }: { ownerUserId: string }) {
+  const active = useRef(false);
+  const saveLock = useRef(false);
   const [loading, setLoading] = useState(true);
   const [errorMensaje, setErrorMensaje] = useState("");
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -20,145 +35,136 @@ export default function HerramientasLegalesPage() {
   const [legalSettings, setLegalSettings] = useState<LegalSettings>(emptyLegalSettings);
   const [songOptions, setSongOptions] = useState<ReturnType<typeof getSongOptions>>([]);
   const [saving, setSaving] = useState(false);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const [savedMessage, setSavedMessage] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    active.current = true;
     async function cargar() {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        router.push("/login");
-        return;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        setErrorMensaje(profileError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Sin fila de perfil no se sigue: antes se caía al perfil semilla
-      // PROFILE_ID, un buzón compartido entre cuentas (ver AUDITORIA.md 9).
-      if (!profile) {
-        setErrorMensaje("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.");
-        setLoading(false);
-        return;
-      }
-      const id = profile.id;
-      setProfileId(id);
-
       try {
-        const settings = await fetchLegalSettings(id);
+        const { data, error } = await supabase.auth.getSession();
+        if (error || data.session?.user.id !== ownerUserId) throw new Error("session");
+        const authorization = `Bearer ${data.session.access_token}`;
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles").select("id").eq("user_id", ownerUserId).maybeSingle()
+          .setHeader("Authorization", authorization);
+        if (profileError || !profile) throw new Error("profile");
+        const [settings, heroResult, tracksResult] = await Promise.all([
+          fetchLegalSettings(profile.id, ownerUserId),
+          supabase.from("profile_blocks").select("content").eq("profile_id", profile.id)
+            .eq("block_type", "hero").maybeSingle().setHeader("Authorization", authorization),
+          supabase.from("profile_blocks").select("content").eq("profile_id", profile.id)
+            .eq("block_type", "tracks").maybeSingle().setHeader("Authorization", authorization),
+        ]);
+        if (cancelled) return;
+        if (heroResult.error || tracksResult.error) throw new Error("blocks");
         setLegalSettings(settings);
-      } catch (err) {
-        console.error("[HerramientasLegales] No se pudo cargar legal_settings:", err);
+        if (heroResult.data) setArtistName((normalizeBlockData("hero", heroResult.data.content) as HeroData).name);
+        if (tracksResult.data) setSongOptions(getSongOptions(normalizeBlockData("tracks", tracksResult.data.content) as TracksData));
+        setProfileId(profile.id);
+      } catch {
+        if (!cancelled) setErrorMensaje("No se pudieron cargar tus datos legales. Recarga la página para volver a intentarlo.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      const { data: heroBlock } = await supabase
-        .from("profile_blocks")
-        .select("content")
-        .eq("profile_id", id)
-        .eq("block_type", "hero")
-        .maybeSingle();
-      if (heroBlock) {
-        const hero = normalizeBlockData("hero", heroBlock.content) as HeroData;
-        setArtistName(hero.name);
-      }
-
-      const { data: tracksBlock } = await supabase
-        .from("profile_blocks")
-        .select("content")
-        .eq("profile_id", id)
-        .eq("block_type", "tracks")
-        .maybeSingle();
-      if (tracksBlock) {
-        const tracks = normalizeBlockData("tracks", tracksBlock.content) as TracksData;
-        setSongOptions(getSongOptions(tracks));
-      }
-
-      setLoading(false);
     }
-    cargar();
-  }, [router]);
+    void cargar();
+    return () => { cancelled = true; active.current = false; };
+  }, [ownerUserId]);
 
   async function handleSaveSettings(next: LegalSettings) {
-    if (!profileId) return;
+    if (!profileId || !active.current || saveLock.current) return;
+    saveLock.current = true;
     setSaving(true);
     setSavedMessage(false);
+    setErrorMensaje("");
     try {
-      await saveLegalSettings(profileId, next);
-      setLegalSettings(next);
-      setSavedMessage(true);
-      setTimeout(() => setSavedMessage(false), 2000);
-    } catch (err) {
-      setErrorMensaje(err instanceof Error ? err.message : "No se pudo guardar.");
+      await saveLegalSettings(profileId, next, ownerUserId);
+      if (active.current) setSavedMessage(true);
+    } catch {
+      if (active.current) setErrorMensaje("No se pudo confirmar el guardado. Conservamos lo que escribiste; vuelve a intentarlo.");
     } finally {
-      setSaving(false);
+      saveLock.current = false;
+      if (active.current) setSaving(false);
     }
   }
 
   if (loading) {
     return (
       <LayoutAdmin>
-        <div className="flex items-center justify-center p-12 text-zinc-400">
+        <div role="status" aria-label="Cargando datos legales" className="flex items-center justify-center p-12 text-muted-foreground">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
       </LayoutAdmin>
     );
   }
 
+  if (!profileId) return (
+    <LayoutAdmin>
+      <div className="p-8 space-y-4">
+        <p role="alert" className="text-sm text-destructive">{errorMensaje}</p>
+        <button type="button" className="min-h-11 rounded-lg border border-border px-4 text-sm hover:bg-muted" onClick={() => window.location.reload()}>Volver a cargar</button>
+      </div>
+    </LayoutAdmin>
+  );
+
   return (
     <LayoutAdmin>
       <div className="p-8 max-w-4xl mx-auto space-y-8">
-        <header className="border-b border-zinc-800 pb-4">
-          <h1 className="text-2xl font-bold text-white">Herramientas Legales</h1>
-          <p className="text-zinc-400 text-xs mt-1">
-            Licencias de uso directo y certificados de autoría — herramientas internas para ti, no aparecen en
+        <header className="border-b border-border pb-4">
+          <h1 className="font-display text-2xl font-bold text-foreground">Herramientas legales</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Borradores de licencias y constancias de huella digital — herramientas internas para ti, no aparecen en
             tu perfil público.
           </p>
         </header>
 
         {errorMensaje && (
-          <div className="p-4 rounded-md border bg-red-500/10 border-red-500/20 text-red-400 text-sm">
+          <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
             {errorMensaje}
           </div>
         )}
 
-        <section className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 space-y-4">
-          <h2 className="text-sm font-semibold text-white">Tus datos como licenciante</h2>
+        <section className="space-y-4 rounded-2xl border border-border bg-card p-6">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Tus datos como licenciante</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Se guardan en privado y sólo se usan para completar tus licencias. No aparecen en tu perfil público.</p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Nombre artístico</label>
+              <label htmlFor="artistStageName" className="mb-1 block text-xs font-medium text-muted-foreground">Nombre artístico</label>
               <input
                 type="text"
+                id="artistStageName"
+                disabled={saving}
                 value={legalSettings.artistStageName}
-                onChange={(e) => setLegalSettings((s) => ({ ...s, artistStageName: e.target.value }))}
-                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                onChange={(e) => { setSavedMessage(false); setLegalSettings((s) => ({ ...s, artistStageName: e.target.value })); }}
+                className="min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
                 placeholder="Nombre con el que te presentas"
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Nombre real (legal)</label>
+              <label htmlFor="artistLegalName" className="mb-1 block text-xs font-medium text-muted-foreground">Nombre real (legal)</label>
               <input
                 type="text"
+                id="artistLegalName"
+                disabled={saving}
                 value={legalSettings.artistLegalName}
-                onChange={(e) => setLegalSettings((s) => ({ ...s, artistLegalName: e.target.value }))}
-                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                onChange={(e) => { setSavedMessage(false); setLegalSettings((s) => ({ ...s, artistLegalName: e.target.value })); }}
+                className="min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
                 placeholder="Nombre completo según DNI"
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">DNI</label>
+              <label htmlFor="artistDni" className="mb-1 block text-xs font-medium text-muted-foreground">DNI</label>
               <input
                 type="text"
+                id="artistDni"
+                disabled={saving}
                 value={legalSettings.artistDni}
-                onChange={(e) => setLegalSettings((s) => ({ ...s, artistDni: e.target.value }))}
-                className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                onChange={(e) => { setSavedMessage(false); setLegalSettings((s) => ({ ...s, artistDni: e.target.value })); }}
+                className="min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
                 placeholder="12345678"
               />
             </div>
@@ -168,17 +174,17 @@ export default function HerramientasLegalesPage() {
               type="button"
               onClick={() => handleSaveSettings(legalSettings)}
               disabled={saving}
-              className="bg-purple-500 hover:bg-purple-600 text-white font-bold text-sm px-6 py-2 rounded transition-colors disabled:opacity-60"
+              className="min-h-11 rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {saving ? "Guardando..." : "Guardar datos"}
             </button>
-            {savedMessage && <span className="text-xs text-emerald-400">Guardado ✓</span>}
+            {savedMessage && <span role="status" className="text-xs text-foreground">Datos guardados.</span>}
           </div>
         </section>
 
-        <LicenseTool data={legalSettings} songOptions={songOptions} profileId={profileId ?? undefined} />
-        <LicenseHistoryPanel profileId={profileId ?? undefined} />
-        <CertificateTool profileId={profileId ?? undefined} artistName={artistName} />
+        <LicenseTool data={legalSettings} songOptions={songOptions} profileId={profileId} ownerUserId={ownerUserId} onRecorded={() => setHistoryRevision((revision) => revision + 1)} />
+        <LicenseHistoryPanel key={historyRevision} profileId={profileId ?? undefined} />
+        <CertificateTool profileId={profileId} artistName={artistName} ownerUserId={ownerUserId} />
       </div>
     </LayoutAdmin>
   );

@@ -23,11 +23,15 @@ export type RecordLicenseInput = {
 }
 
 /**
- * Registra en Supabase que se generó una licencia — solo texto/jsonb, nunca
- * el PDF. El PDF es una función pura de estos mismos datos, así que puede
- * regenerarse idéntico más tarde sin necesidad de guardar el binario.
+ * Registra los datos declarados para un borrador, nunca el PDF firmado.
+ * La redescarga usa la plantilla vigente y una fecha de generación nueva;
+ * no es una copia idéntica ni prueba de aceptación de las partes.
  */
-export async function recordLicense(profileId: string, input: RecordLicenseInput): Promise<void> {
+export async function recordLicense(profileId: string, input: RecordLicenseInput, expectedUserId?: string): Promise<void> {
+  const { data: auth, error: authError } = await supabase.auth.getSession()
+  if (authError || !auth.session || (expectedUserId && auth.session.user.id !== expectedUserId)) {
+    throw new Error("La sesión cambió. No se pudo registrar la licencia.")
+  }
   const { error } = await supabase.from("licenses").insert({
     profile_id: profileId,
     artist_name: input.artistName,
@@ -37,22 +41,38 @@ export async function recordLicense(profileId: string, input: RecordLicenseInput
     event_date: input.eventDate,
     event_end_date: input.eventEndDate || null,
     songs: input.songs,
-  })
-  if (error) throw error
+  }).setHeader("Authorization", `Bearer ${auth.session.access_token}`)
+  if (error) throw new Error("No se pudo confirmar el registro de la licencia.")
 }
 
-export async function fetchLicenseHistory(profileId: string): Promise<LicenseHistoryEntry[]> {
-  const { data, error } = await supabase
+export type LicenseHistoryPage = { entries: LicenseHistoryEntry[]; nextCursor: number | null }
+const HISTORY_PAGE_SIZE = 30
+
+export async function fetchLicenseHistory(profileId: string, expectedUserId?: string, beforeId?: number, signal?: AbortSignal): Promise<LicenseHistoryPage> {
+  if (beforeId !== undefined && (!Number.isSafeInteger(beforeId) || beforeId <= 0)) {
+    throw new Error("No se pudo continuar el historial. Vuelve a cargarlo.")
+  }
+  const { data: auth, error: authError } = await supabase.auth.getSession()
+  if (authError || !auth.session || (expectedUserId && auth.session.user.id !== expectedUserId)) {
+    throw new Error("La sesión cambió. Vuelve a abrir el historial.")
+  }
+  signal?.throwIfAborted()
+  const query = supabase
     .from("licenses")
     .select(
       "id, organizer_name, event_date, event_end_date, songs, artist_name, artist_legal_name, artist_dni, created_at"
     )
     .eq("profile_id", profileId)
-    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(HISTORY_PAGE_SIZE + 1)
+    .setHeader("Authorization", `Bearer ${auth.session.access_token}`)
+  if (beforeId !== undefined) query.lt("id", beforeId)
+  if (signal) query.abortSignal(signal)
+  const { data, error } = await query
 
-  if (error) throw error
+  if (error) throw new Error("No se pudo cargar el historial de licencias.")
 
-  return (data ?? []).map((row) => ({
+  const entries = (data ?? []).slice(0, HISTORY_PAGE_SIZE).map((row) => ({
     id: row.id,
     organizerName: row.organizer_name,
     eventDate: row.event_date,
@@ -63,4 +83,8 @@ export async function fetchLicenseHistory(profileId: string): Promise<LicenseHis
     artistDni: row.artist_dni,
     createdAt: row.created_at,
   }))
+  return {
+    entries,
+    nextCursor: (data?.length ?? 0) > HISTORY_PAGE_SIZE ? entries[entries.length - 1].id : null,
+  }
 }

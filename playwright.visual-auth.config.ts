@@ -55,7 +55,9 @@ export default defineConfig({
   })),
 
   webServer: {
-    command: `pnpm exec next dev -p ${PORT}`,
+    // Igual que el E2E del editor: las claves administrativas del arnés no
+    // pertenecen al servidor de la app, tampoco durante la captura ARIA.
+    command: `node scripts/servidor-editor-e2e.mjs ${PORT}`,
     url: `${baseURL}/legal`,
     reuseExistingServer: false,
     timeout: 180_000,

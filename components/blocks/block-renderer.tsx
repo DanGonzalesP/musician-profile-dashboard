@@ -21,6 +21,7 @@ export function BlockRenderer({
   albumCovers = [],
   creditsCount = 0,
   onAlbumSelect,
+  allowSupportDemo = false,
 }: {
   block: Block
   products?: CatalogProduct[]
@@ -29,6 +30,8 @@ export function BlockRenderer({
   albumCovers?: string[]
   creditsCount?: number
   onAlbumSelect?: (albumId: string) => void
+  /** Sólo vista previa del editor; nunca habilita pagos. */
+  allowSupportDemo?: boolean
 }) {
   switch (block.type) {
     case "hero":
@@ -36,7 +39,7 @@ export function BlockRenderer({
     case "single":
       return <FeaturedSingleBlock data={block.data as SingleData} />
     case "crowdfunding":
-      return <CrowdfundingBlock data={block.data as CrowdfundingData} />
+      return <CrowdfundingBlock key={`${block.id}-${JSON.stringify(block.data)}-${allowSupportDemo}`} data={block.data as CrowdfundingData} allowDemo={allowSupportDemo} />
     case "tracks":
       return <TrackListBlock data={block.data as TracksData} onAlbumSelect={onAlbumSelect} />
     case "credits":

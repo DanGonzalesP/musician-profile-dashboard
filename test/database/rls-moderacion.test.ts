@@ -6,6 +6,7 @@ import {
   crearUsuario,
   limpiarUsuarios,
   mensajeDeError,
+  prepararMedioHistorico,
   type UsuarioDePrueba,
 } from "./helpers"
 
@@ -124,10 +125,9 @@ describe("RLS · moderación y cumplimiento", () => {
       expect(data?.moderator_notes).toBeNull()
     })
 
-    it("un titular de derechos sin cuenta puede reportar, pero no leer nada", async () => {
-      // Se admite a propósito: el titular de los derechos de una obra casi nunca
-      // es usuario de Vibe. El correo va único por corrida para no consumir el
-      // cupo anónimo compartido de la migración 0011.
+    it("sin comprobante del servidor no se permite insertar ni leer reportes", async () => {
+      // El titular sin cuenta usa ahora la RPC firmada, probada por anonymous-report.
+      // La anon key por sí sola no autoriza una escritura directa.
       const anon = clienteAnonimo()
 
       const { error } = await anon.from("content_reports").insert({
@@ -139,7 +139,7 @@ describe("RLS · moderación y cumplimiento", () => {
         details: "Soy el titular de esta obra y no autoricé su publicación.",
         copyright_sworn_statement: true,
       })
-      expect(error).toBeNull()
+      expect(error).toBeTruthy()
 
       const { data, error: errorLectura } = await anon.from("content_reports").select("*").limit(5)
       expect(errorLectura ? true : (data ?? []).length === 0).toBe(true)
@@ -158,9 +158,7 @@ describe("RLS · moderación y cumplimiento", () => {
         position_index: 0,
         content: { titulo: "Bloque de Ana" },
       })
-      await ana.supabase
-        .from("media_assets")
-        .insert({ key: claveDeMedio(), owner_user_id: ana.id, profile_id: ana.profileId, folder: "images" })
+      await prepararMedioHistorico({ key: claveDeMedio(ana), owner_user_id: ana.id, profile_id: ana.profileId, folder: "images" })
 
       await beto.supabase.from("profile_private").upsert({
         profile_id: beto.profileId!,
@@ -193,9 +191,14 @@ describe("RLS · moderación y cumplimiento", () => {
       expect(exportado.archivos.length).toBeGreaterThan(0)
     })
 
-    it("la exportación de A no contiene NADA de B", async () => {
+    it("la exportación de A no contiene NADA de B salvo el perfil público que A reportó", async () => {
       const { data } = await ana.supabase.rpc("exportar_mis_datos")
-      const serializado = JSON.stringify(data)
+      // Los reportes enviados son datos de A e identifican el perfil público
+      // reportado. Fuera de ese campo no debe aparecer ningún dato de B.
+      const reportes = (data.reportes_enviados ?? []) as { perfil_reportado?: string }[]
+      expect(reportes.length).toBeGreaterThan(0)
+      const sinReportes = { ...data, reportes_enviados: reportes.map(({ perfil_reportado: _perfil, ...resto }) => resto) }
+      const serializado = JSON.stringify(sinReportes)
 
       expect(serializado).not.toContain(beto.profileId!)
       expect(serializado).not.toContain(beto.id)
@@ -227,6 +230,7 @@ describe("RLS · moderación y cumplimiento", () => {
       // Usuario propio para que la prueba no dependa del orden de ejecución.
       const carla = await crearUsuario({ nombre: "Carla Moderación" })
 
+      expect((await carla.supabase.rpc("begin_media_account_closure")).data).toBe(true)
       const { error } = await carla.supabase.rpc("eliminar_mi_cuenta")
       expect(error).toBeNull()
 

@@ -1,142 +1,95 @@
 "use client"
 
-// Carrusel de auto-scroll infinito. El contenido se desplaza solo y en loop
-// sin fin: lo que sale por un extremo reaparece por el otro. Funciona en los
-// dos ejes ("x" horizontal, "y" vertical).
-//
-// Cómo logra el loop sin costuras: renderiza los hijos DOS veces (el segundo
-// juego es aria-hidden). Un requestAnimationFrame va sumando scrollLeft/Top y,
-// al pasar la mitad del contenido (que es exactamente un juego completo),
-// resta esa mitad — como el segundo juego es idéntico al primero, el salto es
-// invisible. Como usa scroll nativo (no transform), el usuario puede además
-// deslizar/arrastrar/scrollear con el dedo o la rueda en cualquier momento; el
-// auto-scroll se pausa mientras interactúa o pasa el mouse por encima y se
-// reanuda solo.
-//
-// A propósito NO respeta prefers-reduced-motion: es un carrusel decorativo
-// con su propio control manual (pausa al pasar el mouse/tocar), y el pedido
-// explícito es que se mueva siempre solo, sin depender de una preferencia de
-// accesibilidad del sistema operativo del visitante que además es invisible
-// para el usuario (parecía "roto"/estático sin ninguna pista de por qué).
+import { useEffect, useId, useRef, useState, type ReactNode } from "react"
+import { useReducedMotion } from "framer-motion"
+import { useLocale } from "@/components/locale-provider"
 
-import { useEffect, useRef, type ReactNode } from "react"
-
+/** Una sola copia del contenido: los enlaces y reproductores no se duplican. */
 export function AutoScrollCarousel({
-  axis = "x",
-  speed = 0.5,
-  paused = false,
-  className = "",
-  innerClassName = "",
-  ariaLabel,
-  children,
+  axis = "x", speed = 0.5, paused = false, className = "", innerClassName = "", ariaLabel, children,
 }: {
   axis?: "x" | "y"
-  /** px por frame (~60fps). 0.5 ≈ lento y elegante, pero bien perceptible. */
+  /** Velocidad equivalente en píxeles por frame a60Hz. */
   speed?: number
-  /** Pausa forzada desde afuera (ej. cuando una tarjeta está expandida). */
+  /** Por ejemplo, una tarjeta expandida reproduciendo un embed. */
   paused?: boolean
-  /** Clases del contenedor scrolleable (overflow, tamaño, etc.). */
   className?: string
-  /** Clases del track interno (flex-row/flex-col, gap...). Se aplica a cada juego. */
   innerClassName?: string
   ariaLabel?: string
   children: ReactNode
 }) {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const pausedRef = useRef(false)
-  const externalPausedRef = useRef(paused)
-  const resumeTimer = useRef<number | null>(null)
-
+  const { t } = useLocale()
+  const id = useId()
+  const ref = useRef<HTMLDivElement>(null)
+  const hover = useRef(false)
+  const resumeAt = useRef(0)
+  const [stopped, setStopped] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const reducedMotion = useReducedMotion() === true
   const isY = axis === "y"
 
   useEffect(() => {
-    externalPausedRef.current = paused
-  }, [paused])
-
-  useEffect(() => {
     const el = ref.current
-    if (!el) return
-
+    if (!el || paused || stopped || focused || reducedMotion || !Number.isFinite(speed) || speed <= 0) return
     let raf = 0
-    const tick = () => {
+    let previous = 0
+    let position: number | null = null
+    let endReachedAt = 0
+    const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
-      if (pausedRef.current || externalPausedRef.current) return
-      const half = (isY ? el.scrollHeight : el.scrollWidth) / 2
-      if (half <= 1) return
-      if (isY) {
-        el.scrollTop += speed
-        if (el.scrollTop >= half) el.scrollTop -= half
-      } else {
-        el.scrollLeft += speed
-        if (el.scrollLeft >= half) el.scrollLeft -= half
+      const elapsed = previous ? Math.min(now - previous, 64) : 0
+      previous = now
+      if (hover.current || now < resumeAt.current || document.hidden) {
+        position = null
+        endReachedAt = 0
+        return
       }
+      const limit = isY ? el.scrollHeight - el.clientHeight : el.scrollWidth - el.clientWidth
+      if (limit <= 1) return
+      const current = isY ? el.scrollTop : el.scrollLeft
+      // Acumular fracciones evita quedarse quieto si el navegador redondea el scroll.
+      if (position === null || Math.abs(current - position) > 2) position = current
+      if (current >= limit - 1) {
+        if (!endReachedAt) endReachedAt = now
+        if (now - endReachedAt < 1600) return
+        position = 0
+        endReachedAt = 0
+      } else position = Math.min(limit, position + speed * elapsed / (1000 / 60))
+      if (isY) el.scrollTop = position
+      else el.scrollLeft = position
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [isY, speed])
+  }, [isY, speed, paused, stopped, focused, reducedMotion])
 
-  // Mantiene el loop también cuando el usuario scrollea a mano: al cruzar la
-  // mitad se reajusta para que nunca choque contra un borde duro.
-  const handleScroll = () => {
+  const nudge = () => { resumeAt.current = performance.now() + 1600 }
+  const move = (direction: number) => {
     const el = ref.current
     if (!el) return
-    const half = (isY ? el.scrollHeight : el.scrollWidth) / 2
-    if (half <= 1) return
-    const pos = isY ? el.scrollTop : el.scrollLeft
-    if (pos >= half) {
-      if (isY) el.scrollTop = pos - half
-      else el.scrollLeft = pos - half
-    }
+    setStopped(true)
+    const distance = direction * (isY ? el.clientHeight : el.clientWidth) * 0.8
+    el.scrollBy({ top: isY ? distance : 0, left: isY ? 0 : distance, behavior: "instant" })
   }
+  const buttonClass = "min-h-11 rounded-lg border border-border px-3 text-xs disabled:opacity-70"
 
-  const pause = () => {
-    pausedRef.current = true
-    if (resumeTimer.current) {
-      window.clearTimeout(resumeTimer.current)
-      resumeTimer.current = null
-    }
-  }
-  const resume = () => {
-    pausedRef.current = false
-  }
-  // Tras deslizar/rueda: pausa breve y reanuda solo.
-  const nudge = () => {
-    pausedRef.current = true
-    if (resumeTimer.current) window.clearTimeout(resumeTimer.current)
-    resumeTimer.current = window.setTimeout(() => {
-      pausedRef.current = false
-    }, 1600)
-  }
-
-  return (
-    <div
-      ref={ref}
-      role="list"
-      aria-label={ariaLabel}
-      onScroll={handleScroll}
-      onMouseEnter={pause}
-      onMouseLeave={resume}
-      onPointerDown={pause}
-      onPointerUp={resume}
-      onTouchStart={pause}
-      onTouchEnd={nudge}
-      onWheel={nudge}
-      style={{ scrollbarWidth: "none" }}
-      className={`${isY ? "overflow-y-auto" : "overflow-x-auto"} [&::-webkit-scrollbar]:hidden ${className}`}
-    >
-      {/* Envoltorio SIN gap propio que ubica los dos juegos uno junto al otro
-          en el eje del carrusel (fila para "x", columna para "y"). Sin este
-          `flex` explícito, dos <div> son bloques y se APILAN VERTICALMENTE
-          por default — eso rompía el carrusel horizontal (se veía como una
-          grilla de 2 filas en vez de una sola fila continua). El gap entre
-          juegos debe ser CERO (no llevarlo acá) para que la mitad exacta del
-          scroll coincida con el final del primer juego. */}
-      <div className={isY ? "flex flex-col" : "flex flex-row"}>
-        <div className={innerClassName}>{children}</div>
-        <div className={innerClassName} aria-hidden="true">
-          {children}
-        </div>
-      </div>
+  return <div className="min-w-0 space-y-3"
+    onFocusCapture={() => setFocused(true)}
+    onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false) }}>
+    <div className="flex flex-wrap gap-2" role="group" aria-label={t("carousel_controls")}>
+      <button type="button" aria-controls={id} className={buttonClass} onClick={() => move(-1)}>{t("carousel_previous")}</button>
+      <button type="button" aria-controls={id} className={buttonClass} onClick={() => move(1)}>{t("carousel_next")}</button>
+      <button type="button" aria-controls={id} className={buttonClass} disabled={reducedMotion} aria-pressed={stopped || reducedMotion}
+        onClick={() => setStopped(value => !value)}>
+        {t(reducedMotion ? "albums_reduced_motion" : stopped ? "albums_resume_motion" : "albums_pause_motion")}
+      </button>
     </div>
-  )
+    <div id={id} ref={ref} role="region" aria-label={ariaLabel ?? t("carousel_content")} tabIndex={0}
+      onMouseEnter={() => { hover.current = true }}
+      onMouseLeave={() => { hover.current = false }}
+      onPointerDown={() => setStopped(true)}
+      onWheel={nudge}
+      className={`${isY ? "overflow-y-auto" : "overflow-x-auto"} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${className}`}>
+      <div className={innerClassName}>{children}</div>
+    </div>
+  </div>
 }

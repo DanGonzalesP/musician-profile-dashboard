@@ -1,5 +1,38 @@
 # Política de migraciones — forward-only
 
+## Estado local del 6 de noviembre de 2026
+
+0059 (`gestion_roles`) aplicada sólo local con salida0 mediante actualizador;
+respaldo previo en `.wrangler/auditoria/actualizacion-local-1793981556811/`,
+copia de570archivos. Añade directorio restringido y escritura condicionada al
+estado consultado, sin cambiar asignaciones existentes.0000–0059 inmutables;
+siguiente0060+. Sin pruebas ni modificación remota.
+
+0058 (`resumen_mantenimiento`) aplicada sólo local mediante actualizador, salida0,
+respaldo previo en `.wrangler/auditoria/actualizacion-local-1793981037441/` y
+sincronización de565archivos. Primer intento1793980999936 falló por conexión TCP;
+el contenedor seguía running/healthy, aceptaba conexiones y conservaba0057.
+Se reintentó sin reiniciar ni reconstruir la base.0000–0058 son inmutables;
+próxima corrección0059+. No tests/gates/restauración ni modificación remota.
+
+Actualización posterior: 0057 (`moderacion_titulares_grupos`) aplicada localmente
+con salida 0 y respaldo previo en
+`.wrangler/auditoria/actualizacion-local-1793979810711/`. También es inmutable;
+el próximo arreglo debe ir en 0058 o posterior. Se sincronizaron 554 archivos
+en la vista local. No se ejecutaron pruebas ni se modificó producción.
+
+Se aplicaron 0042–0056 al Supabase **local** de Vibe mediante
+`scripts/actualizar-vibe-local.mjs --aplicar-local` (salida 0), después de guardar
+`antes-de-migrar.dump` (781177 bytes) en
+`.wrangler/auditoria/actualizacion-local-1793979542553/`. Los registros de esa
+carpeta enumeran las quince migraciones aplicadas. No se ejecutaron gates ni
+se ensayó restauración. No hubo cambios en el proyecto remoto.
+
+Las migraciones 0000–0057 ya son inmutables por su aplicación local. Los
+comentarios «preparada/no aplicada» dentro de archivos antiguos describen el
+momento de su creación; no autorizan a modificarlos. Cualquier corrección nueva
+debe ir en 0058 o posterior.
+
 Cierra P-14. Es la regla que convierte el esquema de Vibe en un artefacto
 versionado, aplicable y reproducible, en vez de folclore repartido entre 23
 archivos sueltos y el historial del SQL Editor.
@@ -241,3 +274,35 @@ Ver `DESPLIEGUE.md` y [`runbooks/rollback.md`](runbooks/rollback.md). Resumen:
 4. Promover el despliegue del Worker (`pnpm cf:deploy`, o el build automático de Cloudflare). Ver [`cloudflare.md`](cloudflare.md).
 5. `pnpm smoke` apuntado a producción.
 6. Observar errores 30 minutos.
+
+### Estado de la migración 0034 — 2026-11-05
+
+`0034_congelacion_y_supresion_recuperable.sql` está aplicada localmente y es
+forward-only. Congela escrituras sobre las tablas relevantes para la cuenta,
+conserva el inventario de medios con su propiedad y recibos de retirada, y
+condiciona la RPC final a retirar todos los objetos; cada petición procesa
+hasta 25 y no finaliza mientras queden bloqueos u objetos pendientes. Los
+históricos sin reserva permanecen bloqueados hasta contar con
+prueba operativa de que las credenciales antiguas ya no pueden escribir y de
+que las operaciones en vuelo se drenaron.
+
+Evidencia comunicada para esta migración: DB, 166 pruebas en 14 archivos, exit
+0 (`avance-0034-db-final.log`); reconstrucción local 0000–0034, exit 0
+(`avance-0034-reconstruccion.log`). Esta evidencia no completa el cierre 2:
+siguen pendientes un ejecutor sin sesión, definir la retención, resolver cachés
+y URLs antiguas, y obtener evidencia remota. No se atribuye a 0034 ningún otro
+gate no registrado aquí.
+
+### Estado de la migración 0035 — 2026-11-05
+
+`0035_cerrar_escrituras_directas_de_inventario.sql` está aplicada únicamente en
+local. Retira privilegios de escritura directa de `media_assets` y las políticas
+permisivas INSERT/DELETE; conserva SELECT autenticado con RLS y el protocolo RPC.
+No modifica datos históricos ni migraciones anteriores. Es incompatible con
+clientes que aún escriban inventario directamente: coordinar la publicación de
+las rutas nuevas y el corte antes de aplicarla remotamente.
+
+DB: 172 pruebas en 14 archivos, exit 0 (`avance-0035-db-final.log`), frente a 166.
+Reconstrucción 0000–0035 y lint de esquemas sin errores, exit 0
+(`avance-0035-reconstruccion.log`). Los demás gates y límites se registran en
+`RESULTADOS_PRUEBAS.md`; no se acredita operación remota.

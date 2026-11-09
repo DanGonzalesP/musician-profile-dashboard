@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { unstable_cache } from "next/cache"
 import type { DbProfileBlock } from "./blocks"
+import { mediaUrl } from "./media-url"
+import { applyPublicCreditApprovals } from "./public-credit-approvals"
 
 // Cliente de Supabase para Server Components y generateMetadata.
 //
@@ -16,7 +18,10 @@ export function createServerSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
+    }
   )
 }
 
@@ -114,12 +119,12 @@ async function cargarPerfilPublico(usernameCrudo: string): Promise<ResultadoPerf
 
     const { data: actual, error: errorActual } = await supabase
       .from("profiles")
-      .select("username")
+      .select("username, is_suspended")
       .eq("id", historico.profile_id)
       .maybeSingle()
 
     if (errorActual) throw new SinServidor("profiles")
-    return actual?.username ? { estado: "redirigir", username: actual.username } : { estado: "no-encontrado" }
+    return actual?.username && actual.is_suspended === false ? { estado: "redirigir", username: actual.username } : { estado: "no-encontrado" }
   }
 
   // Suspensión efectiva en el render del servidor (P-34). La base ya oculta el
@@ -175,7 +180,8 @@ async function cargarPerfilPublico(usernameCrudo: string): Promise<ResultadoPerf
  * Igual que `cargarPerfilPublico`, pero memorizada por username y etiquetada
  * para poder invalidarla al publicar (`app/acciones/revalidar-perfil.ts`). Sin
  * la etiqueta, un cambio del artista tardaría hasta 5 minutos en verse; con
- * ella se ve al instante, y el resto del tiempo la página no toca Supabase.
+ * ella se ve al instante. Cada petición comprueba estado y versión en Supabase;
+ * sólo el contenido pesado puede reutilizarse.
  *
  * `generateMetadata` y el render de la página llaman a esto por separado
  * (Next.js los ejecuta como dos pasadas): la memoria hace que sea UNA sola ida
@@ -187,14 +193,34 @@ async function cargarPerfilPublico(usernameCrudo: string): Promise<ResultadoPerf
  * degradado durante los cinco minutos de `revalidate`. Devolverlo como valor sí
  * lo habría cacheado.
  */
+async function comprobarCreditosPublicos(result: ResultadoPerfilPublico): Promise<ResultadoPerfilPublico> {
+  if (result.estado !== "ok" || !result.datos.blockRows.some(block => block.block_type === "credits")) return result
+  const approvals = await createServerSupabase().rpc("public_credit_approvals", { p_profile_id: result.datos.profile.id })
+  if (approvals.error) throw new SinServidor("credit_approvals")
+  return { ...result, datos: { ...result.datos,
+    blockRows: applyPublicCreditApprovals(result.datos.blockRows, approvals.data),
+  } }
+}
+
 export async function fetchPublicProfilePage(username: string): Promise<ResultadoPerfilPublico> {
   const clave = username.trim().toLowerCase()
-  const cacheada = unstable_cache(() => cargarPerfilPublico(clave), ["perfil-publico", clave], {
-    revalidate: 300,
-    tags: [etiquetaPerfil(clave)],
-  })
+  if (!USERNAME_VALIDO.test(clave)) return { estado: "no-encontrado" }
   try {
-    return await cacheada()
+    // La autorización nunca vive dentro de la caché: un acierto no ejecuta su
+    // callback. También se consulta la versión para tolerar una invalidación
+    // perdida después de una publicación confirmada en Postgres.
+    const { data: actual, error } = await createServerSupabase().from("profiles")
+      .select("id, content_version, is_suspended, username, display_name, bio, profile_type, unified_profile, accent_color")
+      .eq("username", clave).maybeSingle()
+    if (error) throw new SinServidor("profiles")
+    if (!actual) return await comprobarCreditosPublicos(await cargarPerfilPublico(clave))
+    if (actual.is_suspended !== false) return { estado: "no-encontrado" }
+    const cacheada = unstable_cache(() => cargarPerfilPublico(clave), ["perfil-publico-v3", clave, JSON.stringify(actual)], {
+      revalidate: 300,
+      tags: [etiquetaPerfil(clave)],
+    })
+    // La aceptación y la suspensión del otro artista no quedan cacheadas.
+    return await comprobarCreditosPublicos(await cacheada())
   } catch {
     return { estado: "sin-servidor" }
   }
@@ -241,8 +267,8 @@ export async function fetchProfileMeta(username: string): Promise<PublicProfileM
     displayName: profile.displayName || profile.username,
     bio: profile.bio,
     profileType: profile.profileType,
-    image: typeof hero.image === "string" && hero.image ? hero.image : undefined,
-    banner: typeof hero.banner === "string" && hero.banner ? hero.banner : undefined,
+    image: typeof hero.image === "string" && hero.image ? mediaUrl(hero.image) : undefined,
+    banner: typeof hero.banner === "string" && hero.banner ? mediaUrl(hero.banner) : undefined,
     tagline: typeof hero.tagline === "string" ? hero.tagline : undefined,
     location: typeof hero.location === "string" ? hero.location : undefined,
   }

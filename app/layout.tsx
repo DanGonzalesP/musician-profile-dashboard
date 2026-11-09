@@ -3,6 +3,8 @@ import { Geist_Mono, Plus_Jakarta_Sans, Unbounded } from 'next/font/google'
 import './globals.css'
 import { SITE_URL } from '@/lib/site'
 import { ThemeScript } from '@/components/theme-script'
+import { ThemePreferences } from '@/components/theme-preferences'
+import { SessionGuard } from '@/components/session-guard'
 import { LocaleProvider } from '@/components/locale-provider'
 import { ToastProvider } from '@/components/toast-provider'
 import { ConsentimientoCookies } from '@/components/legal/consentimiento-cookies'
@@ -65,6 +67,8 @@ export default async function RootLayout({
         <ThemeScript nonce={nonce} />
       </head>
       <body className="font-sans antialiased">
+        <ThemePreferences />
+        <SessionGuard />
         <LocaleProvider>
           <ToastProvider>{children}</ToastProvider>
         </LocaleProvider>

@@ -9,7 +9,7 @@
 // imágenes/audio de Supabase y R2 en <img>/<audio> en el resto de la app.
 // El single-thread es más lento pero no requiere esos headers.
 import { FFmpeg } from "@ffmpeg/ffmpeg"
-import { fetchFile, toBlobURL } from "@ffmpeg/util"
+import { fetchFile } from "@ffmpeg/util"
 
 // Formatos que ya vienen en un contenedor mp3/aac/m4a válido y reproducible en
 // cualquier navegador — no hace falta re-procesarlos.
@@ -25,20 +25,89 @@ export const DEFAULT_AUDIO_BITRATE: AudioBitrate = "320k"
 
 let ffmpegSingleton: FFmpeg | null = null
 let loadPromise: Promise<FFmpeg> | null = null
+let operations: Promise<unknown> = Promise.resolve()
 
-async function getFFmpeg(): Promise<FFmpeg> {
+function discardWorker(ffmpeg: FFmpeg) {
+  ffmpeg.terminate()
+  if (ffmpegSingleton === ffmpeg) { ffmpegSingleton = null; loadPromise = null }
+}
+
+/** Terminar el worker, no sólo rechazar la espera: así la siguiente operación
+ * serializada no hereda un motor bloqueado ni archivos de una conversión fallida. */
+async function withWorkerDeadline<T>(ffmpeg: FFmpeg, milliseconds: number, operation: (signal: AbortSignal) => Promise<T>, cancellation?: AbortSignal): Promise<T> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let abort: (() => void) | undefined
+  try {
+    cancellation?.throwIfAborted()
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      abort = () => {
+        controller.abort()
+        discardWorker(ffmpeg)
+        reject(new DOMException("Preparación de audio cancelada.", "AbortError"))
+      }
+      cancellation?.addEventListener("abort", abort, { once: true })
+    })
+    return await Promise.race([
+      operation(controller.signal),
+      cancelled,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          controller.abort()
+          discardWorker(ffmpeg)
+          reject(new Error("La preparación del audio tardó demasiado. Conserva el archivo y vuelve a intentarlo."))
+        }, milliseconds)
+      }),
+    ])
+  } catch (error) {
+    controller.abort()
+    discardWorker(ffmpeg)
+    throw error
+  } finally {
+    clearTimeout(timer)
+    if (abort) cancellation?.removeEventListener("abort", abort)
+  }
+}
+
+async function coreAsset(path: string, type: string, signal: AbortSignal): Promise<string> {
+  const response = await fetch(path, { signal })
+  if (!response.ok) throw new Error("No se pudo cargar el conversor de audio.")
+  const bytes = await response.arrayBuffer()
+  signal.throwIfAborted()
+  return URL.createObjectURL(new Blob([bytes], { type }))
+}
+
+// El core y su filesystem son compartidos. Serializar también las sondas
+// evita mezclar output.mp3, eventos de progreso y Duration entre dos archivos.
+function exclusive<T>(operation: () => Promise<T>): Promise<T> {
+  const result = operations.then(operation)
+  operations = result.catch(() => undefined)
+  return result
+}
+
+async function getFFmpeg(cancellation?: AbortSignal): Promise<FFmpeg> {
+  cancellation?.throwIfAborted()
   if (ffmpegSingleton) return ffmpegSingleton
   if (!loadPromise) {
     loadPromise = (async () => {
       const ffmpeg = new FFmpeg()
-      const baseURL = "/ffmpeg"
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-      })
+      await withWorkerDeadline(ffmpeg, 120_000, async signal => {
+        const urls: string[] = []
+        try {
+          const coreURL = await coreAsset("/ffmpeg/ffmpeg-core.js", "text/javascript", signal)
+          urls.push(coreURL)
+          const wasmURL = await coreAsset("/ffmpeg/ffmpeg-core.wasm", "application/wasm", signal)
+          urls.push(wasmURL)
+          signal.throwIfAborted()
+          await ffmpeg.load({ coreURL, wasmURL }, { signal })
+          signal.throwIfAborted()
+        } finally {
+          urls.forEach(url => URL.revokeObjectURL(url))
+        }
+      }, cancellation)
       ffmpegSingleton = ffmpeg
       return ffmpeg
-    })()
+    })().catch((error) => { loadPromise = null; throw error })
   }
   return loadPromise
 }
@@ -53,24 +122,34 @@ async function getFFmpeg(): Promise<FFmpeg> {
 export async function ensureCompressedAudio(
   file: File,
   bitrate: AudioBitrate = DEFAULT_AUDIO_BITRATE,
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  cancellation?: AbortSignal
 ): Promise<File> {
+  cancellation?.throwIfAborted()
   const ext = (file.name.split(".").pop() ?? "").toLowerCase()
   if (COMPRESSED_AUDIO_EXTS.has(ext)) return file
 
-  const ffmpeg = await getFFmpeg()
+  return exclusive(async () => {
+  cancellation?.throwIfAborted()
+  const ffmpeg = await getFFmpeg(cancellation)
+  return withWorkerDeadline(ffmpeg, 600_000, async signal => {
   const inputName = `input.${ext || "wav"}`
   const outputName = "output.mp3"
 
   const onFFmpegProgress = ({ progress }: { progress: number }) => {
-    if (onProgress) onProgress(Math.min(1, Math.max(0, progress)))
+    if (!signal.aborted && onProgress && Number.isFinite(progress)) onProgress(Math.min(1, Math.max(0, progress)))
   }
   if (onProgress) ffmpeg.on("progress", onFFmpegProgress)
 
   try {
-    await ffmpeg.writeFile(inputName, await fetchFile(file))
-    await ffmpeg.exec(["-i", inputName, "-c:a", "libmp3lame", "-b:a", bitrate, outputName])
-    const data = await ffmpeg.readFile(outputName)
+    const input = await fetchFile(file)
+    signal.throwIfAborted()
+    await ffmpeg.writeFile(inputName, input, { signal })
+    const code = await ffmpeg.exec(["-i", inputName, "-c:a", "libmp3lame", "-b:a", bitrate, outputName], 600_000, { signal })
+    if (code !== 0) throw new Error("No se pudo convertir el audio.")
+    const data = await ffmpeg.readFile(outputName, "binary", { signal })
+    signal.throwIfAborted()
+    if (!(data instanceof Uint8Array) || data.byteLength === 0) throw new Error("La conversión no produjo un audio válido.")
     const mp3Name = file.name.replace(/\.\w+$/, "") + ".mp3"
     return new File([data as Uint8Array<ArrayBuffer>], mp3Name, { type: "audio/mpeg" })
   } finally {
@@ -80,6 +159,8 @@ export async function ensureCompressedAudio(
     await ffmpeg.deleteFile(inputName).catch(() => {})
     await ffmpeg.deleteFile(outputName).catch(() => {})
   }
+  }, cancellation)
+  })
 }
 
 /**
@@ -88,8 +169,11 @@ export async function ensureCompressedAudio(
  * variable o tags ID3, Chrome estima esa duración buscando cerca del final
  * del archivo y puede errar por varios segundos. ffmpeg lee el header real.
  */
-export async function getAccurateAudioDuration(file: File): Promise<number | null> {
-  const ffmpeg = await getFFmpeg()
+export async function getAccurateAudioDuration(file: File, cancellation?: AbortSignal): Promise<number | null> {
+  return exclusive(async () => {
+  cancellation?.throwIfAborted()
+  const ffmpeg = await getFFmpeg(cancellation)
+  return withWorkerDeadline(ffmpeg, 60_000, async signal => {
   const ext = (file.name.split(".").pop() ?? "bin").toLowerCase()
   const inputName = `probe.${ext}`
 
@@ -104,20 +188,26 @@ export async function getAccurateAudioDuration(file: File): Promise<number | nul
 
   ffmpeg.on("log", parseLog)
   try {
-    await ffmpeg.writeFile(inputName, await fetchFile(file))
+    const input = await fetchFile(file)
+    signal.throwIfAborted()
+    await ffmpeg.writeFile(inputName, input, { signal })
     try {
       // "-f null -" descarta la salida: solo interesa el log de metadata
       // que ffmpeg imprime al abrir el archivo, no hace falta re-codificar.
-      await ffmpeg.exec(["-i", inputName, "-f", "null", "-"])
+      await ffmpeg.exec(["-i", inputName, "-t", "0", "-f", "null", "-"], 60_000, { signal })
     } catch {
       // Algunos archivos hacen que ffmpeg termine con código de error
       // igual habiendo logueado el Duration antes — no es un fallo real acá.
     }
-    return durationSeconds
+    signal.throwIfAborted()
+    return durationSeconds !== null && Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : null
   } catch {
+    discardWorker(ffmpeg)
     return null
   } finally {
     ffmpeg.off("log", parseLog)
     await ffmpeg.deleteFile(inputName).catch(() => {})
   }
+  }, cancellation)
+  }).catch(() => { cancellation?.throwIfAborted(); return null })
 }

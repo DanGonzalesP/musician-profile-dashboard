@@ -11,8 +11,8 @@
 //    contra la base real sería un incidente, no un fallo de pruebas.
 //
 // 2. **La service role NUNCA prueba lo que se está probando.** Se usa solo
-//    para dos cosas administrativas: crear el usuario efímero y borrarlo al
-//    final. Toda aserción de permisos se hace con un cliente que lleva el JWT
+//    para preparar y limpiar usuarios/datos ficticios, incluidos históricos
+//    anteriores al protocolo de reservas. Toda aserción de permisos usa el JWT
 //    del usuario, porque es así como la app habla con la base. Probar con
 //    service role sería probar que RLS se puede saltar, que ya lo sabemos.
 
@@ -74,7 +74,7 @@ export function clienteAnonimo(): SupabaseClient {
 }
 
 /**
- * Cliente administrativo. SOLO para crear y borrar los usuarios efímeros.
+ * Cliente administrativo. SOLO para preparar y limpiar fixtures locales.
  * Si aparece dentro de una aserción, la prueba está mal escrita.
  */
 export function clienteAdministrativo(): SupabaseClient {
@@ -85,10 +85,28 @@ export function clienteAdministrativo(): SupabaseClient {
 export type UsuarioDePrueba = {
   id: string
   email: string
+  /** Auth conserva la sesión real para probar cambios de metadatos del usuario. */
+  auth: SupabaseClient["auth"]
   /** Cliente con SU JWT: RLS se evalúa con su identidad real. */
   supabase: SupabaseClient
   /** Perfil creado para él, si se pidió. */
   profileId?: string
+}
+
+/** Prepara inventario previo a las reservas; nunca representa una subida actual. */
+export async function prepararMedioHistorico(datos: {
+  key: string
+  owner_user_id: string
+  profile_id?: string | null
+  folder: string
+  content_type?: string
+  bytes?: number | null
+  created_at?: string
+}): Promise<void> {
+  const admin = clienteAdministrativo()
+  await exigirBaseDeVibe(admin, exigirEntornoLocal().url)
+  const { error } = await admin.from("media_assets").insert(datos)
+  if (error) throw new Error("No se pudo preparar el inventario histórico ficticio")
 }
 
 let contador = 0
@@ -114,6 +132,9 @@ export async function crearUsuario(opciones: { conPerfil?: boolean; nombre?: str
     email,
     password,
     email_confirm: true,
+    // Persona ficticia mayor de edad que acepta los documentos: sin esta
+    // constancia (0071) una cuenta nueva no puede crear perfil.
+    user_metadata: { vibe_legal: { terms_version: "2026-11-09", privacy_version: "2026-11-09", age_assurance: "adult_self_declared" } },
   })
   if (errorCrear || !creado.user) {
     throw new Error(`No se pudo crear el usuario de prueba: ${errorCrear?.message}`)
@@ -134,7 +155,7 @@ export async function crearUsuario(opciones: { conPerfil?: boolean; nombre?: str
     global: { headers: { Authorization: `Bearer ${sesion.session.access_token}` } },
   })
 
-  const usuario: UsuarioDePrueba = { id: creado.user.id, email, supabase }
+  const usuario: UsuarioDePrueba = { id: creado.user.id, email, supabase, auth: sesionCliente.auth }
 
   if (opciones.conPerfil !== false) {
     usuario.profileId = await crearPerfil(usuario, opciones.nombre)
@@ -183,8 +204,8 @@ export async function crearPista(usuario: UsuarioDePrueba, titulo = "Pista de pr
 }
 
 /** Clave de R2 única por llamada: dos corridas seguidas nunca colisionan. */
-export function claveDeMedio(carpeta: "images" | "audio" | "video" = "images"): string {
-  return `${carpeta}/${crypto.randomUUID()}.bin`
+export function claveDeMedio(propietario: UsuarioDePrueba, carpeta: "images" | "audio" | "video" = "images"): string {
+  return `${carpeta}/${propietario.id}/${crypto.randomUUID()}.bin`
 }
 
 /**
@@ -211,6 +232,15 @@ export async function limpiarUsuarios(...usuarios: (UsuarioDePrueba | undefined)
   const admin = clienteAdministrativo()
   for (const u of usuarios) {
     if (!u) continue
+    // La propiedad de marcadores ya no cae al borrar auth.users. En fixtures
+    // sin R2 real, retiramos explícitamente ese inventario antes del perfil.
+    await admin.from("media_assets").delete().eq("owner_user_id", u.id)
+    const { data: profiles } = await admin.from("profiles").select("id").or(`user_id.eq.${u.id},owner_user_id.eq.${u.id}`)
+    if (profiles?.length) {
+      const ids = profiles.map(profile => profile.id)
+      await admin.from("services").delete().in("profile_id", ids)
+      await admin.from("products").delete().in("seller_id", ids)
+    }
     await admin.from("profiles").delete().or(`user_id.eq.${u.id},owner_user_id.eq.${u.id}`)
     await admin.auth.admin.deleteUser(u.id).catch(() => {})
   }

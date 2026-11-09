@@ -56,7 +56,7 @@ async function publicarYEsperar(page: Page): Promise<void> {
  * el navegador no habría dejado salir la petición.
  */
 function esperarPutFirmado(url: string): void {
-  expect(url).toMatch(/^https:\/\/vibe-e2e\.r2-de-prueba\.localhost\//)
+  expect(url).toMatch(/^https:\/\/(?:127\.0\.0\.1:54998\/vibe-e2e|vibe-e2e\.r2-de-prueba\.localhost)\//)
   expect(url).toContain("X-Amz-Signature")
 }
 
@@ -182,7 +182,7 @@ test.describe("Editor · subidas a R2", () => {
 
     await publicarYEsperar(page)
 
-    const rutas = r2.puts.map((u) => new URL(u).pathname)
+    const rutas = r2.puts.map((u) => new URL(u).pathname.replace(/^\/vibe-e2e\//, "/"))
     expect(rutas.some((p) => p.startsWith("/images/")), `PUT observados: ${rutas.join(", ") || "(ninguno)"}`).toBe(true)
     for (const url of r2.puts) esperarPutFirmado(url)
 
@@ -217,10 +217,56 @@ test.describe("Editor · subidas a R2", () => {
 
     await publicarYEsperar(page)
 
-    const rutas = r2.puts.map((u) => new URL(u).pathname)
+    const rutas = r2.puts.map((u) => new URL(u).pathname.replace(/^\/vibe-e2e\//, "/"))
     expect(rutas.some((p) => p.startsWith("/audio/")), `PUT observados: ${rutas.join(", ") || "(ninguno)"}`).toBe(true)
     for (const url of r2.puts) esperarPutFirmado(url)
 
+    esperarConsolaLimpia(consola)
+  })
+
+  test("convierte WAV real a MP3 reproducible antes de publicar", async ({ page }) => {
+    const consola = vigilarConsola(page)
+    const r2 = await aislarR2(page)
+    await iniciarSesion(page, usuario)
+    await esperarEditorListo(page)
+    await abrirBibliotecaDeBloques(page)
+    await page.getByRole("button", { name: /agregar bloque lanzamiento actual/i }).click()
+
+    // Medio segundo de tono sintético PCM mono, sin archivos con derechos.
+    const muestras = 22050
+    const wav = Buffer.alloc(44 + muestras * 2)
+    wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4)
+    wav.write("WAVEfmt ", 8); wav.writeUInt32LE(16, 16)
+    wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22)
+    wav.writeUInt32LE(44100, 24); wav.writeUInt32LE(88200, 28)
+    wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34)
+    wav.write("data", 36); wav.writeUInt32LE(muestras * 2, 40)
+    for (let i = 0; i < muestras; i++) {
+      wav.writeInt16LE(Math.round(8000 * Math.sin(2 * Math.PI * 440 * i / 44100)), 44 + i * 2)
+    }
+    await page.locator('input[type="file"][aria-label="Subir audio"]').setInputFiles({
+      name: "tono.wav", mimeType: "audio/wav", buffer: wav,
+    })
+    await expect(page.getByRole("button", { name: /escuchar antes de publicar/i })).toBeEnabled({ timeout: 60_000 })
+
+    const subida = page.waitForRequest(request => request.method() === "PUT" &&
+      /^https:\/\/(?:127\.0\.0\.1:54998\/vibe-e2e|vibe-e2e\.r2-de-prueba\.localhost)\/audio\//.test(request.url()))
+    await publicarYEsperar(page)
+    const request = await subida
+    const mp3 = request.postDataBuffer()
+    expect(mp3).not.toBeNull()
+    expect(mp3!.length).toBeGreaterThan(1000)
+    expect(mp3!.subarray(0, 4).toString()).not.toBe("RIFF")
+    expect(new URL(request.url()).pathname).toMatch(/\.mp3$/)
+    // Decodificar el resultado comprueba audio real; no basta cambiar extensión.
+    const duracion = await page.evaluate(async bytes => {
+      const context = new AudioContext()
+      try { return (await context.decodeAudioData(Uint8Array.from(bytes).buffer)).duration }
+      finally { await context.close() }
+    }, [...mp3!])
+    expect(duracion).toBeGreaterThanOrEqual(0.49)
+    expect(duracion).toBeLessThan(0.65)
+    expect(r2.puts).toContain(request.url())
     esperarConsolaLimpia(consola)
   })
 

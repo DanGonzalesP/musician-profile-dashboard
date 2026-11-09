@@ -37,6 +37,7 @@ export function EmbedsFields({
       <ItemPager
         label="Enlace"
         count={items.length}
+        itemsVersion={JSON.stringify(items)}
         onAdd={addItem}
         onRemove={removeItem}
         addLabel="Agregar enlace"

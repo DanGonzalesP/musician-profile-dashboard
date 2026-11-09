@@ -44,6 +44,11 @@ const CORP_TARJETA_SOCIAL = { key: "Cross-Origin-Resource-Policy", value: "cross
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Sólo metadato público: conservar el commit del build en el Worker aunque
+  // Workers Builds no exponga sus variables de CI durante la ejecución.
+  env: {
+    APP_VERSION: (process.env.WORKERS_CI_COMMIT_SHA || process.env.APP_VERSION || "desarrollo").slice(0, 40),
+  },
   // TypeScript SÍ corre en el build. Estaba en ignoreBuildErrors: true, lo que
   // desactivaba justo la red que protege un código de 21.000 líneas con JSONB
   // sin esquema. El proyecto compila con 0 errores, así que no había ninguna
@@ -97,7 +102,10 @@ export default nextConfig
 //
 // Es una llamada de arranque, no un plugin: no envuelve `nextConfig` ni cambia
 // el build de produccion, que lo hace `opennextjs-cloudflare build`.
-if (process.env.NODE_ENV === "development") {
+// La vista local (scripts/abrir-vibe-local.mjs) fija VIBE_DEV_SIN_WORKERD=1 sólo
+// cuando Windows bloquea el binario de workerd: Next arranca sin emular los
+// bindings de Cloudflare. No afecta a build, pruebas del Worker ni despliegue.
+if (process.env.NODE_ENV === "development" && process.env.VIBE_DEV_SIN_WORKERD !== "1") {
   const { initOpenNextCloudflareForDev } = await import("@opennextjs/cloudflare")
   await initOpenNextCloudflareForDev()
 }
