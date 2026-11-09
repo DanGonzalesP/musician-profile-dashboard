@@ -10,10 +10,9 @@ Add-Type -AssemblyName System.Security
 $vibeRoot = Split-Path $PSScriptRoot -Parent
 $vibeRef = 'iyppeurjtbuydhjtraxf'
 $vibeApi = "https://api.supabase.com/v1/projects/$vibeRef"
-$vibeFile = Get-ChildItem (Join-Path $vibeRoot 'supabase/migrations') -Filter "$($Version)_*.sql" | Select-Object -First 1
-if (-not $vibeFile) { throw "No existe la migración $Version" }
-$vibeName = $vibeFile.BaseName.Substring(5)
-$vibeSql = [IO.File]::ReadAllText($vibeFile.FullName)
+$vibePrepared = & node (Join-Path $PSScriptRoot 'preparar-migracion-staging.mjs') $Version
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo preparar una migración transaccional segura' }
+$vibeQuery = $vibePrepared -join "`n"
 $vibeTokenBytes = $null
 try {
   $vibeTokenBytes = [Security.Cryptography.ProtectedData]::Unprotect(
@@ -31,9 +30,10 @@ try {
   $vibeExpected = '{0:D4}' -f ([int]$Version - 1)
   if ($vibeLatest -eq $Version) { Write-Output "Staging ya tiene $Version; no se repite."; exit 0 }
   if ($vibeLatest -ne $vibeExpected) { throw "Historial remoto en $vibeLatest; se esperaba $vibeExpected antes de $Version" }
-  Invoke-VibeSql $vibeSql | Out-Null
-  $vibeLedger = "insert into supabase_migrations.schema_migrations(version, name, statements) values ('$Version', '$vibeName', array[`$vibe`$$vibeSql`$vibe`$])"
-  Invoke-VibeSql $vibeLedger | Out-Null
+  # Una sola petición y transacción: ningún fallo puede dejar DDL aplicado sin
+  # historial. La guarda interna vuelve a comprobar la versión tras tomar el
+  # bloqueo; dos ejecuciones concurrentes no aplican la misma migración.
+  Invoke-VibeSql $vibeQuery | Out-Null
   $vibeAfter = (Invoke-VibeSql 'select max(version) as v, count(*) as n from supabase_migrations.schema_migrations')[0]
   Write-Output (@{ project = $vibeRef; applied = $Version; latest = $vibeAfter.v; migrations = $vibeAfter.n } | ConvertTo-Json -Compress)
 } finally {

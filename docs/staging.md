@@ -1,5 +1,14 @@
 # Staging — Vibe
 
+Nota de continuidad 2026-11-09: el aplicador
+`scripts/aplicar-migracion-staging.ps1` ahora prepara SQL e historial en una sola
+transacción mediante `scripts/preparar-migracion-staging.mjs`, sin credenciales
+durante la preparación. Un bloqueo transaccional y una guarda interna exigen la
+versión inmediatamente anterior. Si falla SQL o historial, nada se confirma.
+Cinco pruebas en PostgreSQL efímero verifican también dos aplicadores simultáneos.
+Esto mejora el procedimiento; **no significa que 0071 se haya aplicado a staging**.
+Conservar las comprobaciones de destino, respaldo y gates antes de ejecutarlo.
+
 Actualización 2026-11-06. Preparación del cierre 20, **no acreditado**.
 Se crearon los tres buckets R2 y la D1 exclusiva de staging el 2026-11-06;
 Supabase staging se creó después y recibió las migraciones `0000`–`0070`. No hay
