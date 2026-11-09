@@ -4,6 +4,7 @@
     - img
   - text: Editor (3 bloques)
   - button "Más opciones"
+  - status: Contenido cargado. Tus próximos cambios se guardarán como borrador.
 - main:
   - text: Banner Principal
   - button "Editar bloque"
@@ -21,41 +22,18 @@
   - button "Editar bloque"
   - button "Eliminar bloque"
   - text: Discografía
+  - button "Pausar movimiento automático"
   - button "Digital Ethereal Ejemplo Digital Ethereal":
     - img "Digital Ethereal"
-    - text: ""
+    - text: Ejemplo
     - paragraph: Digital Ethereal
   - button "Analog Sessions Ejemplo Analog Sessions":
     - img "Analog Sessions"
-    - text: ""
+    - text: Ejemplo
     - paragraph: Analog Sessions
   - button "Midnight Frequencies Ejemplo Midnight Frequencies":
     - img "Midnight Frequencies"
-    - text: ""
-    - paragraph: Midnight Frequencies
-  - button "Digital Ethereal Ejemplo Digital Ethereal":
-    - img "Digital Ethereal"
-    - text: ""
-    - paragraph: Digital Ethereal
-  - button "Analog Sessions Ejemplo Analog Sessions":
-    - img "Analog Sessions"
-    - text: ""
-    - paragraph: Analog Sessions
-  - button "Midnight Frequencies Ejemplo Midnight Frequencies":
-    - img "Midnight Frequencies"
-    - text: ""
-    - paragraph: Midnight Frequencies
-  - button "Digital Ethereal Ejemplo Digital Ethereal":
-    - img "Digital Ethereal"
-    - text: ""
-    - paragraph: Digital Ethereal
-  - button "Analog Sessions Ejemplo Analog Sessions":
-    - img "Analog Sessions"
-    - text: ""
-    - paragraph: Analog Sessions
-  - button "Midnight Frequencies Ejemplo Midnight Frequencies":
-    - img "Midnight Frequencies"
-    - text: ""
+    - text: Ejemplo
     - paragraph: Midnight Frequencies
   - text: Soltar aquí
 - navigation:

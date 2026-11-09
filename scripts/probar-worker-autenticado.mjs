@@ -7,6 +7,7 @@ import { createServer } from "node:tls"
 import { connect } from "node:net"
 import { spawn, spawnSync } from "node:child_process"
 import { prepararReciboMediaE2E } from "./recibo-media-e2e.mjs"
+import { prepararModeradorE2E } from "./moderador-e2e.mjs"
 import { createR2FixtureServer } from "../tests/e2e-auth/fixtures/servidor-r2.mjs"
 
 assert.equal(process.env.SUPABASE_TEST_URL, "http://127.0.0.1:54421")
@@ -18,7 +19,14 @@ const sockets = new Set()
 let proxy
 let storage
 let receipt
+let moderator
 try {
+  if (!process.env.SUPABASE_TEST_MODERATOR_JSON) {
+    moderator = await prepararModeradorE2E({
+      API_URL: process.env.SUPABASE_TEST_URL,
+      SERVICE_ROLE_KEY: process.env.SUPABASE_TEST_SERVICE_ROLE_KEY,
+    })
+  }
   const openssl = process.platform === "win32" && existsSync("C:/Program Files/Git/usr/bin/openssl.exe")
     ? "C:/Program Files/Git/usr/bin/openssl.exe" : "openssl"
   const generated = spawnSync(openssl, ["req", "-x509", "-newkey", "rsa:2048",
@@ -41,6 +49,7 @@ try {
   await new Promise((resolve, reject) => { storage.once("error", reject); storage.listen(54998, "127.0.0.1", resolve) })
   const child = spawn(process.execPath, ["scripts/worker-auth-runner.mjs"], {
     stdio: "inherit", env: { ...process.env, NODE_EXTRA_CA_CERTS: cert,
+      ...(moderator ? { SUPABASE_TEST_MODERATOR_JSON: JSON.stringify(moderator.user) } : {}),
       VIBE_E2E_RECEIPT_KEY: receipt.key, VIBE_E2E_RECEIPT_KEY_ID: receipt.keyId, VIBE_E2E_ANONYMOUS_KEY: receipt.anonymousKey },
   })
   const code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("exit", resolve) })
@@ -52,8 +61,11 @@ try {
     storage.closeAllConnections()
     await new Promise(resolve => storage.close(resolve))
   }
-  receipt?.cleanup()
-  // Sólo los dos archivos recién creados, nunca borrado recursivo.
-  for (const file of [cert, key]) { try { unlinkSync(file) } catch (error) { if (error.code !== "ENOENT") throw error } }
-  rmdirSync(dir)
+  try { receipt?.cleanup() } finally {
+    try { await moderator?.cleanup() } finally {
+      // Sólo los dos archivos recién creados, nunca borrado recursivo.
+      for (const file of [cert, key]) { try { unlinkSync(file) } catch (error) { if (error.code !== "ENOENT") throw error } }
+      rmdirSync(dir)
+    }
+  }
 }
