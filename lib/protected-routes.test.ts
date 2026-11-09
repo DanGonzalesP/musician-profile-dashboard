@@ -7,7 +7,7 @@ import { esRutaProtegida } from "./protected-routes"
 
 describe("esRutaProtegida", () => {
   it("protege las secciones privadas y sus subrutas", () => {
-    for (const p of ["/dashboard", "/perfil", "/perfil/config", "/perfil/admin-musica", "/grupo", "/grupo/123", "/cleanup"]) {
+    for (const p of ["/dashboard", "/perfil", "/perfil/config", "/perfil/admin-musica", "/grupo", "/grupo/123", "/cleanup", "/admin", "/admin/reportes", "/admin/auditoria"]) {
       expect(esRutaProtegida(p), p).toBe(true)
     }
   })

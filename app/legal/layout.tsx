@@ -41,6 +41,14 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       </header>
 
       <main className="mx-auto max-w-4xl px-5 py-10">
+        <aside aria-label="Estado de los documentos legales" className="mb-8 rounded-xl border border-border bg-card p-4 text-sm">
+          <p className="font-semibold">Documentos en preparación</p>
+          <p className="mt-2 text-muted-foreground">
+            Estos textos son borradores para el lanzamiento de Vibe en Perú. Falta confirmar al
+            titular responsable, los plazos de conservación y las condiciones para menores de edad,
+            y completar la revisión legal. No representan una política definitiva de lanzamiento.
+          </p>
+        </aside>
         {children}
         <p className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
           Última actualización: {LEGAL_LAST_UPDATE}. Estos documentos son una base preparada para una

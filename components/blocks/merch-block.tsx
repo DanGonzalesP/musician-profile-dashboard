@@ -11,7 +11,8 @@ import { ArrowUpRight, Download, Package, ShoppingBag, Sparkles } from "lucide-r
 import type { MerchData } from "@/lib/blocks"
 import { productCategoryLabel, type CatalogProduct } from "@/lib/catalog"
 import { useLocale } from "@/components/locale-provider"
-import { safeHref } from "@/lib/safe-url"
+import { safeUrlOrNull } from "@/lib/safe-url"
+import { CatalogProductDetails } from "@/components/catalog-product-details"
 
 function formatPrice(product: CatalogProduct): string {
   const value = Number(product.price)
@@ -46,6 +47,7 @@ function StockBadge({ product }: { product: CatalogProduct }) {
 
 function BuyButton({ product, big = false }: { product: CatalogProduct; big?: boolean }) {
   const soldOut = product.kind === "fisico" && product.stock <= 0
+  const purchaseUrl = safeUrlOrNull(product.purchaseUrl)
   const base = big
     ? "inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all"
     : "flex w-full items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all"
@@ -55,13 +57,14 @@ function BuyButton({ product, big = false }: { product: CatalogProduct; big?: bo
       <span className={`${base} cursor-not-allowed bg-secondary text-muted-foreground`}>Agotado</span>
     )
   }
-  if (product.purchaseUrl) {
+  if (purchaseUrl) {
     return (
       <a
-        href={safeHref(product.purchaseUrl)}
+        href={purchaseUrl}
+        aria-label={`Comprar ${product.name} (abre otra pestaña)`}
         target="_blank"
         rel="noopener noreferrer nofollow"
-        className={`${base} bg-primary text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] hover:opacity-90 hover:shadow-[0_0_32px_-6px_var(--primary)]`}
+        className={`${base} min-h-11 bg-primary text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] hover:opacity-90 hover:shadow-[0_0_32px_-6px_var(--primary)]`}
       >
         <ShoppingBag className={big ? "size-4" : "size-3.5"} />
         {product.kind === "digital" ? "Descargar / Comprar" : "Comprar"}
@@ -70,8 +73,8 @@ function BuyButton({ product, big = false }: { product: CatalogProduct; big?: bo
     )
   }
   return (
-    <span className={`${base} border border-primary/40 bg-primary/10 text-primary`}>
-      Consulta al artista
+    <span className="text-xs text-muted-foreground">
+      Sin enlace de compra
     </span>
   )
 }
@@ -105,9 +108,10 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
     return ids.length > 1 ? ids : []
   }, [activos])
 
-  const filtered = category === "todo" ? activos : activos.filter((p) => (p.category || "otro") === category)
+  const selectedCategory = activos.some(p => (p.category || "otro") === category) ? category : "todo"
+  const filtered = selectedCategory === "todo" ? activos : activos.filter((p) => (p.category || "otro") === selectedCategory)
 
-  const featured = category === "todo" ? filtered.find((p) => p.isFeatured) : undefined
+  const featured = selectedCategory === "todo" ? filtered.find((p) => p.isFeatured) : undefined
   const rest = featured ? filtered.filter((p) => p.id !== featured.id) : filtered
 
   return (
@@ -130,8 +134,9 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
           <button
             type="button"
             onClick={() => setCategory("todo")}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              category === "todo"
+            aria-pressed={selectedCategory === "todo"}
+            className={`min-h-11 shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              selectedCategory === "todo"
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
             }`}
@@ -143,8 +148,9 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
               key={id}
               type="button"
               onClick={() => setCategory(id)}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                category === id
+              aria-pressed={selectedCategory === id}
+              className={`min-h-11 shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                selectedCategory === id
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
               }`}
@@ -191,10 +197,8 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
               <h4 className="font-display text-xl font-bold leading-tight text-foreground sm:text-2xl">
                 {featured.name}
               </h4>
-              {featured.description && (
-                <p className="line-clamp-4 text-sm leading-relaxed text-muted-foreground">{featured.description}</p>
-              )}
               <VariantChips product={featured} />
+              <CatalogProductDetails product={featured} />
               <div className="mt-2 flex flex-wrap items-center gap-4">
                 <p className="text-2xl font-bold tabular-nums text-foreground">{formatPrice(featured)}</p>
                 <BuyButton product={featured} big />
@@ -251,10 +255,11 @@ export function MerchBlock({ data, products }: { data: MerchData; products: Cata
                 <span className="text-[9px] font-semibold uppercase tracking-wide text-primary/80">
                   {productCategoryLabel(product.category).split(" (")[0]}
                 </span>
-                <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
+                <p className="break-words text-xs font-medium leading-snug text-foreground">
                   {product.name || t("merch_new_product")}
                 </p>
                 <VariantChips product={product} max={4} />
+                <CatalogProductDetails product={product} />
                 <div className="mt-auto flex flex-col gap-1.5 pt-2">
                   <p className="text-sm font-semibold tabular-nums text-foreground">{formatPrice(product)}</p>
                   <BuyButton product={product} />

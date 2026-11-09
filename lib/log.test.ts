@@ -118,6 +118,13 @@ describe("redactar — criterio de aceptación de F12", () => {
 })
 
 describe("emisión", () => {
+  it("no registra texto libre de errores ni filas que un proveedor adjunte", () => {
+    const output = capturar(() => logError("api/x", "falló", {
+      code: "23514", message: "Nombre ficticio y letra inédita", details: "contenido privado", hint: "secreto arbitrario",
+    }), "error")
+    expect(JSON.parse(output).error.codigo).toBe("23514")
+    for (const value of ["Nombre ficticio", "letra inédita", "contenido privado", "secreto arbitrario"]) expect(output).not.toContain(value)
+  })
   it("logInfo emite una sola línea JSON parseable con los campos estables", () => {
     const linea = capturar(() => logInfo("api/salud", "todo bien", { requestId: "r1", duracionMs: 5 }))
     const o = JSON.parse(linea)
@@ -133,7 +140,7 @@ describe("emisión", () => {
   it("logError marca resultado=error y aplana el error", () => {
     const o = JSON.parse(capturar(() => logError("api/x", "falló", new Error("detalle")), "error"))
     expect(o.resultado).toBe("error")
-    expect(o.error.mensaje).toBe("detalle")
+    expect(o.error).toEqual({ omitido: true })
   })
 
   it("logError redacta los campos igual que el resto", () => {
@@ -162,15 +169,28 @@ describe("idDePeticion", () => {
     expect(idDePeticion(req({ "cf-ray": "8f2a1b3c4d5e6f70-LIM" }))).toBe("8f2a1b3c4d5e6f70-LIM")
   })
 
-  it("cae a x-request-id", () => {
-    expect(idDePeticion(req({ "x-request-id": "r-9" }))).toBe("r-9")
+  const uuid = "3f2a1b3c-4d5e-4f70-8a1b-2c3d4e5f6a7b"
+
+  it("cae a x-request-id cuando es un UUID", () => {
+    expect(idDePeticion(req({ "x-request-id": uuid }))).toBe(uuid)
   })
 
   // El valor de cf-ray es el que se pega en el buscador del panel de
   // Cloudflare para encontrar la petición: si x-request-id le ganara, un
   // registro nuestro dejaría de poder cruzarse con el del borde.
   it("cf-ray le gana a x-request-id cuando llegan los dos", () => {
-    expect(idDePeticion(req({ "cf-ray": "abc-LIM", "x-request-id": "r-9" }))).toBe("abc-LIM")
+    expect(idDePeticion(req({ "cf-ray": "8f2a1b3c4d5e6f70-LIM", "x-request-id": uuid }))).toBe("8f2a1b3c4d5e6f70-LIM")
+  })
+
+  // Son cabeceras del cliente: un valor arbitrario podría inyectar texto en
+  // los logs o hacerse pasar por otra petición. Se descarta y se genera uno.
+  it("ignora valores fuera de formato en ambas cabeceras", () => {
+    const casos: Record<string, string>[] = [{ "x-request-id": "r-9" }, { "cf-ray": "abc-LIM" }, { "cf-ray": "x {\"falso\":1}" }, { "x-request-id": "a".repeat(500) }]
+    for (const headers of casos) {
+      const id = idDePeticion(req(headers))
+      expect(Object.values(headers)).not.toContain(id)
+      expect(id).toMatch(/^[0-9a-f-]{36}$|^req-/)
+    }
   })
 
   it("genera uno si no hay ninguno, y no se repite", () => {

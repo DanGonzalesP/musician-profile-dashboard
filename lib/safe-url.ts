@@ -1,3 +1,5 @@
+import { resolveContactChannel } from "./contact-url"
+
 // Saneamiento central de URLs provistas por el usuario.
 //
 // Por qué existe: cualquier campo de enlace del editor (contacto del hero,
@@ -114,6 +116,21 @@ export function sanitizeUrlForStorage(raw: unknown): string {
   return safeUrlOrNull(raw) ?? ""
 }
 
+/** Contacto admite teléfono, @usuario y correo, igual que el botón del perfil. */
+export function isSafeUrlField(field: string, raw: string): boolean {
+  if (field !== "contactUrl") return isSafeUrl(raw)
+  const contact = resolveContactChannel(raw)
+  return contact !== null && isSafeUrl(contact.href)
+}
+
+function sanitizeUrlFieldForStorage(field: string, raw: string): string {
+  // Conservar la entrada de contacto permite editarla sin cambiar de canal:
+  // un correo sin mailto no debe convertirse en un sitio https, ni un teléfono
+  // desaparecer por no ser una URL. El enlace resuelto se valida al renderizar.
+  if (field === "contactUrl") return isSafeUrlField(field, raw) ? raw.trim() : ""
+  return sanitizeUrlForStorage(raw)
+}
+
 // Nombres de propiedad que, en cualquier parte del contenido de un bloque,
 // producto o servicio, terminan en un href navegable. Se sanean al publicar.
 //
@@ -151,7 +168,7 @@ export function sanitizeUrlFields<T>(value: T): T {
     const out: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
       if (URL_FIELD_NAMES.has(key) && typeof val === "string" && val) {
-        out[key] = sanitizeUrlForStorage(val)
+        out[key] = sanitizeUrlFieldForStorage(key, val)
       } else {
         out[key] = sanitizeUrlFields(val)
       }

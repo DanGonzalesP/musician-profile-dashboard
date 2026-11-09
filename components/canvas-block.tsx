@@ -61,6 +61,7 @@ export function CanvasBlock({
   // el botón original dentro del bloque.
   const [shareOpen, setShareOpen] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   // El banner principal es único en la página y no tiene sentido reordenarlo
   // — se queda fijo donde está, sin flechas ni arrastre.
   const isHero = block.type === "hero"
@@ -153,7 +154,7 @@ export function CanvasBlock({
             <Pencil className="size-4" />
           </ControlButton>
           <ControlButton
-            onClick={() => (isHero ? setConfirmClear(true) : onDelete())}
+            onClick={() => (isHero ? setConfirmClear(true) : setConfirmDelete(true))}
             title={isHero ? "Vaciar banner principal" : "Eliminar"}
             label={isHero ? "Vaciar contenido del banner principal" : "Eliminar bloque"}
             className="text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
@@ -163,7 +164,7 @@ export function CanvasBlock({
         </div>
       )}
 
-      {confirmClear && (
+      {confirmClear && !locked && (
         <ConfirmDialog
           title="¿Vaciar el banner principal?"
           description="Se borrará todo el contenido de esta sección (nombre, frase, foto, redes) — el bloque se queda en tu página, pero vacío para que empieces de nuevo."
@@ -173,6 +174,16 @@ export function CanvasBlock({
             setConfirmClear(false)
           }}
           onCancel={() => setConfirmClear(false)}
+        />
+      )}
+
+      {confirmDelete && !locked && (
+        <ConfirmDialog
+          title={`¿Eliminar el bloque "${label}"?`}
+          description="Se quitará esta sección del editor con su contenido. Puedes volver a agregar un bloque desde la biblioteca, pero eso no recupera los datos eliminados."
+          confirmLabel="Eliminar bloque"
+          onConfirm={() => { onDelete(); setConfirmDelete(false) }}
+          onCancel={() => setConfirmDelete(false)}
         />
       )}
 

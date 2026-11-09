@@ -18,7 +18,7 @@ function daysRemainingLabel(
   return t("donation_day_other", { count: String(count) });
 }
 
-export function CrowdfundingBlock({ data }: { data: CrowdfundingData }) {
+export function CrowdfundingBlock({ data, allowDemo = false }: { data: CrowdfundingData; allowDemo?: boolean }) {
   const { t } = useLocale();
 
   const [raised, setRaised] = useState(() => Number(data.currentAmount) || 0);
@@ -33,7 +33,7 @@ export function CrowdfundingBlock({ data }: { data: CrowdfundingData }) {
   const daysLeft = Number(data.daysLeft) || 0;
 
   const handleHype = () => {
-    if (hyped) return;
+    if (!allowDemo || hyped) return;
     setHypeCount((h) => h + 1);
     setHyped(true);
   };
@@ -52,6 +52,9 @@ export function CrowdfundingBlock({ data }: { data: CrowdfundingData }) {
       {data.description && (
         <p className="mt-1.5 whitespace-pre-line text-sm text-muted-foreground">{data.description}</p>
       )}
+      <p className="mt-3 rounded-lg border border-border p-3 text-sm">
+        {t(allowDemo ? "crowdfunding_demo_notice" : "crowdfunding_unavailable_notice")}
+      </p>
 
       {data.chosenStudio && (
         <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary">
@@ -62,7 +65,7 @@ export function CrowdfundingBlock({ data }: { data: CrowdfundingData }) {
 
       {showProgress && (
         <div className="mt-4">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted sm:h-2">
+          <div role="progressbar" aria-label={t("crowdfunding_eyebrow")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 w-full overflow-hidden rounded-full bg-muted sm:h-2">
             <div
               className="h-full rounded-full bg-primary transition-all duration-700"
               style={{
@@ -88,21 +91,21 @@ export function CrowdfundingBlock({ data }: { data: CrowdfundingData }) {
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={() => setModalOpen(true)}
-          aria-label={t("crowdfunding_support_aria")}
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          onClick={() => { if (allowDemo) setModalOpen(true) }}
+          disabled={!allowDemo}
+          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           <Heart className="size-4" />
-          {t("crowdfunding_support_button")}
+          {t(allowDemo ? "crowdfunding_try_demo" : "crowdfunding_payments_disabled")}
         </button>
 
         <button
           type="button"
           onClick={handleHype}
-          disabled={hyped}
+          disabled={!allowDemo || hyped}
           aria-label={hyped ? t("crowdfunding_hyped_aria") : t("crowdfunding_hype_aria")}
-          className={`inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-opacity ${
-            hyped ? "cursor-not-allowed opacity-60" : "hover:opacity-90"
+          className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-opacity ${
+            !allowDemo || hyped ? "cursor-not-allowed opacity-60" : "hover:opacity-90"
           }`}
         >
           <Flame className="size-4" fill={hyped ? "currentColor" : "none"} />
@@ -117,7 +120,7 @@ export function CrowdfundingBlock({ data }: { data: CrowdfundingData }) {
         })}
       </p>
 
-      {modalOpen && (
+      {allowDemo && modalOpen && (
         <SupportModal
           currency="USD"
           onClose={() => setModalOpen(false)}

@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase"
+import { mediaUrl } from "@/lib/media-url"
 import type { FeedTrack } from "@/lib/musicFeed"
-import { expresionKeyset, type CursorFeed } from "@/lib/feed/keyset"
+import { cursorDeUltimaFila, expresionKeyset, type CursorFeed } from "@/lib/feed/keyset"
 import { parseMusicianRoles, type MusicianRole } from "@/lib/musician-roles"
 
 // Publicaciones de los usuarios en el feed principal. No hay una tabla
@@ -13,6 +14,7 @@ export type FeedPost = {
   id: string
   profileId: string
   authorName: string
+  username?: string
   mediaType: "image" | "video"
   url: string
   thumbnail?: string
@@ -34,6 +36,7 @@ type PublicacionesRow = {
   created_at?: string | null
   profiles: {
     display_name: string | null
+    username?: string | null
     musician_roles?: unknown
     musician_category?: string | null
     profile_type?: string | null
@@ -46,6 +49,10 @@ type PublicacionesRow = {
  * (P-17); sin él devuelve la primera página, igual que antes.
  */
 export async function fetchPublicPosts(limit: number = 60, cursor?: CursorFeed): Promise<FeedPost[]> {
+  return (await fetchPublicPostPage(limit, cursor)).items
+}
+
+export async function fetchPublicPostPage(limit = 60, cursor?: CursorFeed, signal?: AbortSignal) {
   // .order() explícito: sin ORDER BY, Postgres no garantiza ningún orden,
   // así que este .limit() devolvía filas ARBITRARIAS. No eran "las 60
   // publicaciones más recientes" sino 60 cualesquiera, y el contenido nuevo
@@ -54,7 +61,7 @@ export async function fetchPublicPosts(limit: number = 60, cursor?: CursorFeed):
   let consulta = supabase
     .from("profile_blocks")
     .select(`id, profile_id, content, created_at,
-      profiles ( display_name, musician_roles, profile_type, is_suspended )`)
+      profiles ( display_name, username, musician_roles, profile_type, is_suspended )`)
     .eq("block_type", "publicaciones")
     .eq("is_visible", true)
     .order("created_at", { ascending: false })
@@ -62,7 +69,8 @@ export async function fetchPublicPosts(limit: number = 60, cursor?: CursorFeed):
     .limit(limit)
   if (cursor) consulta = consulta.or(expresionKeyset(cursor))
 
-  const { data, error } = await consulta
+  const deadline = AbortSignal.timeout(15_000)
+  const { data, error } = await consulta.abortSignal(signal ? AbortSignal.any([signal, deadline]) : deadline)
   if (error) throw error
   const rows = data as unknown as PublicacionesRow[]
 
@@ -81,9 +89,10 @@ export async function fetchPublicPosts(limit: number = 60, cursor?: CursorFeed):
         id: `${row.id}:${item.id ?? posts.length}`,
         profileId: row.profile_id,
         authorName: row.profiles?.display_name || "Artista Desconocido",
+        username: row.profiles?.username ?? undefined,
         mediaType: item.type,
-        url: item.url,
-        thumbnail: item.thumbnail || undefined,
+        url: mediaUrl(item.url),
+        thumbnail: item.thumbnail ? mediaUrl(item.thumbnail) : undefined,
         caption: item.caption || undefined,
         roles,
         isGroup: row.profiles?.profile_type === "band",
@@ -91,7 +100,13 @@ export async function fetchPublicPosts(limit: number = 60, cursor?: CursorFeed):
       })
     }
   }
-  return posts
+  const next = cursorDeUltimaFila(rows)
+  return { items: posts, cursor: next, more: rows.length === limit && next !== null }
+}
+
+export type MixedFeedCursor = {
+  tracks: { cursor: CursorFeed | null; more: boolean }
+  posts: { cursor: CursorFeed | null; more: boolean }
 }
 
 /**

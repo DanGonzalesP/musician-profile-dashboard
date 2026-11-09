@@ -19,7 +19,7 @@ import {
 import type { ServiceData } from "@/lib/blocks"
 import { priceUnitLabel, serviceCategoryLabel, serviceDurationLabel, formatMoney, type CatalogService } from "@/lib/catalog"
 import { useLocale } from "@/components/locale-provider"
-import { safeHref } from "@/lib/safe-url"
+import { safeUrlOrNull } from "@/lib/safe-url"
 
 function modalityLabel(m: CatalogService["modality"]): string {
   if (m === "presencial") return "Presencial"
@@ -41,13 +41,15 @@ function ServicePrice({ service }: { service: CatalogService }) {
 }
 
 function BookButton({ service }: { service: CatalogService }) {
-  if (!service.bookingUrl) return null
+  const bookingUrl = safeUrlOrNull(service.bookingUrl)
+  if (!bookingUrl) return <span className="text-xs text-muted-foreground">Sin enlace de reserva</span>
   return (
     <a
-      href={safeHref(service.bookingUrl)}
+      href={bookingUrl}
+      aria-label={`Reservar o cotizar ${service.title} (abre otra pestaña)`}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] transition-all hover:opacity-90 hover:shadow-[0_0_32px_-6px_var(--primary)]"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] transition-all hover:opacity-90 hover:shadow-[0_0_32px_-6px_var(--primary)]"
     >
       <CalendarCheck className="size-3.5" />
       Reservar / Cotizar
@@ -67,7 +69,8 @@ export function ServiceBlock({ data, services }: { data: ServiceData; services: 
     return ids.length > 1 ? ids : []
   }, [activos])
 
-  const filtered = category === "todo" ? activos : activos.filter((s) => (s.category || "otro") === category)
+  const selectedCategory = activos.some(s => (s.category || "otro") === category) ? category : "todo"
+  const filtered = selectedCategory === "todo" ? activos : activos.filter((s) => (s.category || "otro") === selectedCategory)
 
   return (
     <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
@@ -88,8 +91,9 @@ export function ServiceBlock({ data, services }: { data: ServiceData; services: 
           <button
             type="button"
             onClick={() => setCategory("todo")}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              category === "todo"
+            aria-pressed={selectedCategory === "todo"}
+            className={`min-h-11 shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              selectedCategory === "todo"
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
             }`}
@@ -101,8 +105,9 @@ export function ServiceBlock({ data, services }: { data: ServiceData; services: 
               key={id}
               type="button"
               onClick={() => setCategory(id)}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                category === id
+              aria-pressed={selectedCategory === id}
+              className={`min-h-11 shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                selectedCategory === id
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
               }`}
@@ -148,7 +153,7 @@ export function ServiceBlock({ data, services }: { data: ServiceData; services: 
             <p className="relative text-base font-semibold text-foreground">{service.title || t("service_new")}</p>
 
             {service.description && (
-              <p className="relative line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+              <p className="relative whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
                 {service.description}
               </p>
             )}
@@ -162,7 +167,21 @@ export function ServiceBlock({ data, services }: { data: ServiceData; services: 
                   </li>
                 ))}
                 {service.features.length > 4 && (
-                  <li className="text-[11px] text-muted-foreground">y {service.features.length - 4} más...</li>
+                  <li>
+                    <details>
+                      <summary className="min-h-11 cursor-pointer content-center rounded-md py-2 text-xs font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        Ver {service.features.length - 4} detalles más<span className="sr-only"> de {service.title}</span>
+                      </summary>
+                      <ul className="space-y-1 pb-2">
+                        {service.features.slice(4).map((feature, index) => (
+                          <li key={`${feature}-${index}`} className="flex items-start gap-1.5 text-xs text-foreground/85">
+                            <Check className="mt-0.5 size-3 shrink-0 text-primary" />
+                            <span className="break-words">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
                 )}
               </ul>
             )}

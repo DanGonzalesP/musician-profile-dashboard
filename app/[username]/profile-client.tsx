@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { applyPublicCreditApprovals } from "@/lib/public-credit-approvals";
 import { resolveProfileByUsername } from "@/lib/username";
 import { type Block, type BlockType, type TracksData, type CreditsData, BLOCK_LIBRARY, dbBlockToBlock, isKnownBlockType, mergePublicacionesEmbeds } from "@/lib/blocks";
 import { type CatalogProduct, type CatalogService, fetchCatalog, rowToProduct, rowToService } from "@/lib/catalog";
@@ -14,6 +15,7 @@ import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
 import { ReportDialog } from "@/components/report-dialog";
+import { ProfileBlockControl } from "@/components/profile-block-control";
 import { useLocale } from "@/components/locale-provider";
 import { Store, ArrowLeft, Sparkles, Milestone, GalleryHorizontalEnd, Users, type LucideIcon } from "lucide-react";
 
@@ -32,6 +34,11 @@ type TabKey = "main" | "legado" | "publicaciones";
 const MAIN_BLOCK_TYPES: BlockType[] = ["hero", "single", "crowdfunding", "tracks", "credits"];
 // Bloques que ya no se renderizan en el perfil (viven en /tienda).
 const STORE_BLOCK_TYPES: BlockType[] = ["merch", "service"];
+
+// La URL para compartir se lee una vez al montar, como hacía el efecto previo.
+const subscribeToNothing = () => () => {};
+const readLocationHref = () => window.location.href;
+const emptyLocationHref = () => "";
 
 // Traduce las filas crudas que llegan del servidor (F10) a lo que el
 // componente ya sabía renderizar. Se usan LAS MISMAS funciones que aplicaba a
@@ -62,10 +69,23 @@ function mapearDatosIniciales(datos: PerfilPublicoInicial) {
 // exactamente como antes de F10 y carga los datos por su cuenta. El camino
 // viejo sigue vivo y probado, así que revertir la fase es quitar una prop.
 export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: PerfilPublicoInicial }) {
-  const { t } = useLocale();
   const params = useParams();
+  const username = datosIniciales?.profile.username ?? (typeof params?.username === "string" ? params.username.trim().toLowerCase() : "");
+  const [source, setSource] = useState({ datosIniciales, username, revision: 0 });
+  // Una actualización del servidor o navegación sustituye el contenido completo.
+  // No conservar los useState iniciales del perfil anterior ni sus reproductores.
+  if (source.datosIniciales !== datosIniciales || source.username !== username) {
+    setSource({ datosIniciales, username, revision: source.revision + 1 });
+  }
+  return <PerfilPublicoSession key={source.revision} datosIniciales={datosIniciales} username={username}
+    onRetry={() => setSource(value => ({ ...value, revision: value.revision + 1 }))} />;
+}
+
+function PerfilPublicoSession({ datosIniciales, username, onRetry }: {
+  datosIniciales?: PerfilPublicoInicial; username: string; onRetry: () => void;
+}) {
+  const { t } = useLocale();
   const router = useRouter();
-  const username = datosIniciales?.profile.username ?? (params?.username as string)?.trim().toLowerCase();
 
   // Estado inicial calculado UNA vez: cuando el servidor ya trajo los datos,
   // el primer render (el que produce el HTML) sale con el contenido puesto —
@@ -76,10 +96,12 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
   const [products, setProducts] = useState<CatalogProduct[]>(iniciales?.products ?? []);
   const [services, setServices] = useState<CatalogService[]>(iniciales?.services ?? []);
   const [state, setState] = useState<LoadingState>(
-    iniciales ? (iniciales.blocks.length === 0 ? "empty" : "success") : "loading"
+    iniciales ? (iniciales.blocks.length === 0 ? "empty" : "success") : username ? "loading" : "error"
   );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [shareUrl, setShareUrl] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(username ? null : "Perfil no especificado");
+  // La URL de la página sólo existe en el navegador; en el servidor (y en la
+  // hidratación) vale "" igual que antes, sin fijar estado desde un efecto.
+  const shareUrl = useSyncExternalStore(subscribeToNothing, readLocationHref, emptyLocationHref);
   const [unifiedProfile, setUnifiedProfile] = useState(datosIniciales?.profile.unifiedProfile ?? false);
   const [activeTab, setActiveTab] = useState<TabKey>("main");
   const [profileId, setProfileId] = useState<string | null>(datosIniciales?.profile.id ?? null);
@@ -95,26 +117,41 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
   );
 
   useEffect(() => {
-    setShareUrl(window.location.href);
-  }, []);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      const user = data.user;
-      setViewerUserId(user?.id ?? null);
-      if (!user) {
-        setViewerProfileIds([]);
-        return;
-      }
-      // Un usuario autenticado SÍ puede leer user_id/owner_user_id, así que
-      // resuelve del lado del visitante qué perfiles le pertenecen. Sin
-      // sesión esta consulta ni siquiera se lanza.
-      const { data: own } = await supabase
-        .from("profiles")
-        .select("id")
-        .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`);
-      setViewerProfileIds((own ?? []).map((row) => row.id as string));
+    let generation = 0;
+    let controller: AbortController | null = null;
+    // INITIAL_SESSION también llega por esta suscripción. No competir con
+    // otra lectura inicial que podría devolver la cuenta anterior más tarde.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const version = ++generation;
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      setViewerUserId(session?.user.id ?? null);
+      setViewerProfileIds([]);
+      if (!session) return;
+      const userId = session.user.id;
+      const token = session.access_token;
+      // Salir del callback de Auth antes de pedir datos; conservar identidad
+      // y token de la misma sesión durante toda la consulta protegida por RLS.
+      void Promise.resolve().then(async () => {
+        if (request.signal.aborted) return;
+        const { data: own, error } = await supabase
+          .from("profiles")
+          .select("id")
+          .or(`user_id.eq.${userId},owner_user_id.eq.${userId}`)
+          .setHeader("Authorization", `Bearer ${token}`)
+          .abortSignal(AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]));
+        if (request.signal.aborted || version !== generation) return;
+        setViewerProfileIds(error ? [] : (own ?? []).map(row => row.id as string));
+      }).catch(() => {
+        if (!request.signal.aborted && version === generation) setViewerProfileIds([]);
+      });
     });
+    return () => {
+      generation += 1;
+      controller?.abort();
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -122,19 +159,12 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
     // camino sólo corre cuando la página no pudo resolverse en el servidor.
     if (datosIniciales) return;
 
-    if (!username) {
-      setState("error");
-      setErrorMessage("Perfil no especificado");
-      return;
-    }
+    if (!username) return;
 
     const controller = new AbortController();
 
     async function cargarPerfil() {
       try {
-        setState("loading");
-        setErrorMessage(null);
-
         // Resolución por `username` real: igualdad exacta, nunca ilike.
         // Antes se buscaba con .ilike sobre display_name, lo que dejaba que
         // los comodines % y _ de la URL hicieran match con perfiles
@@ -142,7 +172,7 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
         // username es uno antiguo, resolveProfileByUsername devuelve el
         // perfil actual con redirectTo para no romper QR ni enlaces ya
         // compartidos. Ver lib/username.ts.
-        const profile = await resolveProfileByUsername(username);
+        const profile = await resolveProfileByUsername(username, controller.signal);
 
         if (controller.signal.aborted) return;
 
@@ -168,7 +198,7 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
           .from("profiles")
           .select("accent_color")
           .eq("id", profile.id)
-          .maybeSingle()
+          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle()
           .then(({ data: accentRow }) => {
             if (!controller.signal.aborted && accentRow && isAccentColor(accentRow.accent_color)) {
               setProfileAccent(accentRow.accent_color);
@@ -181,22 +211,30 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
           .select("id, block_type, content, position_index")
           .eq("profile_id", profile.id)
           .eq("is_visible", true)
-          .order("position_index", { ascending: true });
+          .order("position_index", { ascending: true })
+          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]));
 
         if (controller.signal.aborted) return;
 
         if (blocksError) {
-          throw new Error(`Error al cargar bloques: ${blocksError.message}`);
+          throw new Error("No se pudieron cargar los bloques del perfil.");
         }
 
+        const approvals = (dbBlocks ?? []).some(block => block.block_type === "credits")
+          ? await supabase.rpc("public_credit_approvals", { p_profile_id: profile.id })
+            .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]))
+          : { data: [], error: null };
+        if (controller.signal.aborted) return;
+        if (approvals.error) throw new Error("No se pudieron comprobar las colaboraciones. Intenta de nuevo.");
+        const publicBlocks = applyPublicCreditApprovals(dbBlocks ?? [], approvals.data);
         const isBandProfile = profile.profileType === "band";
         const parsedBlocks = mergePublicacionesEmbeds(
-          (dbBlocks ?? [])
+          publicBlocks
             .filter((b) => isKnownBlockType(b.block_type))
             .map((b) => dbBlockToBlock(b, { isBand: isBandProfile }))
         );
 
-        const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profile.id);
+        const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profile.id, undefined, controller.signal);
 
         if (controller.signal.aborted) return;
 
@@ -210,12 +248,10 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
           setState("success");
           setBlocks(parsedBlocks);
         }
-      } catch (err) {
+      } catch {
         if (controller.signal.aborted) return;
 
-        const message =
-          err instanceof Error ? err.message : "Error desconocido al cargar el perfil";
-        setErrorMessage(message);
+        setErrorMessage("No pudimos cargar el perfil. Revisa tu conexión y vuelve a intentarlo.");
         setState("error");
       }
     }
@@ -262,9 +298,13 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
         {backToFeedButton}
         <div className="text-center">
-          <p className="text-sm font-semibold text-destructive">
+          <p role="alert" className="text-sm font-semibold text-destructive">
             {errorMessage || "Artista no encontrado."}
           </p>
+          <button type="button" disabled={!username} onClick={onRetry}
+            className="mt-4 min-h-11 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+            Volver a cargar el perfil
+          </button>
         </div>
       </div>
     );
@@ -279,7 +319,7 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
             No hay contenido disponible todavía.
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            El perfil se completará cuando haya datos en Supabase.
+            Aquí aparecerá el contenido que publique el artista.
           </p>
         </div>
       </div>
@@ -446,8 +486,9 @@ export function PerfilPublicoClient({ datosIniciales }: { datosIniciales?: Perfi
             describían este proceso pero no había forma de iniciarlo desde
             la app. No se le muestra al propio dueño del perfil. */}
         {!isOwner && profileId && (
-          <footer className="flex justify-center pb-6 pt-2">
+          <footer className="flex flex-col items-center justify-center gap-3 pb-6 pt-2">
             <ReportDialog profileId={profileId} targetType="perfil" />
+            {viewerUserId && <ProfileBlockControl key={`${viewerUserId}:${profileId}`} profileId={profileId} />}
           </footer>
         )}
       </main>

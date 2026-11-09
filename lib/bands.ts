@@ -56,59 +56,74 @@ export function setActiveBandId(userId: string, bandProfileId: string | null): v
  * selección del switcher antes de usarla (si ya no es válida, ej. el dueño
  * quitó al miembro, cae de vuelta al perfil personal).
  */
-export async function getEffectiveBandRole(bandProfileId: string, userId: string): Promise<BandRole | null> {
-  const { data: band } = await supabase
+export async function getEffectiveBandRole(bandProfileId: string, userId: string, accessToken?: string): Promise<BandRole | null> {
+  const bandQuery = supabase
     .from("profiles")
     .select("owner_user_id")
     .eq("id", bandProfileId)
     .maybeSingle()
+  if (accessToken) bandQuery.setHeader("Authorization", `Bearer ${accessToken}`)
+  const { data: band, error: bandError } = await bandQuery
 
+  if (bandError) throw new Error("No se pudo consultar el acceso al grupo.")
   if (band?.owner_user_id === userId) return "owner"
 
-  const { data: membership } = await supabase
+  const membershipQuery = supabase
     .from("band_members")
     .select("role, status")
     .eq("band_profile_id", bandProfileId)
     .eq("member_user_id", userId)
     .eq("status", "accepted")
     .maybeSingle()
+  if (accessToken) membershipQuery.setHeader("Authorization", `Bearer ${accessToken}`)
+  const { data: membership, error: membershipError } = await membershipQuery
 
+  if (membershipError) throw new Error("No se pudo consultar el acceso al grupo.")
   return (membership?.role as BandRole | undefined) ?? null
 }
 
 /** Perfil personal + todas las bandas donde el usuario es dueño o miembro aceptado — para el switcher. */
-export async function fetchMyProfiles(userId: string): Promise<MyProfileOption[]> {
+export async function fetchMyProfiles(userId: string, accessToken?: string): Promise<MyProfileOption[]> {
   const options: MyProfileOption[] = []
 
-  const { data: personal } = await supabase
+  const personalQuery = supabase
     .from("profiles")
     .select("id, display_name, username")
     .eq("user_id", userId)
     .eq("profile_type", "artist")
     .maybeSingle()
+  if (accessToken) personalQuery.setHeader("Authorization", `Bearer ${accessToken}`)
+  const { data: personal, error: personalError } = await personalQuery
 
+  if (personalError) throw new Error("No se pudieron cargar tus perfiles.")
   if (personal) {
     options.push({ id: personal.id, displayName: personal.display_name || "Mi Perfil", username: personal.username ?? "", isBand: false, role: "owner" })
   }
 
-  const { data: ownedBands } = await supabase
+  const ownedQuery = supabase
     .from("profiles")
     .select("id, display_name, username")
     .eq("owner_user_id", userId)
     .eq("profile_type", "band")
+  if (accessToken) ownedQuery.setHeader("Authorization", `Bearer ${accessToken}`)
+  const { data: ownedBands, error: ownedError } = await ownedQuery
 
+  if (ownedError) throw new Error("No se pudieron cargar tus grupos.")
   for (const band of ownedBands ?? []) {
     options.push({ id: band.id, displayName: band.display_name || "Grupo sin nombre", username: band.username ?? "", isBand: true, role: "owner" })
   }
 
-  const { data: memberships } = await supabase
+  const membershipsQuery = supabase
     .from("band_members")
     .select("role, profiles!band_members_band_profile_id_fkey(id, display_name, username)")
     .eq("member_user_id", userId)
     .eq("status", "accepted")
+  if (accessToken) membershipsQuery.setHeader("Authorization", `Bearer ${accessToken}`)
+  const { data: memberships, error: membershipsError } = await membershipsQuery
 
+  if (membershipsError) throw new Error("No se pudieron cargar tus grupos.")
   for (const m of (memberships ?? []) as unknown as { role: BandRole; profiles: { id: string; display_name: string | null; username: string | null } | null }[]) {
-    if (!m.profiles) continue
+    if (!m.profiles || options.some(option => option.id === m.profiles?.id)) continue
     options.push({ id: m.profiles.id, displayName: m.profiles.display_name || "Grupo sin nombre", username: m.profiles.username ?? "", isBand: true, role: m.role })
   }
 
@@ -132,12 +147,14 @@ export async function createBand(userId: string, displayName: string): Promise<s
   return data.id as string
 }
 
-export async function fetchBandMembers(bandProfileId: string): Promise<BandMember[]> {
-  const { data, error } = await supabase
+export async function fetchBandMembers(bandProfileId: string, accessToken?: string): Promise<BandMember[]> {
+  const query = supabase
     .from("band_members")
     .select("id, member_user_id, role, status, invited_username")
     .eq("band_profile_id", bandProfileId)
     .order("created_at", { ascending: true })
+  if (accessToken) query.setHeader("Authorization", `Bearer ${accessToken}`)
+  const { data, error } = await query
 
   if (error) throw error
 
@@ -150,10 +167,19 @@ export async function fetchBandMembers(bandProfileId: string): Promise<BandMembe
   }))
 }
 
+async function bandMutationAccount(expectedUserId?: string) {
+  const { data, error } = await supabase.auth.getSession()
+  if (error || !data.session || (expectedUserId && data.session.user.id !== expectedUserId)) {
+    throw new Error("La cuenta cambió. Vuelve a abrir el grupo con la cuenta original.")
+  }
+  return { userId: data.session.user.id, token: data.session.access_token }
+}
+
 /** Invita por @username real — solo perfiles personales, no otras bandas. */
-export async function inviteMember(bandProfileId: string, username: string, role: "admin" | "editor"): Promise<void> {
+export async function inviteMember(bandProfileId: string, username: string, role: "admin" | "editor", expectedUserId?: string): Promise<void> {
   const cleanUsername = username.trim().replace(/^@/, "")
   if (!cleanUsername) throw new Error("Escribe un nombre de usuario.")
+  const account = await bandMutationAccount(expectedUserId)
 
   // Búsqueda por username EXACTO. Antes se hacía .ilike sobre display_name
   // probando variantes con guiones/espacios: eso podía invitar al artista
@@ -165,6 +191,7 @@ export async function inviteMember(bandProfileId: string, username: string, role
     .eq("profile_type", "artist")
     .eq("username", cleanUsername.toLowerCase())
     .maybeSingle()
+    .setHeader("Authorization", `Bearer ${account.token}`)
   if (lookupError) throw lookupError
 
   const target = data?.user_id ? data : null
@@ -175,8 +202,7 @@ export async function inviteMember(bandProfileId: string, username: string, role
     )
   }
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user && target.user_id === user.id) {
+  if (target.user_id === account.userId) {
     throw new Error("Ya eres parte del grupo como creador — no necesitas invitarte.")
   }
 
@@ -185,7 +211,7 @@ export async function inviteMember(bandProfileId: string, username: string, role
     member_user_id: target.user_id,
     role,
     invited_username: target.username,
-  })
+  }).setHeader("Authorization", `Bearer ${account.token}`)
 
   if (error) {
     // 23505 = unique (band_profile_id, member_user_id): ya estaba invitado.
@@ -201,22 +227,34 @@ export async function inviteMember(bandProfileId: string, username: string, role
   }
 }
 
-export async function updateMemberRole(membershipId: string, role: "admin" | "editor"): Promise<void> {
-  const { error } = await supabase.from("band_members").update({ role }).eq("id", membershipId)
-  if (error) throw error
+export async function updateMemberRole(membershipId: string, role: "admin" | "editor", bandProfileId: string, expectedUserId?: string, previousRole?: "admin" | "editor"): Promise<void> {
+  const account = await bandMutationAccount(expectedUserId)
+  const query = supabase.from("band_members").update({ role })
+    .eq("id", membershipId).eq("band_profile_id", bandProfileId).eq("status", "accepted").select("id")
+    .setHeader("Authorization", `Bearer ${account.token}`)
+  if (previousRole) query.eq("role", previousRole)
+  const { data, error } = await query.single()
+  if (error || !data) throw new Error("No se confirmó el cambio de rol.")
 }
 
-export async function removeMember(membershipId: string): Promise<void> {
-  const { error } = await supabase.from("band_members").delete().eq("id", membershipId)
-  if (error) throw error
+export async function removeMember(membershipId: string, bandProfileId: string, expectedUserId?: string, previous?: Pick<BandMember, "role" | "status">): Promise<void> {
+  const account = await bandMutationAccount(expectedUserId)
+  const query = supabase.from("band_members").delete()
+    .eq("id", membershipId).eq("band_profile_id", bandProfileId).select("id")
+    .setHeader("Authorization", `Bearer ${account.token}`)
+  if (previous) query.eq("role", previous.role).eq("status", previous.status)
+  const { data, error } = await query.single()
+  if (error || !data) throw new Error("No se confirmó la retirada del integrante.")
 }
 
-export async function fetchMyPendingInvites(userId: string): Promise<PendingInvite[]> {
-  const { data, error } = await supabase
+export async function fetchMyPendingInvites(userId: string, accessToken?: string): Promise<PendingInvite[]> {
+  const query = supabase
     .from("band_members")
     .select("id, band_profile_id, role, profiles!band_members_band_profile_id_fkey(display_name)")
     .eq("member_user_id", userId)
     .eq("status", "pending")
+  if (accessToken) query.setHeader("Authorization", `Bearer ${accessToken}`)
+  const { data, error } = await query
 
   if (error) throw error
 
@@ -231,7 +269,17 @@ export async function fetchMyPendingInvites(userId: string): Promise<PendingInvi
   })
 }
 
-export async function respondToInvite(membershipId: string, decision: "accepted" | "declined"): Promise<void> {
-  const { error } = await supabase.from("band_members").update({ status: decision }).eq("id", membershipId)
-  if (error) throw error
+export async function respondToInvite(membershipId: string, decision: "accepted" | "declined", expectedUserId?: string): Promise<void> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user || (expectedUserId && user.id !== expectedUserId)) throw new Error("No se pudo verificar tu sesión.")
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError || sessionData.session?.user.id !== user.id) throw new Error("La cuenta cambió. Vuelve a abrir tus invitaciones.")
+  const { data, error } = await supabase.from("band_members").update({ status: decision })
+    .eq("id", membershipId)
+    .eq("member_user_id", user.id)
+    .eq("status", "pending")
+    .select("id")
+    .single()
+    .setHeader("Authorization", `Bearer ${sessionData.session.access_token}`)
+  if (error || !data) throw new Error("No se confirmó la respuesta a la invitación.")
 }

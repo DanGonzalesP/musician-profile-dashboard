@@ -44,7 +44,7 @@ export default function VinylCover({
     <button
       type="button"
       onClick={onTap}
-      className="group relative flex aspect-square w-64 items-center justify-center sm:w-72"
+      className="group relative flex aspect-square w-64 max-w-[max(5rem,calc(100dvh-31rem))] shrink-0 items-center justify-center sm:w-72 lg:max-w-none"
       aria-label={isPlaying ? "Pausar" : "Reproducir"}
     >
       <div

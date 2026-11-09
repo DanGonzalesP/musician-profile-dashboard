@@ -4,8 +4,9 @@ import { SITE_URL } from "@/lib/site"
 import { logError } from "@/lib/log"
 
 // Sitemap dinámico: lista los perfiles públicos para que Google los descubra
-// sin tener que rastrear enlace por enlace. Se regenera cada hora.
-export const revalidate = 3600
+// sin tener que rastrear enlace por enlace. Se consulta en cada petición para
+// no anunciar durante una hora un perfil suspendido.
+export const dynamic = "force-dynamic"
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const estaticas: MetadataRoute.Sitemap = [

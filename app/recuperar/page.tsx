@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
@@ -20,33 +20,59 @@ import { urlDeRetornoDeRecuperacion } from "@/lib/recuperar-contrasena"
 // reportado, entra aquí"— y para quien quiera cruzar una lista de correos
 // filtrada de otro sitio contra esta plataforma.
 //
-// Por eso `enviado` se pone a `true` ANTES de mirar el resultado de Supabase.
-// Un error real (Supabase caído, límite de correos alcanzado) se registra en
-// la consola para poder diagnosticarlo, pero al visitante se le dice lo mismo.
-// Es un intercambio consciente: se pierde algo de claridad cuando el fallo es
-// nuestro, a cambio de no publicar quién está registrado.
+// Tanto las respuestas del proveedor como los fallos de red mantienen el mismo
+// mensaje. No se imprimen detalles de cuentas o errores del proveedor en consola.
 
 export default function RecuperarPage() {
   const { t } = useLocale()
   const [email, setEmail] = useState("")
   const [cargando, setCargando] = useState(false)
   const [enviado, setEnviado] = useState(false)
+  const sending = useRef(false)
+  const [cooldownUntil, setCooldownUntil] = useState(0)
+  const [secondsRemaining, setSecondsRemaining] = useState(0)
+  const emailInput = useRef<HTMLInputElement>(null)
+  const focusEmail = useRef(false)
+
+  useEffect(() => {
+    if (!cooldownUntil) return
+    const update = () => {
+      const seconds = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000))
+      setSecondsRemaining(seconds)
+      if (seconds === 0) clearInterval(timer)
+    }
+    const timer = setInterval(update, 1000)
+    update()
+    return () => clearInterval(timer)
+  }, [cooldownUntil])
+
+  useEffect(() => {
+    if (!enviado && focusEmail.current) {
+      emailInput.current?.focus()
+      focusEmail.current = false
+    }
+  }, [enviado])
 
   const solicitar = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (sending.current || Date.now() < cooldownUntil) return
+    sending.current = true
     setCargando(true)
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: urlDeRetornoDeRecuperacion(),
-    })
-
-    // Ver el comentario de arriba: el resultado NO cambia lo que se muestra.
-    if (error) {
-      console.error("No se pudo enviar el correo de recuperación:", error.message)
+    try {
+      await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: urlDeRetornoDeRecuperacion(),
+      })
+    } catch {
+      // La respuesta pública no permite inferir la existencia de una cuenta.
+    } finally {
+      // Pausa de interfaz idéntica en todos los resultados; el límite real
+      // sigue perteneciendo al proveedor. No confirma envío ni existencia.
+      setCooldownUntil(Date.now() + 60_000)
+      setSecondsRemaining(60)
+      setEnviado(true)
+      setCargando(false)
+      sending.current = false
     }
-
-    setEnviado(true)
-    setCargando(false)
   }
 
   return (
@@ -79,6 +105,10 @@ export default function RecuperarPage() {
               >
                 {t("auth_recovery_sent")}
               </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">{t("auth_recovery_help")}</p>
+              <button type="button" onClick={() => { focusEmail.current = true; setEnviado(false) }} className="min-h-11 w-full rounded-lg border border-border px-3 text-sm font-semibold hover:bg-secondary">
+                {t("auth_recovery_edit_retry")}
+              </button>
               <Link
                 href="/login"
                 className="block w-full rounded-lg border border-border py-2 text-center text-sm font-semibold transition-colors hover:bg-secondary"
@@ -87,7 +117,7 @@ export default function RecuperarPage() {
               </Link>
             </div>
           ) : (
-            <form onSubmit={solicitar} className="space-y-4">
+            <form onSubmit={solicitar} aria-busy={cargando} className="space-y-4">
               <div>
                 <label
                   htmlFor="recuperar-email"
@@ -97,9 +127,11 @@ export default function RecuperarPage() {
                 </label>
                 <input
                   id="recuperar-email"
+                  ref={emailInput}
                   type="email"
                   required
                   autoComplete="email"
+                  disabled={cargando}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t("auth_email_placeholder")}
@@ -109,11 +141,13 @@ export default function RecuperarPage() {
 
               <button
                 type="submit"
-                disabled={cargando}
-                className="w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                disabled={cargando || secondsRemaining > 0}
+                aria-describedby={secondsRemaining > 0 ? "recovery-wait" : undefined}
+                className="min-h-11 w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {cargando ? t("auth_recovery_sending") : t("auth_recovery_submit")}
               </button>
+              {secondsRemaining > 0 && <p id="recovery-wait" className="text-xs text-muted-foreground">{t("auth_recovery_wait")} {secondsRemaining} s.</p>}
             </form>
           )}
         </div>

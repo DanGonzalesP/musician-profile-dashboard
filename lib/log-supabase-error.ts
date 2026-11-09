@@ -1,19 +1,8 @@
-/**
- * PostgrestError no es un Error de JS — console.error(err) a veces solo
- * muestra "[object Object]". Esto imprime siempre message/code/details/hint
- * como texto plano, para poder ver en la consola del navegador exactamente
- * por qué falló un insert/update (ej. violación de RLS, tabla inexistente).
- */
+/** Diagnóstico del cliente sin contenido, tokens ni detalles de consultas. */
 export function logSupabaseError(context: string, error: unknown): void {
-  if (error && typeof error === "object" && "message" in error) {
-    const e = error as { message: string; code?: string; details?: string; hint?: string }
-    console.error(
-      `[${context}] ${e.message}` +
-        (e.code ? ` | código: ${e.code}` : "") +
-        (e.details ? ` | detalles: ${e.details}` : "") +
-        (e.hint ? ` | pista: ${e.hint}` : "")
-    )
-  } else {
-    console.error(`[${context}]`, error)
-  }
+  const rawCode = error && typeof error === "object" && "code" in error ? error.code : undefined
+  // Sólo códigos estructurados conocidos por su formato, nunca message/details/hint.
+  const code = typeof rawCode === "string" && /^(?:[0-9A-Z]{5}|PGRST\d{3})$/.test(rawCode)
+    ? rawCode : "UNCLASSIFIED"
+  console.error(`[${context}] Operación no confirmada (${code}).`)
 }

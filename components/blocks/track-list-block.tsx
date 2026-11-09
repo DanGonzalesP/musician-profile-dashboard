@@ -1,25 +1,32 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Play, Pause, Music } from "lucide-react"
+import { useReducedMotion } from "framer-motion"
 import type { TracksData, Album } from "@/lib/blocks"
 import * as audioEngine from "@/lib/audio-engine"
+import { AudioPlaybackError } from "@/components/audio-playback-error"
 import { useLocale } from "@/components/locale-provider"
 
 function AlbumCover({
   album,
   active,
   onClick,
+  duplicate = false,
 }: {
   album: Album
   active: boolean
   onClick: () => void
+  duplicate?: boolean
 }) {
   const { t } = useLocale()
   return (
     <button
       type="button"
       onClick={onClick}
+      tabIndex={duplicate ? -1 : 0}
+      aria-hidden={duplicate || undefined}
+      aria-pressed={active}
       className={`group flex w-48 shrink-0 flex-col items-center gap-2 rounded-lg p-2 text-left transition-colors ${
         active ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-accent/50"
       }`}
@@ -67,24 +74,26 @@ function formatTime(seconds: number): string {
 
 const ALBUM_DESCRIPTION_ROTATE_MS = 6000
 
-function AlbumDescriptionCarousel({ descriptions }: { descriptions: string[] }) {
+function AlbumDescriptionCarousel({ descriptions, paused }: { descriptions: string[]; paused: boolean }) {
+  return <AlbumDescriptionSlides key={JSON.stringify(descriptions)} descriptions={descriptions} paused={paused} />
+}
+
+function AlbumDescriptionSlides({ descriptions, paused }: { descriptions: string[]; paused: boolean }) {
   const { t } = useLocale()
   const [index, setIndex] = useState(0)
   // Se depende del CONTENIDO, no del array: el padre arma la lista en cada
   // render (y re-renderiza en cada tick del audio), así que con `descriptions`
   // como dependencia el temporizador se reiniciaba sin parar y el carrusel
   // nunca alcanzaba a rotar mientras sonaba una pista.
-  const descriptionsKey = descriptions.join("|")
   const total = descriptions.length
 
   useEffect(() => {
-    setIndex(0)
-    if (total <= 1) return
+    if (total <= 1 || paused) return
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % total)
     }, ALBUM_DESCRIPTION_ROTATE_MS)
     return () => clearInterval(interval)
-  }, [descriptionsKey, total])
+  }, [paused, total])
 
   if (descriptions.length === 0) return null
 
@@ -93,16 +102,20 @@ function AlbumDescriptionCarousel({ descriptions }: { descriptions: string[] }) 
       <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {t("album_about_title")}
       </p>
-      <p key={index} className="animate-fade-in whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
+      <p key={index} className={`${paused ? "" : "animate-fade-in"} whitespace-pre-line text-xs leading-relaxed text-muted-foreground`}>
         {descriptions[index]}
       </p>
       {descriptions.length > 1 && (
-        <div className="mt-2 flex justify-center gap-1.5">
+        <div className="mt-2 flex flex-wrap justify-center gap-1.5">
           {descriptions.map((_, i) => (
-            <span
+            <button
+              type="button"
               key={i}
-              className={`h-1.5 w-1.5 rounded-full transition-colors ${i === index ? "bg-primary" : "bg-muted"}`}
-            />
+              onClick={() => setIndex(i)}
+              aria-label={t("album_description_select", { number: String(i + 1) })}
+              aria-pressed={i === index}
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+            ><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-primary" : "bg-muted"}`} /></button>
           ))}
         </div>
       )}
@@ -110,12 +123,11 @@ function AlbumDescriptionCarousel({ descriptions }: { descriptions: string[] }) 
   )
 }
 
-function TypewriterText({ text }: { text: string }) {
+function TypewriterText({ text, reducedMotion }: { text: string; reducedMotion: boolean }) {
   const [visibleChars, setVisibleChars] = useState(0)
 
   useEffect(() => {
-    setVisibleChars(0)
-    if (!text) return
+    if (!text || reducedMotion) return
     const interval = setInterval(() => {
       setVisibleChars((prev) => {
         if (prev >= text.length) {
@@ -126,22 +138,36 @@ function TypewriterText({ text }: { text: string }) {
       })
     }, 16)
     return () => clearInterval(interval)
-  }, [text])
+  }, [text, reducedMotion])
 
-  return <>{text.slice(0, visibleChars)}</>
+  return <><span aria-hidden="true">{reducedMotion ? text : text.slice(0, visibleChars)}</span><span className="sr-only">{text}</span></>
 }
 
-export function TrackListBlock({
-  data,
-  onAlbumSelect,
-}: {
+type TrackListBlockProps = {
   data: TracksData
   // Notifica (por id de álbum) cuando el usuario abre/cambia de álbum acá —
   // usado en el editor para que el panel derecho enfoque el mismo álbum.
   onAlbumSelect?: (albumId: string) => void
-}) {
+}
+
+export function TrackListBlock(props: TrackListBlockProps) {
+  // Los índices y callbacks diferidos pertenecen a una estructura concreta.
+  // Una sustitución, retirada o reordenación de audio cancela esa sesión;
+  // editar metadatos no interrumpe la reproducción ni cierra el álbum.
+  const playbackStructure = JSON.stringify((props.data.albums ?? []).map(album => [
+    album.id,
+    album.tracks.map(track => track.audioUrl ?? null),
+  ]))
+  return <TrackListSession key={playbackStructure} {...props} />
+}
+
+function TrackListSession({ data, onAlbumSelect }: TrackListBlockProps) {
   const { t } = useLocale()
   const albums = data.albums || []
+  const reducedMotion = useReducedMotion() === true
+  const [motionStopped, setMotionStopped] = useState(false)
+  const [focusWithin, setFocusWithin] = useState(false)
+  const motionPaused = reducedMotion || motionStopped || focusWithin
   // selectedAlbum: cuál álbum debe estar en la posición izquierda del carrusel.
   // panelAlbumIndex: cuál álbum tiene su panel/vinilo realmente desplegado.
   // Van desfasados a propósito para poder secuenciar: retraer → deslizar → desplegar.
@@ -166,6 +192,7 @@ export function TrackListBlock({
   // el archivo nuevo. También sirve para saber si el motor está sonando algo
   // de este bloque al cerrar/cambiar de álbum.
   const loadedUrlRef = useRef<string | null>(null)
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const switchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const slideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -195,19 +222,25 @@ export function TrackListBlock({
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    const mobileLayout = window.matchMedia("(max-width: 639px)")
     const measure = () => {
       setViewportWidth(el.clientWidth)
-      setIsNarrow(window.matchMedia("(max-width: 639px)").matches)
+      setIsNarrow(mobileLayout.matches)
     }
-    measure()
+    // ResizeObserver entrega la medida inicial y las posteriores. El cambio
+    // de breakpoint también importa si el contenedor conserva su ancho.
     const observer = new ResizeObserver(measure)
     observer.observe(el)
-    return () => observer.disconnect()
+    mobileLayout.addEventListener("change", measure)
+    return () => {
+      observer.disconnect()
+      mobileLayout.removeEventListener("change", measure)
+    }
   }, [albums.length])
 
   // Deja la posición dentro de la banda [1 juego, 2 juegos): así siempre queda
   // contenido para arrastrar hacia los dos lados.
-  function normalizeLoop() {
+  const normalizeLoop = useCallback(() => {
     const el = scrollRef.current
     if (!el || singleSetWidth <= 0) return
     if (scrollTargetRef.current !== null) return
@@ -217,7 +250,7 @@ export function TrackListBlock({
     while (pos >= singleSetWidth * 2) pos -= singleSetWidth
     while (pos < singleSetWidth) pos += singleSetWidth
     if (Math.abs(pos - el.scrollLeft) > 0.5) el.scrollLeft = pos
-  }
+  }, [singleSetWidth])
 
   // Posición inicial: un juego completo adentro, para poder arrastrar hacia
   // atrás desde el primer momento.
@@ -237,6 +270,12 @@ export function TrackListBlock({
       raf = requestAnimationFrame(tick)
       const target = scrollTargetRef.current
       if (target !== null) {
+        if (reducedMotion || motionStopped) {
+          el.scrollLeft = target
+          scrollTargetRef.current = null
+          normalizeLoop()
+          return
+        }
         const diff = target - el.scrollLeft
         if (Math.abs(diff) < 1.2) {
           el.scrollLeft = target
@@ -251,7 +290,7 @@ export function TrackListBlock({
         }
         return
       }
-      if (carouselPaused || selectedAlbum !== null) return
+      if (motionPaused || carouselPaused || selectedAlbum !== null) return
       el.scrollLeft += CAROUSEL_AUTO_SPEED
       // Red de seguridad para el caso degenerado en el que no hay recorrido
       // para la banda del loop (pocos álbumes en una pantalla muy ancha):
@@ -261,8 +300,7 @@ export function TrackListBlock({
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carouselPaused, selectedAlbum, singleSetWidth])
+  }, [carouselPaused, selectedAlbum, normalizeLoop, motionPaused, reducedMotion, motionStopped])
 
   // Lleva el álbum elegido a su lugar: centrado en móvil (pedido explícito
   // para que el disco no quede pegado al borde) y a la izquierda en
@@ -303,6 +341,7 @@ export function TrackListBlock({
   // progreso, porque ya no hay ningún disco puesto.
   function resetPlayback() {
     teardownAudio()
+    setLoadedUrl(null)
     setCurrentTrackIndex(null)
   }
 
@@ -330,6 +369,7 @@ export function TrackListBlock({
 
     setCurrentTrackIndex(trackIndex)
     loadedUrlRef.current = track.audioUrl
+    setLoadedUrl(track.audioUrl)
     audioEngine.play(track.audioUrl, {
       onEnded: () => handleTrackEnded(albumIndex, trackIndex),
     })
@@ -352,6 +392,20 @@ export function TrackListBlock({
 
     if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current)
     if (slideTimeoutRef.current) clearTimeout(slideTimeoutRef.current)
+
+    if (reducedMotion || motionStopped) {
+      resetPlayback()
+      setIsClosingPanel(false)
+      if (panelAlbumIndex === index) {
+        setPanelAlbumIndex(null)
+        setSelectedAlbum(null)
+      } else {
+        setSelectedAlbum(index)
+        scrollAlbumIntoView(index)
+        dropVinylFor(index)
+      }
+      return
+    }
 
     if (panelAlbumIndex === index) {
       // Mismo álbum: el vinilo se guarda en su funda y el panel recién
@@ -447,7 +501,7 @@ export function TrackListBlock({
   // lanzamiento actual / single, u otra superficie), las descripciones
   // desplegadas —la de la pista y la del álbum— se guardan: el disco sigue
   // puesto, pero el texto deja de robar pantalla mientras se escucha otra cosa.
-  const otherSourcePlaying = engine.url != null && engine.url !== loadedUrlRef.current
+  const otherSourcePlaying = engine.url != null && engine.url !== loadedUrl
 
   if (albums.length === 0) {
     return (
@@ -463,10 +517,17 @@ export function TrackListBlock({
   const loopAlbums = Array.from({ length: repeatCount }, () => albums).flat()
 
   return (
-    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6">
+    <div className="rounded-2xl border border-border bg-card/40 p-5 sm:p-6"
+      onFocusCapture={() => setFocusWithin(true)}
+      onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusWithin(false) }}>
       <div className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {t("discography_title")}
       </div>
+      <button type="button" disabled={reducedMotion} aria-pressed={motionStopped || reducedMotion}
+        onClick={() => setMotionStopped(value => !value)}
+        className="mb-3 min-h-11 rounded-lg border border-border px-3 text-xs disabled:opacity-70">
+        {reducedMotion ? t("albums_reduced_motion") : motionStopped ? t("albums_resume_motion") : t("albums_pause_motion")}
+      </button>
 
       {/* Carrusel infinito de álbumes — el movimiento es scroll nativo, así se
           puede arrastrar/deslizar con el dedo o el mouse SIN llegar nunca a un
@@ -494,6 +555,7 @@ export function TrackListBlock({
               key={`${album.id}-${i}`}
               album={album}
               active={selectedAlbum === i % albums.length}
+              duplicate={Math.floor(i / albums.length) !== 1}
               onClick={() => handleSelectAlbum(i % albums.length)}
             />
           ))}
@@ -511,12 +573,12 @@ export function TrackListBlock({
             <div className="mx-auto flex w-48 shrink-0 items-center justify-center overflow-hidden sm:mx-0">
               <div
                 className={`aspect-square w-48 shrink-0 overflow-hidden rounded-full shadow-2xl ${
-                  isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
+                  reducedMotion || motionStopped ? "" : isClosingPanel ? "animate-vinyl-retract" : "animate-vinyl-drop"
                 }`}
               >
                 <div
                   className={`flex h-full w-full items-center justify-center ${
-                    isPlaying && !isClosingPanel ? "animate-spin" : ""
+                    isPlaying && !isClosingPanel && !motionPaused ? "animate-spin" : ""
                   }`}
                   style={{
                     animationDuration: "6s",
@@ -607,6 +669,9 @@ export function TrackListBlock({
               álbum, ver resetPlayback(). */}
           {activeTrack && (
             <div className="mt-3 border-t border-border pt-3">
+              {isActiveLoaded && engine.error && <AudioPlaybackError onRetry={() => {
+                if (panelAlbumIndex !== null && currentTrackIndex !== null) handleTrackClick(panelAlbumIndex, currentTrackIndex)
+              }} />}
               <div className="flex items-center gap-2">
                 <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
                   {formatTime(currentTime)}
@@ -629,13 +694,14 @@ export function TrackListBlock({
 
               {activeTrack.description && !otherSourcePlaying && (
                 <p className="mt-3 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
-                  <TypewriterText key={`${panelAlbumIndex}-${currentTrackIndex}`} text={activeTrack.description} />
+                  <TypewriterText key={`${panelAlbumIndex}-${currentTrackIndex}-${activeTrack.description}`} text={activeTrack.description} reducedMotion={reducedMotion || motionStopped} />
                 </p>
               )}
             </div>
           )}
 
           <AlbumDescriptionCarousel
+            paused={motionPaused}
             descriptions={
               otherSourcePlaying ? [] : (activeAlbum.descriptions || []).map((d) => d.trim()).filter(Boolean)
             }

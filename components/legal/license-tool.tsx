@@ -1,19 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { FileCheck2, Loader2, ShieldCheck } from "lucide-react"
 import type { LicenseSongOption } from "@/lib/blocks"
 import type { LegalSettings } from "@/lib/legal-settings"
-import { logSupabaseError } from "@/lib/log-supabase-error"
+import { supabase } from "@/lib/supabase"
 
 export function LicenseTool({
   data,
   songOptions = [],
   profileId,
+  ownerUserId,
+  onRecorded,
 }: {
   data: LegalSettings
   songOptions?: LicenseSongOption[]
-  profileId?: string
+  profileId: string
+  ownerUserId: string
+  onRecorded: () => void
 }) {
   const [organizerName, setOrganizerName] = useState("")
   const [eventDate, setEventDate] = useState("")
@@ -21,6 +25,14 @@ export function LicenseTool({
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [notice, setNotice] = useState("")
+  const active = useRef(false)
+  const generationLock = useRef(false)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
 
   const artistName = data.artistStageName || data.artistLegalName
   const hasArtistData = Boolean(artistName && data.artistDni)
@@ -35,6 +47,7 @@ export function LicenseTool({
   }
 
   async function handleGenerate() {
+    if (!active.current || generationLock.current) return
     if (!hasArtistData) {
       setError("Completa tu nombre y DNI arriba antes de generar licencias.")
       return
@@ -47,48 +60,51 @@ export function LicenseTool({
       setError("Selecciona la fecha del evento.")
       return
     }
+    if (eventEndDate && eventEndDate < eventDate) {
+      setError("La fecha final no puede ser anterior a la del evento.")
+      return
+    }
     const songs = songOptions.filter((s) => selectedSongs.has(s.id)).map((s) => s.label)
     if (songs.length === 0) {
       setError("Selecciona al menos una canción a licenciar.")
       return
     }
 
+    generationLock.current = true
     setError(null)
+    setNotice("")
     setGenerating(true)
+    const input = {
+      artistName,
+      artistLegalName: data.artistLegalName,
+      artistDni: data.artistDni,
+      organizerName: organizerName.trim(),
+      eventDate,
+      eventEndDate,
+      songs,
+    }
     try {
       const { generateLicensePdf } = await import("@/lib/generate-license-pdf")
-      generateLicensePdf({
-        artistName,
-        artistLegalName: data.artistLegalName,
-        artistDni: data.artistDni,
-        organizerName: organizerName.trim(),
-        eventDate,
-        eventEndDate,
-        songs,
-      })
-
-      // El historial es un registro "best effort": si falla, no le quitamos
-      // al usuario el PDF que ya descargó, solo lo dejamos sin registrar.
-      if (profileId) {
-        try {
-          const { recordLicense } = await import("@/lib/licenses")
-          await recordLicense(profileId, {
-            artistName,
-            artistLegalName: data.artistLegalName,
-            artistDni: data.artistDni,
-            organizerName: organizerName.trim(),
-            eventDate,
-            eventEndDate,
-            songs,
-          })
-        } catch (err) {
-          logSupabaseError("LicenseTool: no se pudo guardar el historial", err)
-        }
+      const { data: auth, error: authError } = await supabase.auth.getSession()
+      if (!active.current) return
+      if (authError || auth.session?.user.id !== ownerUserId) throw new Error("session")
+      generateLicensePdf(input)
+      // La descarga y el registro son operaciones distintas: comunicar el resultado parcial.
+      try {
+        const { recordLicense } = await import("@/lib/licenses")
+        if (!active.current) return
+        await recordLicense(profileId, input, ownerUserId)
+        if (!active.current) return
+        setNotice("Descarga solicitada y licencia registrada en tu historial.")
+        onRecorded()
+      } catch {
+        if (active.current) setError("La descarga del PDF se solicitó, pero no pudimos confirmar su registro. Revisa el historial antes de generar otra licencia para evitar duplicados.")
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo generar el PDF.")
+    } catch {
+      if (active.current) setError("No se pudo preparar la descarga. Comprueba tu sesión y vuelve a intentarlo.")
     } finally {
-      setGenerating(false)
+      generationLock.current = false
+      if (active.current) setGenerating(false)
     }
   }
 
@@ -99,8 +115,8 @@ export function LicenseTool({
         Generador de Licencias Express
       </h3>
       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-        Genera en segundos una licencia de uso directo para un evento en vivo, autorizada por el propio
-        artista al margen de la gestión colectiva (APDAYC).
+        Prepara un borrador de autorización para un evento. Antes de firmarlo, revisa qué derechos
+        puedes autorizar, los acuerdos de gestión colectiva y los permisos de otros titulares.
       </p>
 
       {!hasArtistData && (
@@ -113,6 +129,7 @@ export function LicenseTool({
         <label className="block space-y-1.5 sm:col-span-2">
           <span className="text-xs font-medium text-muted-foreground">Organizador / Local</span>
           <input
+            disabled={generating}
             type="text"
             value={organizerName}
             onChange={(e) => setOrganizerName(e.target.value)}
@@ -123,6 +140,7 @@ export function LicenseTool({
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Fecha del evento</span>
           <input
+            disabled={generating}
             type="date"
             value={eventDate}
             onChange={(e) => setEventDate(e.target.value)}
@@ -132,6 +150,7 @@ export function LicenseTool({
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-muted-foreground">Hasta (opcional, si es un período)</span>
           <input
+            disabled={generating}
             type="date"
             value={eventEndDate}
             onChange={(e) => setEventEndDate(e.target.value)}
@@ -154,6 +173,7 @@ export function LicenseTool({
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-accent/50"
               >
                 <input
+                  disabled={generating}
                   type="checkbox"
                   checked={selectedSongs.has(song.id)}
                   onChange={() => toggleSong(song.id)}
@@ -174,13 +194,14 @@ export function LicenseTool({
         </div>
       )}
 
-      {error && <p className="mt-3 text-xs font-medium text-destructive">{error}</p>}
+      {notice && <p role="status" className="mt-3 text-sm text-muted-foreground">{notice}</p>}
+      {error && <p role="alert" className="mt-3 text-xs font-medium text-destructive">{error}</p>}
 
       <button
         type="button"
         onClick={handleGenerate}
         disabled={generating}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="min-h-11 mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {generating ? <Loader2 className="size-4 animate-spin" /> : <FileCheck2 className="size-4" />}
         {generating ? "Generando..." : "Generar Licencia"}

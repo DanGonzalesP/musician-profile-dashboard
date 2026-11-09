@@ -13,9 +13,10 @@ interface ProfileMenuProps {
   personalDisplayName: string;
   personalSlug: string;
   bands: MyProfileOption[];
+  profilesLoaded: boolean;
 }
 
-export default function ProfileMenu({ userId, personalDisplayName, personalSlug, bands }: ProfileMenuProps) {
+export default function ProfileMenu({ userId, personalDisplayName, personalSlug, bands, profilesLoaded }: ProfileMenuProps) {
   const { t } = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -65,14 +66,14 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
 
   return (
     <div ref={containerRef} className="relative flex items-center rounded-full border border-border bg-card/70 py-1 pl-1 pr-3 backdrop-blur transition-colors hover:bg-accent/40">
-      <Link
+      {personalSlug ? <Link
         href={`/${personalSlug}`}
         title={t("feed_menu_artist_panel")}
         aria-label={t("feed_menu_artist_panel")}
         className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
       >
         {initial}
-      </Link>
+      </Link> : <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{initial}</span>}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -97,14 +98,14 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
           </div>
 
           <div className="flex flex-col gap-1">
-            <Link
+            {personalSlug && <Link
               href={`/${personalSlug}`}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-accent/40"
             >
               <LayoutDashboard className="size-4 text-muted-foreground" />
               {t("feed_menu_artist_panel")}
-            </Link>
+            </Link>}
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}
@@ -133,7 +134,7 @@ export default function ProfileMenu({ userId, personalDisplayName, personalSlug,
 
           <div className="my-3 border-t border-border" />
 
-          {bands.length > 0 ? (
+          {!profilesLoaded ? null : bands.length > 0 ? (
             <div className="flex flex-col gap-1">
               <p className="px-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {t("feed_menu_bands_title")}

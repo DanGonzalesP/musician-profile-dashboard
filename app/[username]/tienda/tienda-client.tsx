@@ -28,8 +28,9 @@ import type { PerfilPublicoInicial } from "@/lib/supabase-server";
 import { accentClassName, isAccentColor, type AccentColor } from "@/lib/theme";
 import { ProfileSkeleton } from "@/components/blocks/skeletons";
 import { AudioReactiveBackground } from "@/components/audio-reactive-background";
-import { safeHref } from "@/lib/safe-url";
-import { resolveProfileByUsername } from "@/lib/username";
+import { safeUrlOrNull } from "@/lib/safe-url";
+import { CatalogProductDetails } from "@/components/catalog-product-details";
+import { isValidUsername, resolveProfileByUsername } from "@/lib/username";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -56,8 +57,16 @@ type MobileView = "productos" | "servicios";
 // es opcional: sin él, la tienda carga como antes.
 export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublicoInicial }) {
   const params = useParams();
+  const username = datosIniciales?.profile.username ?? (typeof params?.username === "string" ? params.username.trim().toLowerCase() : "");
+  const [source, setSource] = useState({ datosIniciales, username, revision: 0 });
+  if (source.datosIniciales !== datosIniciales || source.username !== username) {
+    setSource({ datosIniciales, username, revision: source.revision + 1 });
+  }
+  return <TiendaSession key={source.revision} datosIniciales={datosIniciales} username={username} />;
+}
+
+function TiendaSession({ datosIniciales, username }: { datosIniciales?: PerfilPublicoInicial; username: string }) {
   const router = useRouter();
-  const username = datosIniciales?.profile.username ?? (params?.username as string)?.trim().toLowerCase();
 
   const [iniciales] = useState(() =>
     datosIniciales
@@ -75,28 +84,24 @@ export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublic
   const [products, setProducts] = useState<CatalogProduct[]>(iniciales?.products ?? []);
   const [services, setServices] = useState<CatalogService[]>(iniciales?.services ?? []);
   const [accent, setAccent] = useState<AccentColor>(isAccentColor(acentoInicial) ? acentoInicial : "rojo");
-  const [state, setState] = useState<LoadingState>(datosIniciales ? "success" : "loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [state, setState] = useState<LoadingState>(datosIniciales ? "success" : username ? "loading" : "error");
+  const [errorMessage, setErrorMessage] = useState<string | null>(username ? null : "Perfil no especificado");
   const [view, setView] = useState<MobileView>("productos");
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     // El servidor ya resolvió la tienda: nada que pedir desde el navegador.
     if (datosIniciales) return;
 
-    if (!username) {
-      setState("error");
-      setErrorMessage("Perfil no especificado");
-      return;
-    }
+    if (!username) return;
 
     const controller = new AbortController();
 
     async function cargar() {
       try {
-        setState("loading");
         // Igual que el perfil público: igualdad exacta por username, con
         // redirect si el enlace usa uno antiguo. Ver lib/username.ts.
-        const profile = await resolveProfileByUsername(username);
+        const profile = await resolveProfileByUsername(username, controller.signal);
 
         if (controller.signal.aborted) return;
         if (!profile) {
@@ -115,29 +120,30 @@ export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublic
           .from("profiles")
           .select("accent_color")
           .eq("id", profile.id)
-          .maybeSingle();
+          .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle();
+        if (controller.signal.aborted) return;
         if (accentRow && isAccentColor(accentRow.accent_color)) setAccent(accentRow.accent_color);
 
-        const { products: prods, services: servs } = await fetchCatalog(profile.id);
+        const { products: prods, services: servs } = await fetchCatalog(profile.id, undefined, controller.signal);
         if (controller.signal.aborted) return;
 
         setProducts(prods.filter((p) => p.isActive !== false));
         setServices(servs.filter((s) => s.isActive !== false));
         setState("success");
-      } catch (err) {
+      } catch {
         if (controller.signal.aborted) return;
-        setErrorMessage(err instanceof Error ? err.message : "Error al cargar la tienda");
+        setErrorMessage("No pudimos cargar la tienda. Revisa tu conexión y vuelve a intentarlo.");
         setState("error");
       }
     }
 
     cargar();
     return () => controller.abort();
-  }, [username, router, datosIniciales]);
+  }, [username, router, datosIniciales, retry]);
 
   const backButton = (
     <Link
-      href={`/${username}`}
+      href={username && isValidUsername(username) ? `/${username}` : "/"}
       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-accent/40"
     >
       <ArrowLeft className="size-3.5" />
@@ -160,7 +166,12 @@ export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublic
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
         {backButton}
-        <p className="text-sm font-semibold text-destructive">{errorMessage || "No se pudo cargar."}</p>
+        <p role="alert" className="px-4 text-center text-sm font-semibold text-destructive">{errorMessage || "No se pudo cargar."}</p>
+        <button type="button" disabled={!username} onClick={() => {
+          setState("loading");
+          setErrorMessage(null);
+          setRetry(value => value + 1);
+        }} className="min-h-11 rounded-lg border px-4 text-sm font-semibold disabled:opacity-50">Volver a cargar la tienda</button>
       </div>
     );
   }
@@ -189,8 +200,9 @@ export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublic
               <button
                 key={v}
                 type="button"
+                aria-pressed={view === v}
                 onClick={() => setView(v)}
-                className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                className={`min-h-11 flex-1 rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
                   view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -208,10 +220,10 @@ export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublic
             <p className="mt-3 text-sm font-medium">Aún no hay nada publicado en esta tienda.</p>
           </div>
         ) : (
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
+          <div className={`grid gap-8 lg:gap-10 ${hasProducts && hasServices ? "lg:grid-cols-2" : ""}`}>
             {/* ── Mitad izquierda: PRODUCTOS (vitrina) ─────────────────── */}
             {hasProducts && (
-              <section className={view === "productos" ? "block" : "hidden lg:block"}>
+              <section className={!hasServices || view === "productos" ? "block" : "hidden lg:block"}>
                 <SectionHeader
                   icon={ShoppingBag}
                   eyebrow="Tienda"
@@ -229,7 +241,7 @@ export function TiendaClient({ datosIniciales }: { datosIniciales?: PerfilPublic
 
             {/* ── Mitad derecha: SERVICIOS (carta profesional) ─────────── */}
             {hasServices && (
-              <section className={view === "servicios" ? "block" : "hidden lg:block"}>
+              <section className={!hasProducts || view === "servicios" ? "block" : "hidden lg:block"}>
                 <SectionHeader
                   icon={Sparkles}
                   eyebrow="Trabaja conmigo"
@@ -289,6 +301,7 @@ function ProductCard({ product }: { product: CatalogProduct }) {
     product.price === "" || Number.isNaN(value) ? "Consultar" : formatMoney(value, product.currency);
   const image = product.imageUrl || product.images?.[0];
   const soldOut = product.kind !== "digital" && product.stock <= 0;
+  const purchaseUrl = safeUrlOrNull(product.purchaseUrl);
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card/50 transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_16px_40px_-16px_var(--primary)]">
@@ -330,34 +343,26 @@ function ProductCard({ product }: { product: CatalogProduct }) {
         <span className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-background/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
           <Tag className="size-2.5" /> {productCategoryLabel(product.category)}
         </span>
-        <p className="line-clamp-1 text-sm font-semibold">{product.name}</p>
-        {product.description && (
-          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{product.description}</p>
-        )}
-        {(product.variants?.length ?? 0) > 0 && (
-          <p className="line-clamp-1 text-[11px] text-muted-foreground">
-            {product.variants.map((v) => v.options.join("/")).join(" · ")}
-          </p>
-        )}
+        <p className="break-words text-sm font-semibold">{product.name}</p>
+        <CatalogProductDetails product={product} />
         <div className="mt-auto flex items-center justify-between gap-2 pt-1">
           <p className="text-base font-bold tabular-nums text-primary">{price}</p>
-          {product.purchaseUrl ? (
+          {soldOut ? (
+            <span className="text-xs font-medium text-muted-foreground">Agotado</span>
+          ) : purchaseUrl ? (
             <a
-              href={safeHref(product.purchaseUrl)}
+              href={purchaseUrl}
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition-opacity hover:opacity-90 ${
-                soldOut
-                  ? "bg-secondary text-muted-foreground"
-                  : "bg-primary text-primary-foreground shadow-[0_0_20px_-8px_var(--primary)]"
-              }`}
+              aria-label={`Comprar ${product.name} (abre otra pestaña)`}
+              className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              {soldOut ? "Agotado" : "Comprar"}
+              Comprar
               <ArrowUpRight className="size-3.5" />
             </a>
           ) : (
-            <span className="inline-flex items-center rounded-xl border border-border px-3 py-2 text-xs font-medium text-muted-foreground">
-              Consultar
+            <span className="text-xs text-muted-foreground">
+              Sin enlace de compra
             </span>
           )}
         </div>
@@ -374,6 +379,7 @@ function ServiceCard({ service }: { service: CatalogService }) {
   const modality =
     service.modality === "presencial" ? "Presencial" : service.modality === "online" ? "Online" : "Presencial u online";
   const duration = serviceDurationLabel(service);
+  const bookingUrl = safeUrlOrNull(service.bookingUrl);
 
   return (
     <div
@@ -433,18 +439,19 @@ function ServiceCard({ service }: { service: CatalogService }) {
             <span className="ml-1 text-xs font-medium text-muted-foreground">{priceUnitLabel(service.priceUnit)}</span>
           )}
         </p>
-        {service.bookingUrl && (
+        {bookingUrl ? (
           <a
-            href={safeHref(service.bookingUrl)}
+            href={bookingUrl}
+            aria-label={`Reservar o cotizar ${service.title} (abre otra pestaña)`}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] transition-all hover:opacity-90"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-[0_0_24px_-8px_var(--primary)] transition-all hover:opacity-90"
           >
             <CalendarCheck className="size-3.5" />
             Reservar / Cotizar
             <ArrowUpRight className="size-3.5" />
           </a>
-        )}
+        ) : <span className="text-xs text-muted-foreground">Sin enlace de reserva</span>}
       </div>
     </div>
   );

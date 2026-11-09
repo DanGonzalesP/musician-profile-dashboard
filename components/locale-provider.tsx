@@ -1,7 +1,8 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useContext, useMemo, useSyncExternalStore } from "react"
 import { type Locale, translate } from "@/lib/i18n"
+import { createBrowserPreference } from "@/lib/browser-preference"
 
 type LocaleContextValue = {
   locale: Locale
@@ -12,22 +13,14 @@ type LocaleContextValue = {
 const LocaleContext = createContext<LocaleContextValue | null>(null)
 
 const LOCALE_STORAGE_KEY = "amplitude:locale"
+const localePreference = createBrowserPreference<Locale>(
+  LOCALE_STORAGE_KEY, "es", (value): value is Locale => value === "es" || value === "en",
+)
+const setLocale = localePreference.set
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("es")
-
-  // El default de servidor/primer render siempre es "es" (para que no haya
-  // desajuste de hidratación); una vez montado en el cliente, se lee la
-  // preferencia guardada y se aplica.
-  useEffect(() => {
-    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY)
-    if (stored === "es" || stored === "en") setLocaleState(stored)
-  }, [])
-
-  const setLocale = (next: Locale) => {
-    setLocaleState(next)
-    window.localStorage.setItem(LOCALE_STORAGE_KEY, next)
-  }
+  // The server snapshot also supplies the first hydration render.
+  const locale = useSyncExternalStore(localePreference.subscribe, localePreference.getSnapshot, localePreference.getServerSnapshot)
 
   const value = useMemo<LocaleContextValue>(
     () => ({

@@ -5,7 +5,7 @@
 // dentro del panel admin), pasos cortos con vista previa en vivo al costado.
 // Paso 1: nombre → Paso 2: descripción → Paso 3: invitar integrantes → listo.
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -47,19 +47,38 @@ export default function NuevoGrupoPage() {
   const [inviteRole, setInviteRole] = useState<"admin" | "editor">("editor")
 
   const [creating, setCreating] = useState(false)
+  const createInFlight = useRef(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+  const [authError, setAuthError] = useState(false)
+  const [authRetry, setAuthRetry] = useState(0)
+  const [creationUncertain, setCreationUncertain] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null)
   const [inviteWarnings, setInviteWarnings] = useState<string[]>([])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        router.push("/login")
-        return
+    let active = true
+    const checkAuth = async () => {
+      setCheckingAuth(true)
+      setAuthError(false)
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (!active) return
+        if (error) throw error
+        if (!user) {
+          router.push("/login")
+          return
+        }
+        setUserId(user.id)
+      } catch {
+        if (active) setAuthError(true)
+      } finally {
+        if (active) setCheckingAuth(false)
       }
-      setUserId(user.id)
-    })
-  }, [router])
+    }
+    void checkAuth()
+    return () => { active = false }
+  }, [router, authRetry])
 
   const goTo = (next: number) => {
     setDirection(next > step ? 1 : -1)
@@ -78,52 +97,57 @@ export default function NuevoGrupoPage() {
   }
 
   const handleCreate = async () => {
-    if (!userId || !name.trim()) return
+    if (createInFlight.current || creationUncertain || checkingAuth || authError || !userId || !name.trim() || createdGroupId) return
+    createInFlight.current = true
     setCreating(true)
     setErrorMessage("")
     const warnings: string[] = []
+    let confirmedGroupId: string | null = null
     try {
-      const groupId = await createBand(userId, name.trim())
+      let groupId: string
+      try {
+        groupId = await createBand(userId, name.trim())
+        confirmedGroupId = groupId
+      } catch {
+        setCreationUncertain(true)
+        setErrorMessage("No pudimos confirmar si el grupo se creó. Revisa Mis grupos antes de volver a intentarlo.")
+        return
+      }
 
       if (description.trim()) {
-        // La bio es opcional: si falla (ej. falta correr la migración de RLS),
-        // el grupo ya existe y no se bloquea el flujo.
-        const { error: bioError } = await supabase
-          .from("profiles")
-          .update({ bio: description.trim() })
-          .eq("id", groupId)
-        if (bioError) warnings.push("No se pudo guardar la descripción — puedes editarla luego en el editor.")
+        try {
+          const { data, error: bioError } = await supabase
+            .from("profiles")
+            .update({ bio: description.trim() })
+            .eq("id", groupId)
+            .select("id")
+            .maybeSingle()
+          if (bioError || !data) warnings.push("No se pudo guardar la descripción — puedes editarla luego en el editor.")
+        } catch {
+          warnings.push("No se pudo guardar la descripción — puedes editarla luego en el editor.")
+        }
       }
 
       for (const inv of invitations) {
         try {
           await inviteMember(groupId, inv.username, inv.role)
-        } catch (err) {
-          warnings.push(
-            err instanceof Error ? err.message : `No se pudo invitar a @${inv.username}.`
-          )
+        } catch {
+          warnings.push(`No se pudo enviar la invitación a @${inv.username}. Puedes intentarlo luego desde el panel.`)
         }
       }
 
       setInviteWarnings(warnings)
       setCreatedGroupId(groupId)
-    } catch (err) {
-      // Los errores de Supabase (PostgrestError) no son instancias de Error,
-      // así que había que leer .message directo del objeto o se perdía el
-      // motivo real y siempre se mostraba el mensaje genérico de abajo.
-      const raw =
-        err instanceof Error
-          ? err.message
-          : err && typeof err === "object" && "message" in err
-            ? String((err as { message: unknown }).message)
-            : ""
-      // El error típico de RLS de Supabase es críptico — se traduce a algo accionable.
-      setErrorMessage(
-        raw.includes("row-level security")
-          ? "Supabase rechazó la creación del grupo. Verifica que las migraciones versionadas estén aplicadas."
-          : raw || "No se pudo crear el grupo musical. Intenta de nuevo."
-      )
+    } catch {
+      if (confirmedGroupId) {
+        setInviteWarnings([...warnings, "El grupo ya se creó, pero no pudimos terminar todos los pasos. Puedes completarlos desde el panel."])
+        setCreatedGroupId(confirmedGroupId)
+      } else {
+        setCreationUncertain(true)
+        setErrorMessage("No se pudo completar la creación. Revisa Mis grupos antes de volver a intentarlo.")
+      }
     } finally {
+      createInFlight.current = false
       setCreating(false)
     }
   }
@@ -163,7 +187,7 @@ export default function NuevoGrupoPage() {
           </p>
 
           {inviteWarnings.length > 0 && (
-            <div className="mt-4 space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-500">
+            <div role="status" aria-live="polite" className="mt-4 space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-500">
               {inviteWarnings.map((w, i) => (
                 <p key={i}>• {w}</p>
               ))}
@@ -206,6 +230,13 @@ export default function NuevoGrupoPage() {
       </header>
 
       <div className="relative z-10 mx-auto grid w-full max-w-5xl gap-10 px-6 pb-16 pt-6 lg:grid-cols-[1fr_minmax(0,380px)] lg:items-start">
+        {authError && (
+          <div role="alert" className="col-span-full rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+            No pudimos comprobar tu sesión. Inténtalo de nuevo.
+            <button type="button" disabled={checkingAuth} onClick={() => setAuthRetry(value => value + 1)} className="ml-2 min-h-11 underline">Reintentar</button>
+          </div>
+        )}
+        {checkingAuth && <p role="status" className="col-span-full text-sm text-muted-foreground">Comprobando sesión…</p>}
         {/* Columna izquierda: pasos */}
         <div>
           {/* Indicador de pasos */}
@@ -216,7 +247,8 @@ export default function NuevoGrupoPage() {
                 type="button"
                 onClick={() => i < step && goTo(i)}
                 className="group flex items-center gap-2"
-                disabled={i > step}
+                disabled={creating || i > step}
+                aria-current={i === step ? "step" : undefined}
               >
                 <span
                   className={`flex size-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
@@ -265,10 +297,12 @@ export default function NuevoGrupoPage() {
                       separado del tuyo, gestionado entre todos sus integrantes.
                     </p>
                     <input
+                      aria-label="Nombre del grupo"
                       type="text"
                       autoFocus
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      disabled={creating}
                       onKeyDown={(e) => e.key === "Enter" && canContinue && goTo(1)}
                       placeholder="Ej. Los Vientos del Sur"
                       className="w-full rounded-2xl border border-input bg-card/60 px-5 py-4 font-display text-xl font-bold text-foreground placeholder:font-sans placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -282,9 +316,11 @@ export default function NuevoGrupoPage() {
                 {step === 1 && (
                   <div className="mt-6 space-y-3">
                     <textarea
+                      aria-label="Descripción del grupo"
                       autoFocus
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
+                      disabled={creating}
                       rows={5}
                       placeholder="Ej. Cuarteto de cumbia y fusión andina desde Lima. Girando desde 2021."
                       className="w-full resize-none rounded-2xl border border-input bg-card/60 px-5 py-4 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -305,16 +341,20 @@ export default function NuevoGrupoPage() {
                     </p>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <input
+                        aria-label="Nombre de usuario para invitar"
                         type="text"
                         value={inviteUsername}
                         onChange={(e) => setInviteUsername(e.target.value)}
+                        disabled={creating}
                         onKeyDown={(e) => e.key === "Enter" && addInvitation()}
                         placeholder="@usuario"
                         className="flex-1 rounded-xl border border-input bg-card/60 px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                       <select
+                        aria-label="Rol de la invitación"
                         value={inviteRole}
                         onChange={(e) => setInviteRole(e.target.value as "admin" | "editor")}
+                        disabled={creating}
                         className="rounded-xl border border-input bg-card/60 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                       >
                         <option value="editor">Editor</option>
@@ -323,7 +363,7 @@ export default function NuevoGrupoPage() {
                       <button
                         type="button"
                         onClick={addInvitation}
-                        disabled={!inviteUsername.trim()}
+                        disabled={creating || !inviteUsername.trim()}
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                       >
                         <Plus className="size-4" /> Añadir
@@ -348,6 +388,7 @@ export default function NuevoGrupoPage() {
                               onClick={() =>
                                 setInvitations((prev) => prev.filter((i) => i.username !== inv.username))
                               }
+                              disabled={creating}
                               aria-label={`Quitar a ${inv.username}`}
                               className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                             >
@@ -361,8 +402,9 @@ export default function NuevoGrupoPage() {
                 )}
 
                 {errorMessage && (
-                  <p className="mt-4 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                  <p role="alert" aria-live="assertive" className="mt-4 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
                     {errorMessage}
+                    {creationUncertain && <Link href="/perfil/banda" className="mt-2 block min-h-11 underline">Revisar Mis grupos</Link>}
                   </p>
                 )}
 
@@ -371,6 +413,7 @@ export default function NuevoGrupoPage() {
                     <button
                       type="button"
                       onClick={() => goTo(step - 1)}
+                      disabled={creating}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
                     >
                       <ArrowLeft className="size-4" /> Atrás
@@ -380,7 +423,7 @@ export default function NuevoGrupoPage() {
                     <button
                       type="button"
                       onClick={() => goTo(step + 1)}
-                      disabled={!canContinue}
+                      disabled={creating || !canContinue}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                     >
                       Continuar <ArrowRight className="size-4" />
@@ -389,7 +432,7 @@ export default function NuevoGrupoPage() {
                     <button
                       type="button"
                       onClick={handleCreate}
-                      disabled={creating || !name.trim()}
+                      disabled={creating || creationUncertain || checkingAuth || authError || !userId || !name.trim()}
                       className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                     >
                       {creating ? (

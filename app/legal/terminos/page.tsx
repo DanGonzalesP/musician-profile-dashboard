@@ -1,4 +1,5 @@
 import { LEGAL_CONTACT_EMAIL, LEGAL_JURISDICTION, SITE_NAME } from "@/lib/site"
+import { LEGAL_VERSIONS } from "@/lib/legal-acceptance"
 
 export const metadata = { title: "Términos y Condiciones — Vibe" }
 
@@ -6,10 +7,11 @@ export default function TerminosPage() {
   return (
     <article className="space-y-6 text-sm leading-relaxed text-foreground/90 [&_h2]:font-display [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-foreground [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-foreground [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-5">
       <h1 className="font-display text-3xl font-bold text-foreground">Términos y Condiciones</h1>
+      <p className="text-xs text-muted-foreground">Versión del {LEGAL_VERSIONS.terms}</p>
       <p>
-        Bienvenido a {SITE_NAME}. Estos Términos regulan el uso de la plataforma (el sitio web, el
-        editor de perfiles, el feed, la tienda y todos los servicios asociados). Al crear una cuenta
-        o usar {SITE_NAME}, aceptas estos Términos. Si no estás de acuerdo, no uses la plataforma.
+        Este borrador describe las condiciones propuestas para {SITE_NAME}: el sitio web, el editor
+        de perfiles, el feed, la tienda y los servicios asociados. La versión definitiva deberá
+        identificar al titular responsable y las condiciones aprobadas antes del lanzamiento público.
       </p>
 
       <h2>1. Qué es {SITE_NAME}</h2>
@@ -22,7 +24,7 @@ export default function TerminosPage() {
 
       <h2>2. Tu cuenta</h2>
       <ul>
-        <li>Debes tener al menos 13 años (o la edad mínima legal en tu país) para crear una cuenta. Para vender productos o servicios debes tener capacidad legal para contratar.</li>
+        <li>Mientras se definen las autorizaciones y medidas de protección que requiere la participación de menores de edad, crear una cuenta exige declarar que tienes 18 años o más. Guardamos la fecha, la versión de estos documentos y esa declaración como constancia. Para vender productos o servicios se requiere capacidad legal para contratar.</li>
         <li>Eres responsable de mantener la confidencialidad de tu contraseña y de toda la actividad que ocurra en tu cuenta.</li>
         <li>La información de tu perfil debe ser veraz. No puedes hacerte pasar por otra persona, artista o agrupación.</li>
         <li>Los perfiles de grupo musical son gestionados por su creador y por los integrantes que él invite; el creador responde por la página del grupo.</li>
@@ -84,8 +86,9 @@ export default function TerminosPage() {
 
       <h2>7. Propiedad de la plataforma</h2>
       <p>
-        El software, el diseño, el logotipo y la marca {SITE_NAME} son de nuestra propiedad o de
-        nuestros licenciantes. Estos Términos no te otorgan ningún derecho sobre ellos.
+        {SITE_NAME} es el nombre provisional del proyecto. Su disponibilidad y protección como marca
+        están pendientes de evaluación; este documento no afirma que exista una marca registrada.
+        El software, los diseños y los recursos de terceros mantienen sus licencias correspondientes.
       </p>
 
       <h2>8. Descargo de responsabilidad</h2>

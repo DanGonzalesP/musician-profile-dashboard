@@ -41,10 +41,11 @@ function PulseUnderline({ className }: { className?: string }) {
  * corta en el centro — a la vez una v y una onda de sonido, un solo gesto
  * en vez de letra + adorno.
  */
-export function LogoMark({ className }: { className?: string }) {
+export function LogoMark({ className, onNavigate }: { className?: string; onNavigate?: (event: { preventDefault: () => void }) => void }) {
   return (
     <Link
       href="/"
+      onNavigate={onNavigate}
       aria-label="Ir al feed principal"
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black",
@@ -86,18 +87,21 @@ export function Logo({
   className,
   markClassName,
   showWordmark = true,
+  onNavigate,
 }: {
   className?: string
   markClassName?: string
   showWordmark?: boolean
+  onNavigate?: (event: { preventDefault: () => void }) => void
 }) {
   if (!showWordmark) {
-    return <LogoMark className={cn("size-8", markClassName)} />
+    return <LogoMark className={cn("size-8", markClassName)} onNavigate={onNavigate} />
   }
 
   return (
     <Link
       href="/"
+      onNavigate={onNavigate}
       aria-label="Ir al feed principal"
       className={cn("inline-flex flex-col items-start leading-none", className)}
     >

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { esRutaProtegida } from "@/lib/protected-routes"
+import { hasPlatformPermission } from "@/lib/admin"
 import { crearCsp } from "@/lib/csp"
 
 const aplicarCsp = (response: NextResponse, csp: string): NextResponse => {
@@ -44,7 +45,13 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) return aplicarCsp(response, csp)
+  if (user) {
+    if ((pathname === "/admin" || pathname.startsWith("/admin/")) &&
+      !(await hasPlatformPermission(supabase, "moderation"))) {
+      return aplicarCsp(NextResponse.redirect(new URL("/", request.url)), csp)
+    }
+    return aplicarCsp(response, csp)
+  }
 
   const login = new URL("/login", request.url)
   login.searchParams.set("redirect", pathname)

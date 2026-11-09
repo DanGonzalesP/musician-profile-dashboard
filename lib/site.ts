@@ -22,6 +22,6 @@ export const SITE_NAME = "Vibe"
 // Queda entonces: la variable, o localhost. Si falta en producción, las
 // tarjetas sociales apuntarían a localhost, y por eso el smoke la verifica.
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-export const LEGAL_CONTACT_EMAIL = "danielgonzales200427@gmail.com"
-export const LEGAL_LAST_UPDATE = "19 de julio de 2026"
+export const LEGAL_CONTACT_EMAIL = "vibemusicprofile@gmail.com"
+export const LEGAL_LAST_UPDATE = "6 de noviembre de 2026"
 export const LEGAL_JURISDICTION = "Perú";

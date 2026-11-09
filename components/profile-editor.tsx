@@ -1,21 +1,26 @@
 "use client"
 
 import { Suspense, useState, useEffect, useRef } from "react"
+import { collectMediaUrls } from "@/lib/media-url"
 import { useRouter, useSearchParams } from "next/navigation"
 import { type Block, type BlockType, type TracksData, type CreditsData, createBlock, dbBlockToBlock, defaultData, isKnownBlockType, mergePublicacionesEmbeds, SINGLETON_BLOCK_TYPES } from "@/lib/blocks"
 import { evaluarLoteSegunModo } from "@/lib/blocks-schema"
 import { revalidarPerfilPublico } from "@/app/acciones/revalidar-perfil"
-import { type CatalogProduct, type CatalogService, fetchCatalog, publishCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog"
+import { type CatalogProduct, type CatalogService, fetchCatalog, normalizeDraftProduct, normalizeDraftService } from "@/lib/catalog"
 import { type BandRole, getActiveBandId, setActiveBandId, getEffectiveBandRole } from "@/lib/bands"
 import { EditorHeader } from "@/components/editor-header"
+import { CatalogReconciliation, type CatalogChoice } from "@/components/catalog-reconciliation"
 import { BlockLibrary } from "@/components/block-library"
 import { PreviewCanvas } from "@/components/preview-canvas"
 import { BlockInspector, audioBitrateByFile } from "@/components/block-inspector"
 import { Layers, LogOut, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { authedFetch } from "@/lib/authed-fetch"
+import { createVerifiedUploadAttempt } from "@/lib/upload-protocol"
 import { sanitizeUrlFields } from "@/lib/safe-url"
-import { fetchDraft, saveDraft } from "@/lib/draft"
+import { EditorPersistence, EditorPersistenceError, readEditorState } from "@/lib/editor-persistence"
+import { UploadFeedbackError } from "@/lib/upload-feedback"
+import { createEditorCopy } from "@/lib/editor-copy"
+import { mergeUploadedUrls } from "@/lib/upload-merge"
 import { ensureOwnProfile, resolveOwnProfileId } from "@/lib/ensure-profile"
 import imageCompression from "browser-image-compression"
 import { ensureCompressedAudio, DEFAULT_AUDIO_BITRATE } from "@/lib/audio-transcode"
@@ -94,12 +99,7 @@ function stripDeadBlobUrls<T extends Record<string, unknown>>(data: T): T {
  * una imagen por otra).
  */
 function extractR2Urls(value: unknown): Set<string> {
-  const base = process.env.NEXT_PUBLIC_R2_PUBLIC_URL
-  if (!base) return new Set()
-  const json = JSON.stringify(value ?? null)
-  const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const matches = json.match(new RegExp(`${escapedBase}/[^"\\\\]+`, "g")) ?? []
-  return new Set(matches)
+  return collectMediaUrls(value)
 }
 
 // Algunos navegadores detectan mal el MIME type de ciertos archivos de audio
@@ -130,36 +130,39 @@ const IMAGE_MIME_TYPES: Record<string, string> = {
 
 /**
  * Comprime y convierte una imagen a WebP (<500KB) antes de subirla. Esto
- * corre siempre en uploadFileToStorage, invisible para el usuario — no hace
+ * corre al preparar la subida, invisible para el usuario — no hace
  * falta tocar nada en los uploaders individuales (avatar, banner, portadas,
  * pistas, merch, etc).
  */
-async function compressImage(file: File): Promise<File> {
+async function compressImage(file: File, cancellation?: AbortSignal): Promise<File> {
+  cancellation?.throwIfAborted()
   try {
     const compressed = await imageCompression(file, {
+      signal: cancellation,
       maxSizeMB: 0.5,
       maxWidthOrHeight: 2000,
       useWebWorker: true,
       fileType: "image/webp",
       initialQuality: 0.82,
     })
+    cancellation?.throwIfAborted()
     return new File([compressed], file.name.replace(/\.\w+$/, ".webp"), { type: "image/webp" })
-  } catch (err) {
+  } catch {
+    cancellation?.throwIfAborted()
     // Si la compresión falla (ej. formato no soportado por el navegador),
     // se sube el archivo original en vez de bloquear la publicación.
-    console.error("[compressImage] Error comprimiendo imagen, se sube el original:", err)
     return file
   }
 }
 
 /**
- * Sube un File a Cloudflare R2 (vía URL firmada, ver app/api/upload-url) y
- * devuelve la URL pública permanente. El archivo va directo del navegador a
- * R2 — este helper solo pide la URL firmada, no reenvía el archivo por
- * ningún servidor propio.
+ * Prepara los bytes una vez y devuelve un intento repetible vinculado a
+ * cuenta y perfil. El transporte no devuelve URL hasta verificar la subida.
  */
-async function uploadFileToStorage(file: File, folder: "images" | "audio"): Promise<string> {
-  const uploadFile = folder === "images" ? await compressImage(file) : file
+async function prepareFileUpload(file: File, folder: "images" | "audio", ownerUserId: string, profileId: string, cancellation?: AbortSignal): Promise<(cancellation?: AbortSignal) => Promise<string>> {
+  cancellation?.throwIfAborted()
+  const uploadFile = folder === "images" ? await compressImage(file, cancellation) : file
+  cancellation?.throwIfAborted()
   const ext = (uploadFile.name.split(".").pop() ?? "bin").toLowerCase()
   // Se usa || y no ?? a propósito: file.type puede venir como cadena VACÍA
   // (el navegador no reconoció el archivo), y "" es un valor que ?? deja
@@ -173,25 +176,27 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
   const uploadBody =
     uploadFile.type === contentType ? uploadFile : new File([uploadFile], uploadFile.name, { type: contentType })
 
-  const presignRes = await authedFetch("/api/upload-url", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ folder, extension: ext, contentType, bytes: uploadFile.size }),
-  })
-  if (!presignRes.ok) {
-    const body = await presignRes.json().catch(() => ({}))
-    throw new Error(body.error ?? "No se pudo iniciar la subida del archivo.")
-  }
-  const { uploadUrl, publicUrl } = (await presignRes.json()) as { uploadUrl: string; publicUrl: string }
+  return createVerifiedUploadAttempt(uploadBody, folder, ownerUserId, profileId)
+}
 
-  const putRes = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: uploadBody,
-  })
-  if (!putRes.ok) throw new Error("No se pudo subir el archivo al almacenamiento.")
+// WeakMap: los intentos dejan de retener archivos cuando desaparecen del editor.
+// Cuenta, perfil y bitrate separan reservas que no son intercambiables.
+const editorUploadAttempts = new WeakMap<File, Map<string, Promise<(cancellation?: AbortSignal) => Promise<string>>>>()
+type UploadStage = "preparing" | "transferring" | "ready"
+type UploadStageListener = (url: string, stage: UploadStage) => void
 
-  return publicUrl
+// No liberar Publicar al primer rechazo mientras otras subidas siguen activas.
+async function settleUploads<T>(uploads: Promise<T>[], onFailure: () => void): Promise<T[]> {
+  const results = await Promise.allSettled(uploads.map(upload => upload.catch(error => {
+    onFailure()
+    throw error
+  })))
+  const failed = results.find(result => result.status === "rejected")
+  if (failed?.status === "rejected") throw failed.reason
+  return results.map(result => {
+    if (result.status !== "fulfilled") throw new Error("No se completaron los archivos.")
+    return result.value
+  })
 }
 
 /**
@@ -212,7 +217,8 @@ async function uploadFileToStorage(file: File, folder: "images" | "audio"): Prom
  * registro pasa recién al final de handlePublish, cuando TODO el publish
  * terminó con éxito.
  */
-async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Promise<string> {
+async function uploadBlobFile(url: string, blobRegistry: Map<string, File>, profileId: string, expectedOwner: string, onStage?: UploadStageListener, cancellation?: AbortSignal): Promise<string> {
+  cancellation?.throwIfAborted()
   const file = blobRegistry.get(url)
   if (!file) {
     throw new Error(
@@ -235,8 +241,33 @@ async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Pro
   // ese es el único hilo que conecta "qué se eligió" con "qué archivo es" —
   // pasa mucho tiempo (hasta que se publica) entre una cosa y la otra.
   const bitrate = audioBitrateByFile.get(file) ?? DEFAULT_AUDIO_BITRATE
-  const fileToUpload = folder === "audio" ? await ensureCompressedAudio(file, bitrate) : file
-  return uploadFileToStorage(fileToUpload, folder)
+  onStage?.(url, "preparing")
+  const { data, error } = await supabase.auth.getSession()
+  cancellation?.throwIfAborted()
+  if (error || !data.session) throw new Error("Inicia sesión para completar la publicación.")
+  const owner = data.session.user.id
+  if (owner !== expectedOwner) throw new Error("La cuenta cambió durante la subida. Vuelve a abrir el perfil con la cuenta original.")
+  const attemptKey = JSON.stringify([owner, profileId, folder, folder === "audio" ? bitrate : null])
+  let attempts = editorUploadAttempts.get(file)
+  if (!attempts) { attempts = new Map(); editorUploadAttempts.set(file, attempts) }
+  const fileAttempts = attempts
+  let prepared = fileAttempts.get(attemptKey)
+  if (!prepared) {
+    prepared = (async () => {
+      const fileToUpload = folder === "audio" ? await ensureCompressedAudio(file, bitrate, undefined, cancellation) : file
+      cancellation?.throwIfAborted()
+      return prepareFileUpload(fileToUpload, folder, owner, profileId, cancellation)
+    })()
+    fileAttempts.set(attemptKey, prepared)
+    void prepared.catch(() => { if (fileAttempts.get(attemptKey) === prepared) fileAttempts.delete(attemptKey) })
+  }
+  const run = await prepared
+  cancellation?.throwIfAborted()
+  onStage?.(url, "transferring")
+  const permanentUrl = await run(cancellation)
+  cancellation?.throwIfAborted()
+  onStage?.(url, "ready")
+  return permanentUrl
 }
 
 /**
@@ -248,14 +279,18 @@ async function uploadBlobFile(url: string, blobRegistry: Map<string, File>): Pro
  */
 async function resolveEntityBlobs<T extends Record<string, unknown>>(
   item: T,
-  blobRegistry: Map<string, File>
+  blobRegistry: Map<string, File>,
+  profileId: string,
+  expectedOwner: string,
+  onStage?: UploadStageListener,
+  cancellation?: AbortSignal
 ): Promise<T> {
   const blobPaths = collectBlobPaths(item)
   if (blobPaths.length === 0) return item
 
   let updated: Record<string, unknown> = { ...item }
   for (const { path, url } of blobPaths) {
-    const permanentUrl = await uploadBlobFile(url, blobRegistry)
+    const permanentUrl = await uploadBlobFile(url, blobRegistry, profileId, expectedOwner, onStage, cancellation)
     updated = setDeep(updated, path, permanentUrl)
   }
   return updated as T
@@ -302,6 +337,7 @@ function ProfileEditorInner() {
   // overlay a pantalla completa en vez de compartir espacio con el lienzo.
   const [mobileBlocksOpen, setMobileBlocksOpen] = useState(searchParams.get("abrir") === "bloques")
   const [publishing, setPublishing] = useState(false)
+  const [publishStage, setPublishStage] = useState("")
   const [loading, setLoading] = useState(true)
   // Slug de la página pública ya publicada (deriva de profiles.display_name)
   // — solo existe una vez que el artista publicó al menos una vez.
@@ -312,12 +348,47 @@ function ProfileEditorInner() {
   // "editor" para un miembro de banda. Controla qué puede tocar en el
   // lienzo (ver bloqueo de bloques más abajo).
   const [activeRole, setActiveRole] = useState<BandRole>("owner")
+  const [confirmedDraft, setConfirmedDraft] = useState<string | null>(null)
+  const [draftWrites, setDraftWrites] = useState(0)
+  const [draftFailed, setDraftFailed] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [sessionChanged, setSessionChanged] = useState(false)
+  const [draftEverSaved, setDraftEverSaved] = useState(false)
+  const [catalogComparison, setCatalogComparison] = useState<CatalogChoice | null>(null)
+  const [catalogChoiceBusy, setCatalogChoiceBusy] = useState(false)
+  const [catalogChoiceError, setCatalogChoiceError] = useState("")
+  const catalogChoiceLock = useRef(false)
+  const draftSnapshot = JSON.stringify({ blocks, products, services })
+  // Los archivos blob sólo viven en esta pestaña hasta publicarse.
+  const hasLocalFiles = collectBlobPaths({ blocks, products, services }).length > 0
+  const draftPending = confirmedDraft !== null && draftSnapshot !== confirmedDraft
+  const draftMessage = publishing ? publishStage || "Preparando publicación…"
+    : draftFailed ? "Guardado no confirmado. Conserva esta pestaña y tus cambios antes de recargar."
+    : draftWrites > 0 ? "Guardando borrador…"
+    : draftPending ? "Cambios pendientes de guardar…"
+    : hasLocalFiles ? "Texto guardado. Hay archivos locales: publica para conservarlos antes de salir."
+    : !draftEverSaved ? "Contenido cargado. Tus próximos cambios se guardarán como borrador."
+    : "Borrador guardado. Los cambios se hacen públicos al publicar."
   // Aviso de salida al presionar "atrás" en el celular (ver efecto de
   // bloqueo de historial más abajo) — la única salida real desde ese gesto
   // es cerrar sesión; "Volver al feed" del header sigue funcionando normal
   // porque navega con un Link, no dispara "popstate".
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [loggingOutFromEditor, setLoggingOutFromEditor] = useState(false)
+  const logoutLock = useRef(false)
+  const exitDialogRef = useRef<HTMLDialogElement>(null)
+  const keepEditingRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!showExitConfirm) return
+    const dialog = exitDialogRef.current
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    dialog?.showModal()
+    keepEditingRef.current?.focus()
+    return () => {
+      dialog?.close()
+      previousFocus?.focus()
+    }
+  }, [showExitConfirm])
 
   /**
    * Registro de blob URLs → File real.
@@ -325,6 +396,13 @@ function ProfileEditorInner() {
    * la registran aquí. handlePublish lo consulta al guardar.
    */
   const blobRegistryRef = useRef<Map<string, File>>(new Map())
+  useEffect(() => {
+    const registry = blobRegistryRef.current
+    return () => {
+      for (const url of registry.keys()) if (url.startsWith("blob:")) URL.revokeObjectURL(url)
+      registry.clear()
+    }
+  }, [])
   // Id de perfil resuelto en la carga — el autoguardado de borrador lo reutiliza
   // para no repetir la consulta de auth en cada cambio.
   const profileIdRef = useRef<string | null>(null)
@@ -336,14 +414,45 @@ function ProfileEditorInner() {
   // en el ciclo inmediatamente siguiente, las filas que Publish acaba de
   // marcar como is_visible:true.
   const skipNextAutosaveRef = useRef(false)
+  const allowProfileReloadRef = useRef(false)
+  const lastPublishedRef = useRef<string | null>(null)
   // Versión de contenido sobre la que se está editando. Se manda al publicar
   // para que la base rechace el guardado si alguien más publicó mientras
   // tanto, en vez de pisarlo en silencio (ver 0007_optimistic_concurrency).
-  const contentVersionRef = useRef<number | null>(null)
+  const persistenceRef = useRef<EditorPersistence | null>(null)
+  const editorUserIdRef = useRef<string | null>(null)
+  const publishingRef = useRef(false)
+  const publicationPreparation = useRef<AbortController | null>(null)
 
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null
 
   useEffect(() => {
+    let active = true
+    let invalidated = false
+    let observedIdentity: string | null | undefined
+    function invalidateSession() {
+      if (!active || invalidated) return
+      invalidated = true
+      publicationPreparation.current?.abort()
+      persistenceRef.current = null
+      editorUserIdRef.current = null
+      setSessionChanged(true)
+      setLoading(false)
+    }
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextIdentity = session?.user.id ?? null
+      if (observedIdentity !== undefined && observedIdentity !== nextIdentity) invalidateSession()
+      observedIdentity = nextIdentity
+    })
+    function canLoad(userId: string) {
+      if (!active || invalidated) return false
+      if (observedIdentity !== undefined && observedIdentity !== userId) {
+        invalidateSession()
+        return false
+      }
+      observedIdentity = userId
+      return true
+    }
     async function loadSavedBlocks() {
       try {
         // profile_blocks/products/services están indexados por el id real de
@@ -353,13 +462,17 @@ function ProfileEditorInner() {
         // que cualquier visitante anónimo de /dashboard editara —y pisara—
         // un perfil compartido. Ahora sin sesión se manda a /login, y si la
         // cuenta todavía no tiene fila, ensureOwnProfile se la crea.
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (!active || invalidated) return
+        if (authError) throw new Error("No se pudo comprobar tu sesión.")
         if (!user) {
           router.replace("/login")
           return
         }
+        if (!canLoad(user.id)) return
 
         const ownProfile = await ensureOwnProfile(user)
+        if (!canLoad(user.id)) return
         if (!ownProfile) {
           throw new Error("No se pudo cargar tu perfil. Vuelve a iniciar sesión e inténtalo de nuevo.")
         }
@@ -378,9 +491,12 @@ function ProfileEditorInner() {
           const selectedBandId = getActiveBandId(user.id)
           if (selectedBandId) {
             const bandRole = await getEffectiveBandRole(selectedBandId, user.id)
-            const { data: bandProfile } = bandRole
-              ? await supabase.from("profiles").select("id, username").eq("id", selectedBandId).maybeSingle()
-              : { data: null }
+            if (!canLoad(user.id)) return
+            const { data: bandProfile, error: bandError } = bandRole
+              ? await supabase.from("profiles").select("id, username").eq("id", selectedBandId).eq("profile_type", "band").maybeSingle()
+              : { data: null, error: null }
+            if (!canLoad(user.id)) return
+            if (bandError) throw new Error("No se pudo cargar el grupo seleccionado.")
 
             if (bandRole && bandProfile) {
               profileId = bandProfile.id
@@ -393,33 +509,34 @@ function ProfileEditorInner() {
           }
         }
 
-        const { data: versionRow } = await supabase
-          .from("profiles")
-          .select("content_version")
-          .eq("id", profileId)
-          .maybeSingle()
-        contentVersionRef.current = versionRow?.content_version ?? null
-
-        profileIdRef.current = profileId
-        isBandRef.current = isBand
-        setEditorProfile({ id: profileId, isBand })
-        setActiveRole(role)
+        const editorState = await readEditorState(profileId)
+        if (!canLoad(user.id)) return
 
         // El enlace público usa el username real, no un slug derivado del
         // nombre: dos artistas pueden llamarse igual, y renombrarse no debe
         // romper los QR ni los enlaces ya compartidos. Ver lib/username.ts.
-        setPublicSlug(effectiveUsername)
 
-        // El borrador se consulta en una llamada aparte: si falla (ej. la
-        // migración de profile_private todavía no corrió en Supabase) no debe
-        // tumbar la carga de lo ya publicado — solo se ignora el borrador.
-        // profileId siempre está resuelto a esta altura (perfil personal
-        // garantizado por ensureOwnProfile, o la banda seleccionada), así que
-        // ya no hace falta condicionar la lectura del borrador.
+        // La lectura versionada anterior debe confirmarse antes de editar:
+        // un error de borrador no permite cargar contenido público como si
+        // fuera un borrador vacío y sobrescribir el trabajo pendiente.
         type EditorDraft = { blocks: Block[]; products: CatalogProduct[]; services: CatalogService[] }
-        const draft = (await fetchDraft(profileId)) as EditorDraft | null
+        const draft = editorState.draft_content as EditorDraft | null
 
         if (draft) {
+          if (editorState.draft_content?.catalog_base_version !== editorState.content_version) {
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+            if (!canLoad(user.id)) return
+            if (sessionError || sessionData.session?.user.id !== user.id) throw new Error("Sesión no disponible")
+            const token = sessionData.session.access_token
+            const currentCatalog = await fetchCatalog(profileId, token)
+            if (!canLoad(user.id)) return
+            const afterCatalog = await readEditorState(profileId, token)
+            if (!canLoad(user.id)) return
+            if (afterCatalog.content_version !== editorState.content_version || afterCatalog.draft_revision !== editorState.draft_revision) {
+              throw new Error("El catálogo cambió mientras se cargaba")
+            }
+            setCatalogComparison(currentCatalog)
+          }
           const cleanBlocks = (draft.blocks ?? [])
             .filter((b) => isKnownBlockType(b.type))
             .map((b) => ({
@@ -449,6 +566,7 @@ function ProfileEditorInner() {
             .eq("profile_id", profileId)
             .order("position_index", { ascending: true })
 
+          if (!canLoad(user.id)) return
           if (error) throw error
 
           // Lo publicado NUNCA debería tener blob URLs (se resuelven a permanentes
@@ -465,39 +583,65 @@ function ProfileEditorInner() {
                     .map((b) => ({ ...b, data: stripDeadBlobUrls(b.data as Record<string, unknown>) as Block["data"] }))
                 )
               : [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
+          const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId)
+          if (!canLoad(user.id)) return
           setBlocks(loadedBlocks)
           setSelectedId(defaultSelectedId(loadedBlocks))
-
-          const { products: catalogProducts, services: catalogServices } = await fetchCatalog(profileId)
           setProducts(catalogProducts)
           setServices(catalogServices)
         }
+        profileIdRef.current = profileId
+        isBandRef.current = isBand
+        setEditorProfile({ id: profileId, isBand })
+        setActiveRole(role)
+        setPublicSlug(effectiveUsername)
+        editorUserIdRef.current = user.id
+        persistenceRef.current = new EditorPersistence(profileId, editorState, user.id)
+        skipNextAutosaveRef.current = true
       } catch (err) {
-        console.error("Error cargando bloques iniciales:", err)
+        if (!active || invalidated) return
+        persistenceRef.current = null
+        editorUserIdRef.current = null
+        setLoadFailed(true)
+        showToast("No se pudo cargar tu contenido. Recarga la página antes de guardar o publicar.", "error")
+        logSupabaseError("editor: carga inicial", err)
         const fallbackBlocks = [createBlock("hero"), createBlock("tracks"), createBlock("merch")]
         setBlocks(fallbackBlocks)
         setSelectedId(defaultSelectedId(fallbackBlocks))
       } finally {
-        setLoading(false)
+        if (active && !invalidated) setLoading(false)
       }
     }
     loadSavedBlocks()
-  }, [router])
+    return () => {
+      active = false
+      publicationPreparation.current?.abort()
+      authListener.subscription.unsubscribe()
+      persistenceRef.current = null
+      editorUserIdRef.current = null
+    }
+  }, [router, showToast])
 
   // Autoguardado de borrador: cada cambio se sube a profiles.draft_content
   // (columna aparte, nunca leída por el perfil público). No toca
   // profile_blocks/products/services — esas tablas son lo que ya está
   // publicado y solo cambian cuando se presiona Publish.
   useEffect(() => {
-    if (loading || publishing) return
+    if (loading || publishing || loggingOutFromEditor || catalogComparison || !persistenceRef.current) return
+    if (draftSnapshot === lastPublishedRef.current) return
     if (skipNextAutosaveRef.current) {
       skipNextAutosaveRef.current = false
+      setConfirmedDraft(draftSnapshot)
       return
     }
     const profileId = profileIdRef.current
     if (!profileId) return
+    const persistence = persistenceRef.current
 
     const timeout = setTimeout(async () => {
+      if (publishingRef.current || logoutLock.current || persistenceRef.current !== persistence) return
+      setDraftWrites(count => count + 1)
+      try {
       // Se guardan las blob URLs vigentes tal cual (siguen siendo válidas en
       // esta misma pestaña, así la vista previa no parpadea), pero se limpian
       // antes de escribir a Supabase para no persistir referencias que
@@ -512,16 +656,36 @@ function ProfileEditorInner() {
       const sanitizedServices = services.map(
         (s) => stripDeadBlobUrls(s as unknown as Record<string, unknown>) as unknown as CatalogService
       )
-      const { error } = await saveDraft(profileId, {
-        blocks: sanitizedBlocks,
-        products: sanitizedProducts,
-        services: sanitizedServices,
-      })
-      if (error) console.error("[autosave] Error guardando borrador:", error)
+        await persistence.save({
+          blocks: sanitizedBlocks,
+          products: sanitizedProducts,
+          services: sanitizedServices,
+        })
+        if (persistenceRef.current !== persistence) return
+        setConfirmedDraft(draftSnapshot)
+        setDraftEverSaved(true)
+        setDraftFailed(false)
+      } catch (error) {
+        setDraftFailed(true)
+        showToast(error instanceof Error ? error.message : "No se pudo guardar el borrador.", "error")
+      } finally {
+        setDraftWrites(count => count - 1)
+      }
     }, 1500)
 
     return () => clearTimeout(timeout)
-  }, [blocks, products, services, loading, publishing])
+  }, [blocks, products, services, draftSnapshot, loading, publishing, loggingOutFromEditor, catalogComparison, showToast])
+
+  useEffect(() => {
+    if (loading || loadFailed || (!sessionChanged && !draftPending && !draftFailed && draftWrites === 0 && !hasLocalFiles && !publishing)) return
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (allowProfileReloadRef.current) return
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", warnBeforeLeaving)
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving)
+  }, [loading, loadFailed, sessionChanged, draftPending, draftFailed, draftWrites, hasLocalFiles, publishing])
 
   // ── Bloqueo del botón "atrás" del celular dentro del editor ────────────
   // El editor es una app a pantalla completa: un "atrás" accidental (gesto
@@ -546,8 +710,14 @@ function ProfileEditorInner() {
   }, [loading])
 
   async function handleExitLogout() {
+    if (logoutLock.current || publishingRef.current || draftWrites > 0) return
+    if ((draftPending || draftFailed || hasLocalFiles) && !window.confirm("¿Cerrar sesión y descartar los cambios sin guardar y los archivos locales sin publicar?")) return
+    logoutLock.current = true
     setLoggingOutFromEditor(true)
-    await supabase.auth.signOut()
+    try {
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+    allowProfileReloadRef.current = true
     // Navegación dura (no router.push): así se sale de verdad de la trampa
     // de historial de arriba en vez de quedar atrapado en el mismo ciclo.
     //
@@ -560,61 +730,187 @@ function ProfileEditorInner() {
     // descuido.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/"
-  }
-
-  // ── Generación de banner con IA ──────────────────────────────────────
-  async function generarBannerConIA(promptTexto: string) {
-    try {
-      const res = await authedFetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptTexto }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Error en la IA")
-      return data.url
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error(err)
-      alert("Error al generar la imagen con IA: " + message)
-      return null
+    } catch {
+      logoutLock.current = false
+      setLoggingOutFromEditor(false)
+      showToast("No pudimos cerrar la sesión. Conserva tus cambios e inténtalo de nuevo.", "error")
     }
   }
 
+  // ── Generación de banner con IA ──────────────────────────────────────
+  async function generarBannerConIA(promptTexto: string, signal: AbortSignal): Promise<File> {
+    const owner = editorUserIdRef.current
+    const persistence = persistenceRef.current
+    if (!owner || !persistence || publishingRef.current || sessionChanged) throw new Error("Espera a que el editor esté disponible.")
+    const { data, error } = await supabase.auth.getSession()
+    const validContext = () => editorUserIdRef.current === owner && persistenceRef.current === persistence && !signal.aborted
+    if (error || data.session?.user.id !== owner || !validContext()) throw new Error("La sesión cambió. Vuelve a abrir el editor.")
+    const res = await fetch("/api/generate-image", {
+        method: "POST",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(95_000)]),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
+        body: JSON.stringify({ prompt: promptTexto, output: "file" }),
+      })
+    if (!res.ok) throw new Error(res.status === 503 ? "La generación con IA todavía no está disponible." : res.status === 429 ? "Alcanzaste el límite de generación. Inténtalo más tarde." : "No pudimos generar la imagen. Inténtalo más tarde.")
+    const blob = await res.blob()
+    if (!validContext()) throw new Error("La sesión cambió. Vuelve a abrir el editor.")
+    if (blob.type !== "image/png" || blob.size === 0 || blob.size > 5 * 1024 * 1024) throw new Error("La imagen recibida no es válida.")
+    return new File([blob], "banner-generado.png", { type: "image/png" })
+  }
+
   // ── Publicación con subida inteligente de archivos ────────────────────
-  async function handlePublish() {
-    setPublishing(true)
+  async function chooseCatalog(source: "draft" | "published") {
+    const persistence = persistenceRef.current
+    if (!persistence || !catalogComparison || catalogChoiceLock.current || publishingRef.current || sessionChanged) return
+    const confirmed = window.confirm(source === "published"
+      ? "¿Usar los productos y servicios de la tienda publicada en este borrador? Los bloques del perfil se conservarán. Puedes cancelar para descargar antes una copia de ambas opciones."
+      : "¿Conservar el catálogo del borrador? Cuando publiques, sustituirá los productos y servicios de la tienda actual. Los bloques del perfil se conservarán.")
+    if (!confirmed) return
+    const chosen = source === "published" ? catalogComparison : { products, services }
+    catalogChoiceLock.current = true
+    setCatalogChoiceBusy(true)
+    setCatalogChoiceError("")
+    setDraftWrites(count => count + 1)
     try {
+      await persistence.reconcileCatalog({
+        blocks: blocks.map(b => ({ ...b, data: stripDeadBlobUrls(b.data as Record<string, unknown>) })),
+        products: chosen.products.map(p => stripDeadBlobUrls(p as unknown as Record<string, unknown>)),
+        services: chosen.services.map(s => stripDeadBlobUrls(s as unknown as Record<string, unknown>)),
+      })
+      if (persistenceRef.current !== persistence) return
+      setProducts(chosen.products)
+      setServices(chosen.services)
+      setConfirmedDraft(JSON.stringify({ blocks, products: chosen.products, services: chosen.services }))
+      setDraftEverSaved(true)
+      setDraftFailed(false)
+      // The choice was explicitly saved above; don't immediately autosave it again.
+      skipNextAutosaveRef.current = true
+      setCatalogComparison(null)
+      showToast("Elección guardada en el borrador. La tienda pública todavía no cambió.", "success")
+    } catch {
+      if (persistenceRef.current !== persistence) return
+      setCatalogChoiceError("No pudimos confirmar tu elección o el contenido cambió mientras comparabas. Guarda una copia de ambas opciones y vuelve a cargar el editor para revisar el estado guardado.")
+    } finally {
+      catalogChoiceLock.current = false
+      setDraftWrites(count => count - 1)
+      if (persistenceRef.current === persistence) setCatalogChoiceBusy(false)
+    }
+  }
+
+  async function downloadDraftCopy() {
+    const owner = editorUserIdRef.current
+    const persistence = persistenceRef.current
+    if (!owner || !persistence || sessionChanged || loadFailed) return
+    if (!window.confirm("Descargarás un archivo con los textos, la estructura y el catálogo de este borrador. No incluye audios ni imágenes: conserva los archivos originales. Sirve como copia de consulta; todavía no hay importación automática. ¿Descargar?")) return
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      if (error || data.session?.user.id !== owner || editorUserIdRef.current !== owner || persistenceRef.current !== persistence) return
+      const copy = createEditorCopy({ blocks, products, services }, blobRegistryRef.current)
+      const url = URL.createObjectURL(new Blob([JSON.stringify(copy, null, 2)], { type: "application/json" }))
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `vibe-borrador-${copy.createdAt.slice(0, 10)}.json`
+      try {
+        document.body.appendChild(link)
+        link.click()
+      } finally {
+        link.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      }
+      showToast("Descarga solicitada. Comprueba que el archivo se guardó y conserva también tus audios e imágenes originales.", "success")
+    } catch {
+      showToast("No se pudo preparar la copia. Mantén el editor abierto para conservar tus cambios.", "error")
+    }
+  }
+
+  async function handlePublish() {
+    if (publishingRef.current || catalogComparison || catalogChoiceLock.current) return
+    const persistence = persistenceRef.current
+    const editorUserId = editorUserIdRef.current
+    if (!persistence || !editorUserId) {
+      showToast("Recarga la página para cargar tu contenido antes de publicar.", "error")
+      return
+    }
+    publishingRef.current = true
+    const preparation = new AbortController()
+    publicationPreparation.current = preparation
+    setPublishing(true)
+    setPublishStage("Preparando publicación…")
+    let publicationConfirmed = false
+    try {
+      const uploadProfileId = profileIdRef.current
+      if (!uploadProfileId) throw new Error("No se pudo comprobar el perfil de la publicación.")
+      async function assertPublicationContext() {
+        preparation.signal.throwIfAborted()
+        const { data, error } = await supabase.auth.getSession()
+        preparation.signal.throwIfAborted()
+        if (error || data.session?.user.id !== editorUserId || persistenceRef.current !== persistence || profileIdRef.current !== uploadProfileId) {
+          throw new Error("La cuenta o el perfil cambió durante la publicación. Conserva tus cambios y vuelve al perfil original.")
+        }
+        return data.session.access_token
+      }
+      await assertPublicationContext()
+      const files = new Set(collectBlobPaths({ blocks, products, services }).map(item => item.url))
+      const stages = new Map<string, UploadStage>()
+      let uploadFailed = false
+      const reportUploadFailure = () => {
+        if (preparation.signal.aborted) return
+        uploadFailed = true
+        setPublishStage("Una subida no se completó. Esperando que terminen las demás antes de permitir el reintento…")
+      }
+      function waitForUploads<T>(uploads: Promise<T>[]) {
+        return settleUploads(uploads, reportUploadFailure)
+      }
+      const onFileStage: UploadStageListener = (url, stage) => {
+        if (preparation.signal.aborted) return
+        if (uploadFailed) return
+        if (!files.has(url)) return
+        // La misma blob puede aparecer en varios bloques. No retroceder su estado.
+        const rank = { preparing: 0, transferring: 1, ready: 2 }
+        const previous = stages.get(url)
+        if (previous && rank[previous] > rank[stage]) return
+        stages.set(url, stage)
+        const values = [...stages.values()]
+        const ready = values.filter(value => value === "ready").length
+        const preparing = values.filter(value => value === "preparing").length
+        const transferring = values.filter(value => value === "transferring").length
+        setPublishStage(`Archivos verificados: ${ready}/${files.size}. Preparando audio e imágenes: ${preparing}. Subiendo o verificando: ${transferring}.`)
+      }
       // 1. Clonar bloques para trabajar sin mutar el estado de React
       let publishBlocks: Block[] = JSON.parse(JSON.stringify(blocks))
 
       // 2. Escanear bloques, productos y servicios buscando blob URLs y
       // subirlas a Storage antes de publicar.
-      publishBlocks = await Promise.all(
+      publishBlocks = await waitForUploads(
         publishBlocks.map(async (block) => {
-          const updatedData = await resolveEntityBlobs(block.data as Record<string, unknown>, blobRegistryRef.current)
+          await assertPublicationContext()
+          const updatedData = await resolveEntityBlobs(block.data as Record<string, unknown>, blobRegistryRef.current, uploadProfileId, editorUserId, onFileStage, preparation.signal)
+          await assertPublicationContext()
           // Refleja la URL permanente en el estado de React para que la
           // vista previa deje de apuntar a una blob URL en cuanto termina.
-          setBlocks((prev) => prev.map((b) => (b.id === block.id ? { ...b, data: updatedData as Block["data"] } : b)))
+          setBlocks((prev) => mergeUploadedUrls(prev, [block], [{ ...block, data: updatedData }]))
           return { ...block, data: updatedData as Block["data"] }
         })
       )
 
-      const publishProducts: CatalogProduct[] = await Promise.all(
+      const publishProducts: CatalogProduct[] = await waitForUploads(
         products.map(
           async (p) =>
-            (await resolveEntityBlobs(p as unknown as Record<string, unknown>, blobRegistryRef.current)) as unknown as CatalogProduct
+            (await resolveEntityBlobs(p as unknown as Record<string, unknown>, blobRegistryRef.current, uploadProfileId, editorUserId, onFileStage, preparation.signal)) as unknown as CatalogProduct
         )
       )
-      setProducts(publishProducts)
+      await assertPublicationContext()
+      setProducts((prev) => mergeUploadedUrls(prev, products, publishProducts))
 
-      const publishServices: CatalogService[] = await Promise.all(
+      const publishServices: CatalogService[] = await waitForUploads(
         services.map(
           async (s) =>
-            (await resolveEntityBlobs(s as unknown as Record<string, unknown>, blobRegistryRef.current)) as unknown as CatalogService
+            (await resolveEntityBlobs(s as unknown as Record<string, unknown>, blobRegistryRef.current, uploadProfileId, editorUserId, onFileStage, preparation.signal)) as unknown as CatalogService
         )
       )
-      setServices(publishServices)
+      await assertPublicationContext()
+      setServices((prev) => mergeUploadedUrls(prev, services, publishServices))
+      setPublishStage("Comprobando el perfil y preparando los cambios…")
 
       // 3. Resolver el id de perfil sobre el que se publica. Para una banda
       // (Punto 4) la fila ya existe desde que se creó — no se toca ni se
@@ -631,7 +927,7 @@ function ProfileEditorInner() {
         const { data: { user } } = await supabase.auth.getUser()
         // Publicar exige sesión: sin ella no hay perfil propio sobre el que
         // escribir (antes se caía al perfil semilla compartido PROFILE_ID).
-        if (!user) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión para publicar.")
+        if (!user || user.id !== editorUserId) throw new Error("La sesión cambió. Vuelve a la cuenta original para publicar.")
 
         // ─── POR QUÉ ACÁ NO HAY UN UPSERT ────────────────────────────────
         // Hasta el 2026-08-17 esto hacía
@@ -659,6 +955,9 @@ function ProfileEditorInner() {
         profileId = await resolveOwnProfileId(user)
       }
 
+      if (profileId !== uploadProfileId) throw new Error("El perfil de la publicación cambió. Vuelve a cargar el editor.")
+      await assertPublicationContext()
+
       // 3.5. Antes de sobrescribir lo publicado, guardar qué URLs de R2 usa
       // TODAVÍA (para poder borrar después las que este publish deja
       // huérfanas, ej. una pista o imagen reemplazada). Si esta lectura
@@ -666,9 +965,11 @@ function ProfileEditorInner() {
       // este ciclo, el archivo viejo queda para el próximo publish exitoso.
       let oldR2Urls = new Set<string>()
       try {
+        const cleanupReadToken = await assertPublicationContext()
         const [{ data: oldBlocksRows }, { products: oldProducts, services: oldServices }] = await Promise.all([
-          supabase.from("profile_blocks").select("content").eq("profile_id", profileId),
-          fetchCatalog(profileId),
+          supabase.from("profile_blocks").select("content").eq("profile_id", profileId)
+            .setHeader("Authorization", `Bearer ${cleanupReadToken}`),
+          fetchCatalog(profileId, cleanupReadToken),
         ])
         oldR2Urls = new Set([
           ...extractR2Urls(oldBlocksRows),
@@ -676,7 +977,7 @@ function ProfileEditorInner() {
           ...extractR2Urls(oldServices),
         ])
       } catch (err) {
-        console.error("[handlePublish] No se pudo leer el estado previo para limpiar R2:", err)
+        logSupabaseError("handlePublish: lectura previa a limpieza", err)
       }
 
       // 4. Reemplazar los bloques publicados, DE FORMA ATÓMICA.
@@ -710,35 +1011,19 @@ function ProfileEditorInner() {
       const errorDeValidacion = evaluarLoteSegunModo(profileBlocksPayload)
       if (errorDeValidacion) throw new Error(errorDeValidacion)
 
-      const { data: nuevaVersion, error: blocksError } = await supabase.rpc("publish_profile", {
-        p_profile_id: profileId,
-        p_blocks: profileBlocksPayload,
-        p_expected_version: contentVersionRef.current,
-      })
-
-      if (blocksError) {
-        // La base rechaza la publicación si el perfil avanzó desde que se
-        // cargó el editor: alguien más (otra pestaña, el celular) publicó
-        // mientras tanto. Se avisa en vez de pisar su trabajo.
-        if (blocksError.message?.includes("conflicto_de_version")) {
-          throw new Error(
-            "Alguien más publicó cambios en este perfil desde otra sesión. Recarga la página para traer la versión más reciente y vuelve a aplicar lo tuyo."
-          )
-        }
-        // La base también valida la forma de los bloques (migración 0010).
-        // Si llega hasta aquí es que la capa del editor no lo detectó: se
-        // traduce a un mensaje entendible en vez de mostrar el texto de
-        // Postgres, y el detalle queda en el registro para investigarlo.
-        if (blocksError.message?.includes("bloques_invalidos")) {
-          console.warn("[handlePublish] la base rechazo la forma de los bloques", blocksError.message)
-          throw new Error(
-            "No se pudo publicar: uno de los bloques tiene un formato que el sistema no reconoce. Recarga la página e inténtalo de nuevo."
-          )
-        }
-        throw blocksError
-      }
-
-      contentVersionRef.current = typeof nuevaVersion === "number" ? nuevaVersion : null
+      setPublishStage("Guardando la publicación…")
+      await assertPublicationContext()
+      await persistence.publish(profileBlocksPayload, publishProducts, publishServices)
+      publicationConfirmed = true
+      await assertPublicationContext()
+      // Registrar la confirmación antes de los trabajos auxiliares. Si un
+      // certificado o la caché fallan, el autoguardado debe partir de lo que
+      // realmente quedó publicado y conservar las ediciones más recientes.
+      lastPublishedRef.current = JSON.stringify({ blocks: publishBlocks, products: publishProducts, services: publishServices })
+      setConfirmedDraft(lastPublishedRef.current)
+      setDraftEverSaved(true)
+      setDraftFailed(false)
+      setPublishStage("Publicación guardada. Completando los registros de las pistas…")
 
       // 4.5. Registrar el marcado de tiempo (certificado de autoría) de cada
       // pista que ya tiene huella SHA-256 calculada. Es "best effort": si
@@ -753,11 +1038,12 @@ function ProfileEditorInner() {
           for (const album of albums) {
             for (const track of album.tracks) {
               if (!track.fileHash) continue
+              await assertPublicationContext()
               try {
                 await recordAuthorCertificate(profileId, {
                   songTitle: track.title || "Sin título",
                   fileHash: track.fileHash,
-                })
+                }, editorUserId)
               } catch (err) {
                 logSupabaseError("handlePublish: no se pudo registrar el certificado de autoría", err)
               }
@@ -766,85 +1052,83 @@ function ProfileEditorInner() {
         }
       }
 
-      // 5. Publicar catálogo de productos y servicios
-      await publishCatalog(
-        profileId,
-        sanitizeUrlFields(publishProducts),
-        sanitizeUrlFields(publishServices)
-      )
-
-      // 5.5. Borrar de R2 los archivos que quedaron huérfanos: estaban en lo
-      // publicado anteriormente (oldR2Urls) pero ya nada de este publish los
-      // referencia — típicamente porque el usuario reemplazó una pista o una
-      // imagen por otra. Best-effort y en segundo plano: si falla, el
-      // archivo viejo simplemente queda en R2 hasta que un próximo publish
-      // lo vuelva a detectar como huérfano; nunca debe tumbar la publicación
-      // en sí, que ya terminó con éxito en este punto.
+      // La publicación ya está confirmada. La limpieza se solicita por lotes;
+      // un fallo conserva archivos y se informa sin presentar el guardado como fallido.
       const newR2Urls = new Set([
         ...extractR2Urls(publishBlocks),
         ...extractR2Urls(publishProducts),
         ...extractR2Urls(publishServices),
       ])
       const orphanedR2Urls = [...oldR2Urls].filter((url) => !newR2Urls.has(url))
+      let limpiezaPendiente = false
       if (orphanedR2Urls.length > 0) {
-        authedFetch("/api/delete-file", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ urls: orphanedR2Urls }),
-        }).catch((err) => console.error("[handlePublish] No se pudieron borrar archivos huérfanos de R2:", err))
+        setPublishStage("Revisando archivos reemplazados…")
+        for (let offset = 0; offset < orphanedR2Urls.length; offset += 100) {
+          try {
+            const publicationToken = await assertPublicationContext()
+            const response = await fetch("/api/delete-file", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${publicationToken}` },
+              body: JSON.stringify({ urls: orphanedR2Urls.slice(offset, offset + 100) }),
+              signal: AbortSignal.any([preparation.signal, AbortSignal.timeout(15_000)]),
+            })
+            if (!response.ok) { limpiezaPendiente = true; break }
+            const result: unknown = await response.json()
+            if (!result || typeof result !== "object" || !("failed" in result) ||
+              !Array.isArray(result.failed) || result.failed.length > 0) {
+              limpiezaPendiente = true
+              break
+            }
+          } catch {
+            limpiezaPendiente = true
+            break
+          }
+        }
       }
 
       // Recién acá es seguro liberar el registro de blobs: todo lo que
       // apuntaba a blob: ya se subió y el estado ya quedó con las URLs
       // permanentes (ver los setBlocks/setProducts/setServices de arriba),
       // así que ninguna blob URL sigue en uso.
-      for (const url of blobRegistryRef.current.keys()) {
-        if (url.startsWith("blob:")) URL.revokeObjectURL(url)
-      }
-      blobRegistryRef.current.clear()
-
-      // El borrador ya quedó limpio DENTRO de la transacción de
-      // publish_profile, así que acá no hace falta ninguna llamada extra ni
-      // los 3 reintentos que había antes: o se publicó todo y se limpió el
-      // borrador, o no se hizo nada. Ese "a medias" —publicado pero con
-      // borrador viejo, que al reabrir el editor pisaba lo recién
-      // publicado— ya no puede ocurrir.
-      //
-      // El flag sigue siendo necesario: evita que el autoguardado del
-      // siguiente ciclo de React vuelva a escribir el borrador que se acaba
-      // de limpiar.
-      skipNextAutosaveRef.current = true
+      // Las URLs nuevas que el usuario agregó durante la subida siguen vivas.
+      // Las procesadas se conservan hasta desmontar; revocarlas aquí puede
+      // adelantarse al commit del estado de React.
 
       // El perfil público se sirve desde una caché etiquetada (F10). Sin este
       // aviso, el artista publicaría y seguiría viendo lo viejo hasta cinco
       // minutos. Es best-effort a propósito: la publicación ya terminó bien, y
       // un fallo acá sólo significa que el cambio se verá cuando venza la
       // caché — nunca debe convertirse en un error de publicación.
+      let cacheActualizada = true
+      setPublishStage("Actualizando la página pública…")
       if (publicSlug) {
-        revalidarPerfilPublico(publicSlug).catch((err) =>
-          console.error("[handlePublish] No se pudo invalidar la caché del perfil público:", err)
-        )
+        try { cacheActualizada = await revalidarPerfilPublico(publicSlug) } catch { cacheActualizada = false }
       }
 
-      showToast("¡Cambios publicados con éxito en tu perfil!", "success")
+      if (preparation.signal.aborted) return
+      const avisos = [
+        !cacheActualizada && "La página pública puede tardar en actualizarse.",
+        limpiezaPendiente && "La limpieza de algunos archivos anteriores quedó pendiente.",
+      ].filter(Boolean)
+      showToast(avisos.length ? `Cambios publicados. ${avisos.join(" ")} No necesitas volver a publicar.` : "¡Cambios publicados con éxito en tu perfil!", "success")
     } catch (err: unknown) {
-      // Los errores de Supabase son PostgrestError, no Error estándar de JS.
-      // String(postgrestError) devuelve "[object Object]" — usamos JSON.stringify.
-      let message: string
-      if (err instanceof Error) {
-        message = err.message
-      } else if (err && typeof err === "object" && "message" in err) {
-        const pgErr = err as { message: string; code?: string; details?: string; hint?: string }
-        message = pgErr.message
-        if (pgErr.code) message += ` (código: ${pgErr.code})`
-        if (pgErr.hint) message += ` — ${pgErr.hint}`
-      } else {
-        message = JSON.stringify(err)
+      if (preparation.signal.aborted) return
+      if (publicationConfirmed) {
+        showToast("La publicación quedó guardada. No necesitas repetirla. Vuelve a abrir el perfil con la cuenta original para continuar.", "success")
+        return
       }
-      console.error("[handlePublish] Error:", err)
-      showToast("Ocurrió un error al publicar: " + message, "error")
+      const message = err instanceof EditorPersistenceError || err instanceof UploadFeedbackError
+        ? err.message
+        : "No pudimos confirmar la publicación. Mantén el editor abierto para conservar tus cambios y archivos. Revisa tu perfil público antes de repetir el envío."
+      logSupabaseError("handlePublish", err)
+      showToast(message, "error")
     } finally {
-      setPublishing(false)
+      publishingRef.current = false
+      if (publicationPreparation.current === preparation) publicationPreparation.current = null
+      if (!preparation.signal.aborted) {
+        setPublishing(false)
+        setPublishStage("")
+      }
     }
   }
 
@@ -907,8 +1191,8 @@ function ProfileEditorInner() {
     })
   }
 
-  function updateBlock(id: string, data: Block["data"]) {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, data: { ...b.data, ...data } } : b)))
+  function updateBlock(id: string, data: Block["data"] | ((current: Block["data"]) => Block["data"])) {
+    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, data: typeof data === "function" ? data(b.data) : { ...b.data, ...data } } : b)))
   }
 
   function handleDropAt(index: number) {
@@ -969,14 +1253,59 @@ function ProfileEditorInner() {
     )
   }
 
+  if (sessionChanged) {
+    return <main className="mx-auto max-w-xl space-y-4 p-6 text-foreground">
+      <h1 className="text-xl font-bold">La cuenta cambió</h1>
+      <p role="alert">Detuvimos el editor para evitar guardar tus cambios en otra cuenta. El contenido de esta pestaña permanece en memoria, pero no se está guardando.</p>
+      <p>Al recargar se perderán los cambios sin guardar y los archivos que todavía no hayas publicado. Comprueba que has vuelto a la cuenta original antes de continuar.</p>
+      <button type="button" className="min-h-11 rounded-lg border px-4" onClick={() => {
+        if (window.confirm("¿Recargar el editor? Se perderán los cambios sin guardar y los archivos locales pendientes.")) {
+          allowProfileReloadRef.current = true
+          window.location.reload()
+        }
+      }}>Descartar cambios locales y recargar</button>
+    </main>
+  }
+
+  if (loadFailed) {
+    return <main className="mx-auto max-w-xl space-y-4 p-6 text-foreground">
+      <h1 className="text-xl font-bold">No pudimos cargar tu contenido</h1>
+      <p role="alert">El editor está detenido para proteger tu perfil. Revisa tu conexión y vuelve a cargarlo.</p>
+      <button type="button" onClick={() => window.location.reload()} className="min-h-11 rounded-lg border px-4">Volver a cargar el editor</button>
+      <button type="button" onClick={() => router.push("/perfil/dashboard")} className="block min-h-11 text-primary underline">Ir al panel</button>
+    </main>
+  }
+
+  if (catalogComparison) {
+    return <CatalogReconciliation draft={{ products, services }} published={catalogComparison}
+      busy={catalogChoiceBusy} error={catalogChoiceError} onChoose={source => void chooseCatalog(source)}
+      onDownloadDraft={() => void downloadDraftCopy()} />
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <EditorHeader
         blockCount={blocks.length}
         onPublish={handlePublish}
+        onDownloadCopy={() => void downloadDraftCopy()}
         isPublishing={publishing}
         publicSlug={publicSlug}
         activeRole={activeRole}
+        draftMessage={draftMessage}
+        draftFailed={draftFailed}
+        previewContent={{ blocks, products, services }}
+        onBeforeNavigate={() => {
+          if (publishingRef.current || draftWrites > 0) {
+            showToast("Espera a que termine el guardado antes de salir del editor.", "error")
+            return false
+          }
+          return !(draftPending || draftFailed || hasLocalFiles) || window.confirm("¿Salir del editor? Se perderán los cambios sin guardar y los archivos locales que todavía no hayas publicado.")
+        }}
+        switchingDisabled={draftWrites > 0 || (!draftFailed && draftPending)}
+        onBeforeProfileReload={() => {
+          allowProfileReloadRef.current = true
+          return () => { allowProfileReloadRef.current = false }
+        }}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -1070,6 +1399,7 @@ function ProfileEditorInner() {
           }`}
         >
           <BlockInspector
+            generateBanner={publishing ? undefined : generarBannerConIA}
             block={selectedBlock}
             onChange={updateBlock}
             onDelete={deleteBlock}
@@ -1113,24 +1443,29 @@ function ProfileEditorInner() {
       </nav>
 
       {showExitConfirm && (
-        <div
-          className="fixed inset-0 z-100 flex items-end justify-center bg-black/70 p-4 sm:items-center"
-          onClick={() => setShowExitConfirm(false)}
+        <dialog
+          ref={exitDialogRef}
+          aria-labelledby="editor-exit-title"
+          aria-describedby="editor-exit-description"
+          className="fixed inset-0 z-100 m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-border bg-card p-0 text-foreground backdrop:bg-black/70"
+          onCancel={event => {
+            if (logoutLock.current) event.preventDefault()
+            else setShowExitConfirm(false)
+          }}
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="w-full p-6 shadow-2xl"
           >
-            <h3 className="mb-2 text-lg font-semibold text-foreground">¿Salir del editor?</h3>
-            <p className="mb-5 text-sm text-muted-foreground">
-              Tu progreso se guarda solo. Para salir del editor con el botón atrás, primero cierra sesión — o usa
-              "Volver al feed" desde el menú de arriba.
+            <h3 id="editor-exit-title" className="mb-2 text-lg font-semibold text-foreground">¿Salir del editor?</h3>
+            <p id="editor-exit-description" className="mb-5 text-sm text-muted-foreground">
+              Revisa el estado del guardado antes de salir. Los archivos locales todavía sin publicar
+              se perderán al cerrar esta pestaña. También puedes usar "Volver al feed" desde el menú de arriba.
             </p>
             <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={handleExitLogout}
-                disabled={loggingOutFromEditor}
+                disabled={loggingOutFromEditor || publishing || draftWrites > 0}
                 className="flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <LogOut className="size-4" />
@@ -1138,6 +1473,8 @@ function ProfileEditorInner() {
               </button>
               <button
                 type="button"
+                ref={keepEditingRef}
+                disabled={loggingOutFromEditor}
                 onClick={() => setShowExitConfirm(false)}
                 className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
               >
@@ -1145,7 +1482,7 @@ function ProfileEditorInner() {
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </div>
   )

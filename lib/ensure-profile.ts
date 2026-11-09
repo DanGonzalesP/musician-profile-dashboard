@@ -37,12 +37,15 @@ export async function resolveOwnProfileId(user: User): Promise<string> {
 }
 
 export async function ensureOwnProfile(user: User): Promise<OwnProfile | null> {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from("profiles")
     .select("id, username, display_name, unified_profile")
     .eq("user_id", user.id)
     .maybeSingle()
 
+  // No convertir un fallo de lectura en una cuenta nueva ni intentar insertar
+  // otra fila mientras no se sabe si el perfil existente pudo consultarse.
+  if (readError) return null
   if (existing) {
     return {
       id: existing.id,
@@ -71,14 +74,14 @@ export async function ensureOwnProfile(user: User): Promise<OwnProfile | null> {
     .select("id, username, display_name, unified_profile")
     .single()
 
-  if (error) {
+  if (error || !created) {
     // Carrera benigna: el trigger de la DB pudo haberla creado en paralelo.
-    const { data: retry } = await supabase
+    const { data: retry, error: retryError } = await supabase
       .from("profiles")
       .select("id, username, display_name, unified_profile")
       .eq("user_id", user.id)
       .maybeSingle()
-    if (retry) {
+    if (!retryError && retry) {
       return {
         id: retry.id,
         username: retry.username ?? "",
@@ -86,7 +89,6 @@ export async function ensureOwnProfile(user: User): Promise<OwnProfile | null> {
         unifiedProfile: Boolean(retry.unified_profile),
       }
     }
-    console.error("No se pudo crear el perfil del usuario:", error)
     return null
   }
 

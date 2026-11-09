@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useId, cloneElement, isValidElement, Children } from "react"
+import { useState, useRef, useEffect, useEffectEvent, useId, cloneElement, isValidElement, Children } from "react"
 import Link from "next/link"
 import type { Block, HeroData, SingleData, CrowdfundingData, TracksData, CreditsData, CreditItem, CreditRole, CreditSourceType, CreditStatus, MerchData, ServiceData, Album, Track, SocialLink, SocialPlatform, LegadoData, PublicacionesData, EmbedsData } from "@/lib/blocks"
 import { BLOCK_LIBRARY, SOCIAL_PLATFORM_LABELS } from "@/lib/blocks"
@@ -20,7 +20,7 @@ import {
 import * as audioEngine from "@/lib/audio-engine"
 import { type AudioBitrate } from "@/lib/audio-transcode"
 import { searchPlatformSongs, type PlatformSongResult } from "@/lib/song-search"
-import { createCreditRequest, fetchCreditRequestStatuses } from "@/lib/credit-requests"
+import { createCreditRequest, fetchVerifiedCreditStatus } from "@/lib/credit-requests"
 import { fetchOembedMetadata, detectOembedProvider, type OembedProvider } from "@/lib/oembed"
 import { MUSICIAN_ROLES } from "@/lib/musician-roles"
 import { X, Trash2, Plus, Music, Play, Pause, Disc3, Rocket, ArrowLeft, Search, Move, ImagePlus, Check, AlertCircle } from "lucide-react"
@@ -33,6 +33,7 @@ import { LocationSelect } from "@/components/inspector/location-fields"
 import { ItemPager } from "@/components/inspector/item-pager"
 import { ImageAdjustModal } from "@/components/inspector/image-adjust-modal"
 import { GenreSelect, YearSelect } from "@/components/inspector/genre-year-select"
+import { BannerGenerator, type GenerateBanner } from "@/components/inspector/banner-generator"
 
 function BackToPanelLink() {
   return (
@@ -56,8 +57,9 @@ export type BlobRegistry = React.MutableRefObject<Map<string, File>>
 export const audioBitrateByFile = new WeakMap<File, AudioBitrate>()
 
 type Props = {
+  generateBanner?: GenerateBanner
   block: Block | null
-  onChange: (id: string, data: Block["data"]) => void
+  onChange: (id: string, data: Block["data"] | ((current: Block["data"]) => Block["data"])) => void
   onDelete: (id: string) => void
   // El "banner principal" (hero) nunca se elimina del todo — vacía su
   // contenido en su lugar (ver confirmación antes de llamarlo).
@@ -78,6 +80,7 @@ type Props = {
 }
 
 export function BlockInspector({
+  generateBanner,
   block,
   onChange,
   onDelete,
@@ -112,7 +115,7 @@ export function BlockInspector({
   }
 
   const def = BLOCK_LIBRARY.find((b) => b.type === block.type)
-  const update = (data: Block["data"]) => onChange(block.id, data)
+  const update = (data: Block["data"] | ((current: Block["data"]) => Block["data"])) => onChange(block.id, data)
 
   return (
     <div className="flex h-full flex-col text-foreground">
@@ -136,26 +139,37 @@ export function BlockInspector({
 
       <div className="thin-scroll flex-1 space-y-6 bg-sidebar/40 p-4">
         {block.type === "hero" && (
-          <HeroFields data={block.data as HeroData} onChange={update} blobRegistry={blobRegistry} />
+          <HeroFields key={`${profileId ?? "local"}:${block.id}`} data={block.data as HeroData}
+            onChange={changes => update(current => ({ ...current, ...changes }))}
+            blobRegistry={blobRegistry} generateBanner={generateBanner}
+            onBanner={file => {
+              const url = URL.createObjectURL(file)
+              blobRegistry.current.set(url, file)
+              update(current => ({ ...current, banner: url }))
+            }} />
         )}
         {block.type === "single" && (
-          <SingleFields data={block.data as SingleData} onChange={update} blobRegistry={blobRegistry} />
+          <SingleFields key={`${profileId ?? "local"}:${block.id}`} data={block.data as SingleData}
+            onChange={changes => update(current => ({ ...current, ...changes }))} blobRegistry={blobRegistry}
+            onTransform={transform => update(current => transform(current as SingleData))} />
         )}
         {block.type === "crowdfunding" && (
           <CrowdfundingFields data={block.data as CrowdfundingData} onChange={update} />
         )}
         {block.type === "tracks" && (
           <TracksFields
+            key={`${profileId ?? "local"}:${block.id}`}
             data={block.data as TracksData}
-            onChange={update}
+            onTransform={transform => update(current => transform(current as TracksData))}
             blobRegistry={blobRegistry}
             focusAlbumId={focusAlbumId}
           />
         )}
         {block.type === "credits" && (
           <CreditsFields
+            key={`${profileId ?? "local"}:${block.id}`}
             data={block.data as CreditsData}
-            onChange={update}
+            onTransform={transform => update(current => transform(current as CreditsData))}
             profileId={profileId ?? null}
             blobRegistry={blobRegistry}
           />
@@ -206,7 +220,7 @@ export function BlockInspector({
           onClick={() => onClose?.()}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow transition-all hover:brightness-110 active:scale-95 xl:hidden"
         >
-          Guardar cambios
+          Volver al editor
         </button>
         {/* Escritorio (xl+): panel estático sin botón de cerrar — el borrado
             se queda acá porque no hay "volver" que sirva de confirmación. */}
@@ -236,7 +250,7 @@ export function BlockInspector({
       {confirmDelete && (
         <ConfirmDialog
           title={`¿Eliminar el bloque "${def?.label ?? "este bloque"}"?`}
-          description="Se quitará esta sección de tu página con su contenido. Puedes volver a agregarla después desde la biblioteca de bloques."
+          description="Se quitará esta sección del editor con su contenido. Puedes volver a agregar un bloque desde la biblioteca, pero eso no recupera los datos eliminados."
           confirmLabel="Eliminar bloque"
           onConfirm={() => {
             onDelete(block.id)
@@ -388,18 +402,13 @@ export function ImageUploader({
   /** Muestra "(opcional)" dentro del recuadro vacío (ej. imagen de pista). */
   optional?: boolean
 }) {
-  const [localPreview, setLocalPreview] = useState<string | null>(null)
-  const [adjusting, setAdjusting] = useState(false)
+  const [adjusting, setAdjusting] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  if (adjusting && adjusting !== currentImageUrl) setAdjusting(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
-
-    // Revocar blob URL anterior si existe para liberar memoria
-    if (localPreview && localPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(localPreview)
-    }
 
     // Crear blob URL temporal — la preview reacciona al instante
     const blobUrl = URL.createObjectURL(file)
@@ -407,7 +416,6 @@ export function ImageUploader({
     // Registrar el archivo real para subirlo al publicar
     blobRegistry.current.set(blobUrl, file)
 
-    setLocalPreview(blobUrl)
     onUploadReady(blobUrl)
 
     // Reset del input para permitir re-seleccionar el mismo archivo
@@ -420,16 +428,16 @@ export function ImageUploader({
   // entrada pero la imagen recortada igual quedaba puesta en el bloque, y
   // publicar tiraba "no se encontró el archivo" para algo recién recortado).
   function handleAdjustConfirm(blobUrl: string, file: File) {
-    setAdjusting(false)
+    setAdjusting(null)
     blobRegistry.current.set(blobUrl, file)
-    if (localPreview && localPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(localPreview)
-    }
-    setLocalPreview(blobUrl)
     onUploadReady(blobUrl)
   }
 
-  const displayUrl = localPreview || currentImageUrl
+  // El borrador es la fuente de la vista previa. Una copia local ocultaba
+  // cambios externos y mostraba la imagen anterior al navegar entre elementos.
+  // El editor libera las URLs del registro al cerrar: todavía pueden estar
+  // referenciadas por otra parte del borrador o una operación de publicación.
+  const displayUrl = currentImageUrl
 
   // Un único recuadro presionable: la imagen y el "subir/cambiar" son lo
   // mismo (antes el botón vivía en una barra aparte, ajena a la miniatura).
@@ -482,7 +490,7 @@ export function ImageUploader({
         {displayUrl && (
           <button
             type="button"
-            onClick={() => setAdjusting(true)}
+            onClick={() => setAdjusting(displayUrl)}
             title="Acomodar imagen"
             aria-label="Acomodar imagen"
             className="absolute right-1 top-1 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 text-white transition-colors hover:bg-black/80"
@@ -493,11 +501,11 @@ export function ImageUploader({
         )}
       </div>
 
-      {adjusting && displayUrl && (
+      {adjusting && adjusting === displayUrl && (
         <ImageAdjustModal
-          src={displayUrl}
+          src={adjusting}
           aspect={aspect}
-          onCancel={() => setAdjusting(false)}
+          onCancel={() => setAdjusting(null)}
           onConfirm={handleAdjustConfirm}
         />
       )}
@@ -546,10 +554,17 @@ function AudioUploader({
   const [hashing, setHashing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [lastWasAlreadyCompressed, setLastWasAlreadyCompressed] = useState(false)
+  const selectionGeneration = useRef(0)
+  useEffect(() => () => { selectionGeneration.current += 1 }, [])
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return
     const file = e.target.files[0]
+    const generation = ++selectionGeneration.current
+    // Capturar y limpiar antes de cualquier espera: permite volver a elegir
+    // el mismo archivo y evita retener el evento durante el cálculo.
+    e.target.value = ""
+    setHashing(false)
 
     // Aceptamos mp3/aac/m4a (ya comprimidos, se suben tal cual) y además
     // cualquier formato de audio sin comprimir habitual entre músicos (wav,
@@ -586,12 +601,14 @@ function AudioUploader({
     let fileHash = ""
     try {
       const { sha256File } = await import("@/lib/audio-hash")
+      if (selectionGeneration.current !== generation) return
       fileHash = await sha256File(file)
-    } catch (err) {
-      console.error("[AudioUploader] No se pudo calcular el hash SHA-256:", err)
+    } catch {
+      // El audio conserva su flujo de publicación aunque no haya huella.
     } finally {
-      setHashing(false)
+      if (selectionGeneration.current === generation) setHashing(false)
     }
+    if (selectionGeneration.current !== generation) return
 
     // La calidad ya no se elige a mano: cada archivo se publica con la
     // calidad con la que se subió — un mp3/aac/m4a se sube tal cual (su
@@ -603,7 +620,6 @@ function AudioUploader({
 
     setFileName(file.name)
     onUploadReady(blobUrl, fileHash)
-    e.target.value = ""
   }
 
   const hasAudio = Boolean(fileName || currentAudioUrl)
@@ -952,20 +968,24 @@ function HeroFields({
   data,
   onChange,
   blobRegistry,
+  generateBanner,
+  onBanner,
 }: {
   data: HeroData
-  onChange: (d: HeroData) => void
+  onChange: (changes: Partial<HeroData>) => void
   blobRegistry: BlobRegistry
+  generateBanner?: GenerateBanner
+  onBanner: (file: File) => void
 }) {
   return (
     <>
       <Field label="Nombre del artista">
-        <TextInput value={data.name || ""} onChange={(e) => onChange({ ...data, name: e.target.value })} />
+        <TextInput value={data.name || ""} onChange={(e) => onChange({ name: e.target.value })} />
       </Field>
       <Field label="Nombre real (opcional)">
         <TextInput
           value={data.realName || ""}
-          onChange={(e) => onChange({ ...data, realName: e.target.value })}
+          onChange={(e) => onChange({ realName: e.target.value })}
           placeholder="Ej. Juan Pérez"
         />
       </Field>
@@ -976,7 +996,7 @@ function HeroFields({
           <span className="block text-xs font-medium text-muted-foreground">Foto de perfil</span>
           <ImageUploader
             currentImageUrl={data.image}
-            onUploadReady={(url) => onChange({ ...data, image: url })}
+            onUploadReady={(url) => onChange({ image: url })}
             blobRegistry={blobRegistry}
             aspect={1}
             tileClassName="size-20"
@@ -986,8 +1006,9 @@ function HeroFields({
         <div className="min-w-0 flex-1 space-y-1.5">
           <span className="block text-xs font-medium text-muted-foreground">Banner de fondo</span>
           <ImageUploader
+            key={data.banner}
             currentImageUrl={data.banner}
-            onUploadReady={(url) => onChange({ ...data, banner: url })}
+            onUploadReady={(url) => onChange({ banner: url })}
             blobRegistry={blobRegistry}
             aspect={16 / 9}
             tileClassName="h-20 w-full"
@@ -995,26 +1016,27 @@ function HeroFields({
           />
         </div>
       </div>
+      {generateBanner && <BannerGenerator generate={generateBanner} apply={onBanner} />}
       <Field label="¿Qué eres?">
         <RoleTagPicker
           value={data.tagline || ""}
-          onChange={(tagline) => onChange({ ...data, tagline })}
+          onChange={(tagline) => onChange({ tagline })}
         />
       </Field>
       <Field label="Ubicación">
         <LocationSelect
           value={data.location || ""}
-          onChange={(location) => onChange({ ...data, location })}
+          onChange={(location) => onChange({ location })}
         />
       </Field>
       <SocialLinksFields
         socials={data.socials || []}
-        onChange={(socials) => onChange({ ...data, socials })}
+        onChange={(socials) => onChange({ socials })}
       />
       <Field label="Botón de contacto (opcional)">
         <ContactField
           value={data.contactUrl || ""}
-          onChange={(contactUrl) => onChange({ ...data, contactUrl })}
+          onChange={(contactUrl) => onChange({ contactUrl })}
         />
       </Field>
     </>
@@ -1023,13 +1045,33 @@ function HeroFields({
 
 // ─── TracksFields — gestión de álbumes y pistas ────────────────────────────
 
-function extractAudioDuration(url: string): Promise<number> {
+function extractAudioDuration(url: string, signal?: AbortSignal): Promise<number> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return }
     const audio = new Audio()
+    let settled = false
+    const finish = (duration?: number, error?: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      signal?.removeEventListener("abort", abort)
+      audio.onloadedmetadata = null
+      audio.ontimeupdate = null
+      audio.onerror = null
+      audio.pause()
+      audio.removeAttribute("src")
+      audio.load()
+      if (error) reject(error)
+      else if (duration !== undefined && Number.isFinite(duration) && duration > 0) resolve(duration)
+      else reject(new Error("No se pudo leer la duración del audio"))
+    }
+    const abort = () => finish(undefined, new DOMException("Lectura de audio cancelada.", "AbortError"))
+    const timer = setTimeout(() => finish(undefined, new Error("La lectura del audio tardó demasiado.")), 30_000)
+    signal?.addEventListener("abort", abort, { once: true })
     audio.preload = "metadata"
     audio.onloadedmetadata = () => {
       if (isFinite(audio.duration)) {
-        resolve(audio.duration)
+        finish(audio.duration)
         return
       }
       // Bug conocido de Chrome al leer blob URLs: la duración llega como
@@ -1038,10 +1080,10 @@ function extractAudioDuration(url: string): Promise<number> {
       audio.ontimeupdate = () => {
         audio.ontimeupdate = null
         audio.currentTime = 0
-        resolve(audio.duration)
+        finish(audio.duration)
       }
     }
-    audio.onerror = () => reject(new Error("No se pudo leer la duración del audio"))
+    audio.onerror = () => finish(undefined, new Error("No se pudo leer la duración del audio"))
     audio.src = url
   })
 }
@@ -1053,14 +1095,16 @@ function extractAudioDuration(url: string): Promise<number> {
  * varios segundos en mp3 con bitrate variable). Si no está disponible, cae
  * al método del navegador sobre la blob URL como antes.
  */
-async function resolveUploadedDuration(url: string, blobRegistry: BlobRegistry): Promise<number> {
+async function resolveUploadedDuration(url: string, blobRegistry: BlobRegistry, signal?: AbortSignal): Promise<number> {
+  signal?.throwIfAborted()
   const file = blobRegistry.current.get(url)
   if (file) {
     const { getAccurateAudioDuration } = await import("@/lib/audio-transcode")
-    const accurate = await getAccurateAudioDuration(file)
+    const accurate = await getAccurateAudioDuration(file, signal)
     if (accurate !== null) return accurate
   }
-  return extractAudioDuration(url)
+  signal?.throwIfAborted()
+  return extractAudioDuration(url, signal)
 }
 
 function formatDuration(seconds: number): string {
@@ -1070,15 +1114,42 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`
 }
 
+// Cada campo conserva su propio trabajo. Reemplazar un archivo o desmontar el
+// inspector cancela sólo sus sondas, sin detener trabajos de otros campos.
+function useDurationJobs() {
+  const jobs = useRef(new Map<string, AbortController>())
+  useEffect(() => {
+    const pending = jobs.current
+    return () => { pending.forEach(job => job.abort()); pending.clear() }
+  }, [])
+  return {
+    start(key: string) {
+      jobs.current.get(key)?.abort()
+      const job = new AbortController()
+      jobs.current.set(key, job)
+      return job
+    },
+    finish(key: string, job: AbortController) {
+      if (jobs.current.get(key) === job) jobs.current.delete(key)
+    },
+    cancelAll() {
+      jobs.current.forEach(job => job.abort())
+      jobs.current.clear()
+    },
+  }
+}
+
 // ─── SingleFields — el lanzamiento actual / single destacado ──────────────
 
 function SingleFields({
   data,
   onChange,
+  onTransform,
   blobRegistry,
 }: {
   data: SingleData
-  onChange: (d: SingleData) => void
+  onChange: (changes: Partial<SingleData>) => void
+  onTransform: (transform: (current: SingleData) => SingleData) => void
   blobRegistry: BlobRegistry
 }) {
   // La preescucha usa el motor de audio global (un solo <audio> para toda la
@@ -1086,17 +1157,21 @@ function SingleFields({
   const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState)
   useEffect(() => audioEngine.subscribe(setEngine), [])
   const isPreviewing = Boolean(data.audioUrl) && engine.url === data.audioUrl && engine.playing
+  const durationJobs = useDurationJobs()
 
   const handleAudioUploaded = async (url: string) => {
-    // Igual que en TracksFields: audioUrl y duration se guardan juntos en una
-    // sola actualización para no pisar el estado con una copia vieja.
+    const job = durationJobs.start("single")
+    onTransform(current => ({ ...current, audioUrl: url, duration: "" }))
     let duration = ""
     try {
-      duration = formatDuration(await resolveUploadedDuration(url, blobRegistry))
+      duration = formatDuration(await resolveUploadedDuration(url, blobRegistry, job.signal))
     } catch {
       // Sin metadata legible: se deja vacío, el artista puede escribirla luego.
     }
-    onChange({ ...data, audioUrl: url, duration })
+    durationJobs.finish("single", job)
+    if (!job.signal.aborted && duration) {
+      onTransform(current => current.audioUrl === url && !current.duration ? { ...current, duration } : current)
+    }
   }
 
   const togglePreview = () => {
@@ -1112,7 +1187,7 @@ function SingleFields({
       <Field label="Título de la canción">
         <TextInput
           value={data.title || ""}
-          onChange={(e) => onChange({ ...data, title: e.target.value })}
+          onChange={(e) => onChange({ title: e.target.value })}
           placeholder="Ej. Neon Horizon"
         />
       </Field>
@@ -1121,13 +1196,13 @@ function SingleFields({
           <Field label="Género">
             <GenreSelect
               value={data.genre || ""}
-              onChange={(genre) => onChange({ ...data, genre })}
+              onChange={(genre) => onChange({ genre })}
             />
           </Field>
         </div>
         <div className="w-24 shrink-0">
           <Field label="Año">
-            <YearSelect value={data.year || ""} onChange={(year) => onChange({ ...data, year })} />
+            <YearSelect value={data.year || ""} onChange={(year) => onChange({ year })} />
           </Field>
         </div>
       </div>
@@ -1139,7 +1214,7 @@ function SingleFields({
             compact
             optional
             currentImageUrl={data.cover}
-            onUploadReady={(url) => onChange({ ...data, cover: url })}
+            onUploadReady={(url) => onChange({ cover: url })}
             blobRegistry={blobRegistry}
           />
           <AudioUploader
@@ -1166,7 +1241,7 @@ function SingleFields({
       <Field label="Descripción (opcional)">
         <AutoGrowTextarea
           value={data.description || ""}
-          onChange={(v) => onChange({ ...data, description: v })}
+          onChange={(v) => onChange({ description: v })}
           minRows={3}
           maxLength={2000}
           placeholder="Cuenta la historia detrás de esta canción: en qué te inspiraste, dónde la grabaste..."
@@ -1265,12 +1340,12 @@ function CrowdfundingFields({
 
 function TracksFields({
   data,
-  onChange,
+  onTransform,
   blobRegistry,
   focusAlbumId,
 }: {
   data: TracksData
-  onChange: (d: TracksData) => void
+  onTransform: (transform: (current: TracksData) => TracksData) => void
   blobRegistry: BlobRegistry
   // Id de álbum recién elegido en el lienzo (ver profile-editor.tsx) — al
   // cambiar, este panel salta a ese mismo álbum en vez de quedarse en el
@@ -1278,145 +1353,144 @@ function TracksFields({
   focusAlbumId?: string | null
 }) {
   const albums = data.albums || []
+  const durationJobs = useDurationJobs()
   // Preescucha vía motor de audio global — una sola pista suena a la vez.
   const [engine, setEngine] = useState<audioEngine.AudioEngineState>(audioEngine.getState)
   useEffect(() => audioEngine.subscribe(setEngine), [])
   // Solo un álbum se edita a la vez — evita el scroll largo de mostrarlos todos juntos.
-  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(albums[0]?.id ?? null)
+  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(
+    albums.find((album) => album.id === focusAlbumId)?.id ?? albums[0]?.id ?? null,
+  )
+  const [previousFocusAlbumId, setPreviousFocusAlbumId] = useState(focusAlbumId)
 
-  useEffect(() => {
+  if (previousFocusAlbumId !== focusAlbumId) {
+    setPreviousFocusAlbumId(focusAlbumId)
     if (focusAlbumId && albums.some((a) => a.id === focusAlbumId)) {
       setActiveAlbumId(focusAlbumId)
     }
-    // Solo debe reaccionar cuando cambia el álbum enfocado desde el lienzo,
-    // no cada vez que `albums` se actualiza por una edición cualquiera.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusAlbumId])
-
-  const updateAlbums = (next: Album[]) => onChange({ albums: next })
+  }
 
   const setAlbum = (albumIndex: number, changes: Partial<Album>) => {
-    updateAlbums(albums.map((a, idx) => (idx === albumIndex ? { ...a, ...changes } : a)))
+    const albumId = albums[albumIndex]?.id
+    if (!albumId) return
+    onTransform(current => ({ ...current, albums: (current.albums ?? []).map(album =>
+      album.id === albumId ? { ...album, ...changes } : album
+    ) }))
   }
 
   const addAlbum = () => {
-    const newAlbum: Album = { id: `album-${Date.now()}`, title: "Nuevo Álbum", cover: "", tracks: [] }
-    updateAlbums([...albums, newAlbum])
+    const newAlbum: Album = { id: `album-${crypto.randomUUID()}`, title: "Nuevo Álbum", cover: "", tracks: [] }
+    onTransform(current => ({ ...current, albums: [...(current.albums ?? []), newAlbum] }))
     setActiveAlbumId(newAlbum.id)
   }
 
   const removeAlbum = (albumIndex: number) => {
+    durationJobs.cancelAll()
     const removedId = albums[albumIndex]?.id
-    const next = albums.filter((_, idx) => idx !== albumIndex)
-    updateAlbums(next)
+    if (!removedId) return
+    onTransform(current => ({ ...current, albums: (current.albums ?? []).filter(album => album.id !== removedId) }))
     if (removedId === activeAlbumId) {
-      setActiveAlbumId(next[0]?.id ?? null)
+      setActiveAlbumId(null)
     }
   }
 
-  // Al abrir el editor, cualquier pista que ya tenga audio pero no tenga
-  // duración calculada (ej. las pistas de ejemplo, o datos cargados desde la
-  // base de datos) la calcula automáticamente leyendo la metadata real del
-  // audio. Así la duración nunca es un número inventado — solo aparece
-  // cuando realmente se puede leer del archivo.
+  // La apertura toma una instantánea de los audios sin duración. Las ediciones
+  // posteriores no reinician estas lecturas ni recuperan datos de un borrador viejo.
+  const [initialDurationJobs] = useState(() => albums.flatMap(album =>
+    album.tracks.flatMap(track => track.audioUrl && !track.duration ? [{
+      albumId: album.id,
+      audioUrl: track.audioUrl,
+    }] : [])
+  ))
+  const applyMissingDurations = useEffectEvent((updates: { albumId: string; audioUrl: string; duration: string }[]) => {
+    onTransform(current => ({ ...current, albums: (current.albums ?? []).map(album => ({
+      ...album,
+      tracks: album.tracks.map(track => {
+        const match = updates.find(update => update.albumId === album.id && update.audioUrl === track.audioUrl)
+        return match && !track.duration ? { ...track, duration: match.duration } : track
+      }),
+    })) }))
+  })
+
   useEffect(() => {
-    let cancelled = false
-
+    const controller = new AbortController()
     async function fillMissingDurations() {
-      const updates: { albumIndex: number; trackIndex: number; duration: string }[] = []
-
-      for (let aIdx = 0; aIdx < albums.length; aIdx++) {
-        const tracks = albums[aIdx].tracks
-        for (let tIdx = 0; tIdx < tracks.length; tIdx++) {
-          const track = tracks[tIdx]
-          if (track.audioUrl && !track.duration) {
-            try {
-              const seconds = await extractAudioDuration(track.audioUrl)
-              updates.push({ albumIndex: aIdx, trackIndex: tIdx, duration: formatDuration(seconds) })
-            } catch {
-              // Sin metadata legible: se deja vacío, el artista puede escribirla luego.
-            }
-          }
+      const updates: { albumId: string; audioUrl: string; duration: string }[] = []
+      for (const job of initialDurationJobs) {
+        if (controller.signal.aborted) return
+        try {
+          const seconds = await extractAudioDuration(job.audioUrl, controller.signal)
+          updates.push({ ...job, duration: formatDuration(seconds) })
+        } catch {
+          // Sin metadata legible: el artista puede escribir la duración luego.
         }
       }
-
-      if (cancelled || updates.length === 0) return
-
-      updateAlbums(
-        albums.map((a, aIdx) => ({
-          ...a,
-          tracks: a.tracks.map((t, tIdx) => {
-            const match = updates.find((u) => u.albumIndex === aIdx && u.trackIndex === tIdx)
-            return match ? { ...t, duration: match.duration } : t
-          }),
-        }))
-      )
+      if (!controller.signal.aborted && updates.length > 0) applyMissingDurations(updates)
     }
-
-    fillMissingDurations()
-    return () => {
-      cancelled = true
-    }
-    // Solo debe correr una vez, al abrir el editor de este bloque.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    void fillMissingDurations()
+    return () => controller.abort()
+  }, [initialDurationJobs])
 
   const setTrackFields = (albumIndex: number, trackIndex: number, changes: Partial<Track>) => {
-    updateAlbums(
-      albums.map((a, aIdx) =>
-        aIdx === albumIndex
+    const albumId = albums[albumIndex]?.id
+    if (!albumId) return
+    onTransform(current => ({ ...current, albums: (current.albums ?? []).map((a) =>
+        a.id === albumId
           ? { ...a, tracks: a.tracks.map((t, tIdx) => (tIdx === trackIndex ? { ...t, ...changes } : t)) }
           : a
-      )
-    )
+      ) }))
   }
 
   const setTrack = (albumIndex: number, trackIndex: number, key: keyof Track, value: string) =>
     setTrackFields(albumIndex, trackIndex, { [key]: value })
 
   const addTrack = (albumIndex: number) => {
-    updateAlbums(
-      albums.map((a, idx) =>
-        idx === albumIndex ? { ...a, tracks: [...a.tracks, { title: "Nueva Pista", duration: "" }] } : a
-      )
-    )
+    const albumId = albums[albumIndex]?.id
+    if (!albumId) return
+    onTransform(current => ({ ...current, albums: (current.albums ?? []).map(album =>
+      album.id === albumId ? { ...album, tracks: [...album.tracks, { title: "Nueva Pista", duration: "" }] } : album
+    ) }))
   }
 
   const removeTrack = (albumIndex: number, trackIndex: number) => {
-    updateAlbums(
-      albums.map((a, idx) =>
-        idx === albumIndex ? { ...a, tracks: a.tracks.filter((_, tIdx) => tIdx !== trackIndex) } : a
-      )
-    )
+    durationJobs.cancelAll()
+    const albumId = albums[albumIndex]?.id
+    if (!albumId) return
+    onTransform(current => ({ ...current, albums: (current.albums ?? []).map(album =>
+      album.id === albumId ? { ...album, tracks: album.tracks.filter((_, index) => index !== trackIndex) } : album
+    ) }))
   }
 
   const handleAudioUploaded = async (albumIndex: number, trackIndex: number, url: string, fileHash: string) => {
-    // Ambos campos se guardan juntos en una sola actualización. Si se guardaran
-    // por separado (audioUrl primero, duration después de esperar la metadata),
-    // el segundo guardado usaría una copia vieja del estado y borraría la URL
-    // recién guardada — eso causaba que el audio "desapareciera" tras subirlo.
+    const targetId = albums[albumIndex]?.id
+    if (!targetId || !albums[albumIndex]?.tracks[trackIndex]) return
+    const jobKey = `${targetId}:${trackIndex}`
+    const job = durationJobs.start(jobKey)
+    // Guardar la selección antes de esperar. La duración sólo completa ese
+    // audio en el estado vigente, nunca restaura una copia anterior del álbum.
+    onTransform(current => ({ ...current, albums: (current.albums ?? [])
+      .map(album => album.id === targetId ? {
+        ...album,
+        isExample: false,
+        tracks: album.tracks.map((track, index) => index === trackIndex
+          ? { ...track, audioUrl: url, duration: "", fileHash } : track),
+      } : album)
+      .filter(album => album.id === targetId || !album.isExample),
+    }))
     let duration = ""
     try {
-      duration = formatDuration(await resolveUploadedDuration(url, blobRegistry))
+      duration = formatDuration(await resolveUploadedDuration(url, blobRegistry, job.signal))
     } catch {
       // Si el navegador no puede leer la metadata, se deja la duración vacía
       // y el artista puede escribirla manualmente.
     }
-    // Esta es música real del artista: el álbum deja de ser "Ejemplo" y los
-    // demás álbumes de ejemplo se retiran automáticamente.
-    const targetId = albums[albumIndex]?.id
-    const updated = albums.map((a, aIdx) =>
-      aIdx === albumIndex
-        ? {
-            ...a,
-            isExample: false,
-            tracks: a.tracks.map((t, tIdx) =>
-              tIdx === trackIndex ? { ...t, audioUrl: url, duration, fileHash } : t
-            ),
-          }
-        : a
-    )
-    updateAlbums(updated.filter((a) => a.id === targetId || !a.isExample))
+    durationJobs.finish(jobKey, job)
+    if (job.signal.aborted || !duration) return
+    onTransform(current => ({ ...current, albums: (current.albums ?? []).map(album =>
+      album.id === targetId ? { ...album, tracks: album.tracks.map(track =>
+        track.audioUrl === url && track.fileHash === fileHash && !track.duration
+          ? { ...track, duration } : track) } : album),
+    }))
   }
 
   const togglePreview = (url?: string) => {
@@ -1531,6 +1605,7 @@ function TracksFields({
               <ItemPager
                 label="Pista"
                 count={activeAlbum.tracks.length}
+                itemsVersion={JSON.stringify([activeAlbum.id, activeAlbum.tracks])}
                 onAdd={() => addTrack(activeAlbumIndex)}
                 onRemove={(trackIndex) => removeTrack(activeAlbumIndex, trackIndex)}
                 addLabel="Agregar Pista"
@@ -1567,6 +1642,7 @@ function TracksFields({
                           todo del mismo alto para que vaya a la par. */}
                       <div className="flex items-start gap-2">
                         <ImageUploader
+                          key={`image:${activeAlbum.id}:${activeAlbum.tracks.length}:${trackIndex}`}
                           compact
                           optional
                           currentImageUrl={track.image}
@@ -1574,6 +1650,7 @@ function TracksFields({
                           blobRegistry={blobRegistry}
                         />
                         <AudioUploader
+                          key={`audio:${activeAlbum.id}:${activeAlbum.tracks.length}:${trackIndex}`}
                           compact
                           currentAudioUrl={track.audioUrl}
                           onUploadReady={(url, hash) => handleAudioUploaded(activeAlbumIndex, trackIndex, url, hash)}
@@ -1717,18 +1794,22 @@ const CREDIT_STATUS_CLASSES: Record<CreditStatus, string> = {
 
 function CreditsFields({
   data,
-  onChange,
+  onTransform,
   profileId,
   blobRegistry,
 }: {
   data: CreditsData
-  onChange: (d: CreditsData) => void
+  onTransform: (transform: (current: CreditsData) => CreditsData) => void
   profileId: string | null
   blobRegistry: BlobRegistry
 }) {
   const credits = data.credits || []
-
-  const updateCredits = (next: CreditItem[]) => onChange({ credits: next })
+  const pendingRequests = useRef(new Set<string>())
+  const active = useRef(true)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
 
   const addCredit = () => {
     const newItem: CreditItem = {
@@ -1740,15 +1821,29 @@ function CreditsFields({
       externalUrl: "",
       status: "accepted",
     }
-    updateCredits([...credits, newItem])
+    onTransform(current => ({ ...current, credits: [...(current.credits ?? []), newItem] }))
   }
 
   const setCredit = (index: number, changes: Partial<CreditItem>) => {
-    updateCredits(credits.map((c, i) => (i === index ? { ...c, ...changes } : c)))
+    const id = credits[index]?.id
+    if (!id || !active.current) return
+    onTransform(current => ({ ...current, credits: (current.credits ?? []).map(c =>
+      c.id === id ? { ...c, ...changes } : c) }))
+  }
+
+  // Una respuesta tardía sólo se aplica al crédito exacto que la originó.
+  // Si se editó, cambió de origen o se eliminó, no recupera datos antiguos.
+  const applyCreditResponse = (credit: CreditItem, changes: Partial<CreditItem>) => {
+    if (!active.current) return
+    const snapshot = JSON.stringify(credit)
+    onTransform(current => ({ ...current, credits: (current.credits ?? []).map(c =>
+      c.id === credit.id && JSON.stringify(c) === snapshot ? { ...c, ...changes } : c) }))
   }
 
   const removeCredit = (index: number) => {
-    updateCredits(credits.filter((_, i) => i !== index))
+    const id = credits[index]?.id
+    if (!id) return
+    onTransform(current => ({ ...current, credits: (current.credits ?? []).filter(c => c.id !== id) }))
   }
 
   // Al cambiar el tipo de origen se limpian los campos específicos del otro
@@ -1780,37 +1875,43 @@ function CreditsFields({
     }
   }
 
-  const handleSongSelect = async (index: number, credit: CreditItem, song: PlatformSongResult) => {
-    if (!profileId) return
-    const { id: requestId, status } = await createCreditRequest({
-      requesterProfileId: profileId,
-      requesterCreditId: credit.id,
-      ownerProfileId: song.ownerProfileId,
-      songTitle: song.title,
-      songKey: song.songKey,
-      role: credit.role,
-    })
-    setCredit(index, {
-      title: song.title,
-      mainArtist: song.ownerDisplayName,
-      ownerProfileId: song.ownerProfileId,
-      songKey: song.songKey,
-      requestId,
-      status,
-    })
+  const handleSongSelect = async (credit: CreditItem, song: PlatformSongResult) => {
+    if (!profileId) throw new Error("Perfil no disponible.")
+    if (pendingRequests.current.has(credit.id)) throw new Error("Solicitud en curso.")
+    pendingRequests.current.add(credit.id)
+    try {
+      const { id: requestId, status } = await createCreditRequest({
+        requesterProfileId: profileId,
+        requesterCreditId: credit.id,
+        ownerProfileId: song.ownerProfileId,
+        songTitle: song.title,
+        songKey: song.songKey,
+        role: credit.role,
+      })
+      applyCreditResponse(credit, {
+        title: song.title,
+        mainArtist: song.ownerDisplayName,
+        ownerProfileId: song.ownerProfileId,
+        songKey: song.songKey,
+        requestId,
+        status,
+      })
+    } finally {
+      pendingRequests.current.delete(credit.id)
+    }
   }
 
-  const refreshStatus = async (index: number, credit: CreditItem) => {
-    if (!credit.requestId) return
-    const statuses = await fetchCreditRequestStatuses([credit.requestId])
-    const next = statuses[credit.requestId]
-    if (next) setCredit(index, { status: next })
+  const refreshStatus = async (credit: CreditItem) => {
+    if (!profileId) throw new Error("Perfil no disponible.")
+    const status = await fetchVerifiedCreditStatus(profileId, credit)
+    applyCreditResponse(credit, { status })
   }
 
   return (
     <ItemPager
       label="Crédito"
       count={credits.length}
+      itemsVersion={JSON.stringify(credits)}
       onAdd={addCredit}
       onRemove={removeCredit}
       addLabel="Agregar Crédito"
@@ -1823,6 +1924,7 @@ function CreditsFields({
           <>
             <Field label="Imagen de la tarjeta">
               <ImageUploader
+                key={`image:${credit.id}`}
                 currentImageUrl={credit.image}
                 onUploadReady={(blobUrl) => setCredit(index, { image: blobUrl })}
                 blobRegistry={blobRegistry}
@@ -1842,19 +1944,32 @@ function CreditsFields({
 
             {credit.sourceType === "internal" ? (
               <InternalCreditFields
+                key={credit.id}
                 credit={credit}
                 profileId={profileId}
-                onSelectSong={(song) => handleSongSelect(index, credit, song)}
-                onRefreshStatus={() => refreshStatus(index, credit)}
+                onSelectSong={(song) => handleSongSelect(credit, song)}
+                onRefreshStatus={() => refreshStatus(credit)}
               />
             ) : (
-              <ExternalCreditFields credit={credit} onFieldChange={(changes) => setCredit(index, changes)} />
+              <ExternalCreditFields key={credit.id} credit={credit} onFieldChange={(changes) => applyCreditResponse(credit, changes)} />
             )}
+            <Link href="/perfil/notificaciones" target="_blank" rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center text-xs text-primary underline underline-offset-4">
+              Revisar o retirar solicitudes enviadas (otra pestaña)
+            </Link>
 
             <Field label="Tu rol">
               <select
                 value={credit.role}
-                onChange={(e) => setCredit(index, { role: e.target.value as CreditRole })}
+                onChange={(e) => {
+                  const role = e.target.value as CreditRole
+                  if (credit.sourceType === "internal" && role !== credit.role) {
+                    setCredit(index, { role, status: "pending", requestId: undefined,
+                      ownerProfileId: undefined, songKey: undefined, title: "", mainArtist: "" })
+                  } else {
+                    setCredit(index, { role })
+                  }
+                }}
                 className={inputClass}
               >
                 {CREDIT_ROLES.map((role) => (
@@ -1863,6 +1978,12 @@ function CreditsFields({
                   </option>
                 ))}
               </select>
+              {credit.sourceType === "internal" && credit.requestId && (
+                <p className="text-[11px] text-muted-foreground">
+                  Cambiar el rol requiere elegir la canción y solicitar aprobación de nuevo.
+                  La solicitud anterior conserva su historial.
+                </p>
+              )}
             </Field>
           </>
         )
@@ -1887,35 +2008,39 @@ function InternalCreditFields({
   onRefreshStatus: () => Promise<void>
 }) {
   const [query, setQuery] = useState("")
-  const [results, setResults] = useState<PlatformSongResult[]>([])
-  const [searching, setSearching] = useState(false)
+  const [searchResult, setSearchResult] = useState<{
+    query: string
+    profileId: string | null
+    songs: PlatformSongResult[]
+    failed: boolean
+  } | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const eligibleQuery = query.trim().length >= 2
+  const currentResult = eligibleQuery && searchResult?.query === query && searchResult.profileId === profileId
+    ? searchResult
+    : null
+  const searching = eligibleQuery && !currentResult
+  const results = currentResult?.songs ?? []
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([])
-      return
-    }
+    if (query.trim().length < 2) return
     let cancelled = false
-    setSearching(true)
+    const controller = new AbortController()
     const handle = setTimeout(() => {
-      searchPlatformSongs(query, profileId ?? undefined)
+      searchPlatformSongs(query, profileId ?? undefined, controller.signal)
         .then((found) => {
-          if (!cancelled) setResults(found)
+          if (!cancelled) setSearchResult({ query, profileId, songs: found, failed: false })
         })
-        .catch((err) => {
-          console.error("Error buscando canciones en la plataforma:", err)
-          if (!cancelled) setResults([])
-        })
-        .finally(() => {
-          if (!cancelled) setSearching(false)
+        .catch(() => {
+          if (!cancelled) setSearchResult({ query, profileId, songs: [], failed: true })
         })
     }, 350)
     return () => {
       cancelled = true
       clearTimeout(handle)
+      controller.abort()
     }
   }, [query, profileId])
 
@@ -1946,18 +2071,20 @@ function InternalCreditFields({
           disabled={refreshing}
           onClick={async () => {
             setRefreshing(true)
+            setErrorMessage("")
             try {
               await onRefreshStatus()
-            } catch (err) {
-              console.error("No se pudo actualizar el estado del crédito:", err)
+            } catch {
+              setErrorMessage("No se pudo actualizar el estado. Intenta de nuevo.")
             } finally {
               setRefreshing(false)
             }
           }}
-          className="text-[11px] font-medium text-primary hover:underline disabled:opacity-50"
+          className="min-h-11 text-[11px] font-medium text-primary hover:underline disabled:opacity-50"
         >
           {refreshing ? "Actualizando..." : "Actualizar estado"}
         </button>
+        {errorMessage && <p role="alert" className="text-[11px] text-destructive">{errorMessage}</p>}
       </div>
     )
   }
@@ -1969,13 +2096,21 @@ function InternalCreditFields({
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setSearchResult(null)
+            setErrorMessage("")
+          }}
           placeholder="Escribe el nombre de la canción..."
+          maxLength={200}
           className={`${inputClass} pl-8`}
         />
       </div>
-      {searching && <p className="mt-1 text-[11px] text-muted-foreground">Buscando...</p>}
-      {!searching && query.trim().length >= 2 && results.length === 0 && (
+      {searching && <p role="status" className="mt-1 text-[11px] text-muted-foreground">Buscando...</p>}
+      {currentResult?.failed && (
+        <p role="alert" className="mt-1 text-[11px] text-destructive">No se pudo buscar canciones. Modifica la búsqueda para volver a intentarlo.</p>
+      )}
+      {currentResult && !currentResult.failed && results.length === 0 && (
         <p className="mt-1 text-[11px] text-muted-foreground">Sin resultados.</p>
       )}
       {errorMessage && <p className="mt-1 text-[11px] text-destructive">{errorMessage}</p>}
@@ -1992,10 +2127,9 @@ function InternalCreditFields({
                 try {
                   await onSelectSong(song)
                   setQuery("")
-                  setResults([])
-                } catch (err) {
-                  console.error("No se pudo crear la solicitud de crédito:", err)
-                  setErrorMessage("No se pudo enviar la solicitud. Intenta de nuevo.")
+                  setSearchResult(null)
+                } catch {
+                  setErrorMessage("No se pudo confirmar la solicitud. Revisa las solicitudes enviadas; si ya la retiraste, crea un nuevo crédito para volver a solicitarla.")
                 } finally {
                   setSelecting(false)
                 }

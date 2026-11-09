@@ -1,3 +1,5 @@
+import { createBrowserPreference } from "@/lib/browser-preference"
+
 export type Theme = "dark" | "light"
 
 export const THEME_STORAGE_KEY = "amplitude-theme"
@@ -35,12 +37,11 @@ export function applyTheme(theme: Theme) {
 }
 
 export function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark"
-  return window.localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark"
+  return themePreference.getSnapshot()
 }
 
 export function setStoredTheme(theme: Theme) {
-  window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  themePreference.set(theme)
   applyTheme(theme)
 }
 
@@ -52,12 +53,17 @@ export function applyAccent(accent: AccentColor) {
 }
 
 export function getStoredAccent(): AccentColor {
-  if (typeof window === "undefined") return "rojo"
-  const stored = window.localStorage.getItem(ACCENT_STORAGE_KEY)
-  return isAccentColor(stored) ? stored : "rojo"
+  return accentPreference.getSnapshot()
 }
 
 export function setStoredAccent(accent: AccentColor) {
-  window.localStorage.setItem(ACCENT_STORAGE_KEY, accent)
+  accentPreference.set(accent)
   applyAccent(accent)
 }
+
+export const themePreference = createBrowserPreference<Theme>(
+  THEME_STORAGE_KEY, "dark", (value): value is Theme => value === "dark" || value === "light",
+)
+export const accentPreference = createBrowserPreference<AccentColor>(
+  ACCENT_STORAGE_KEY, "rojo", isAccentColor,
+)

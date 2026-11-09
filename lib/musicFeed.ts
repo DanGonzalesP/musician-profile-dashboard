@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { expresionKeyset, type CursorFeed } from "@/lib/feed/keyset";
+import { mediaUrl, mediaKeyFromUrl } from "@/lib/media-url";
+import { cursorDeUltimaFila, expresionKeyset, type CursorFeed } from "@/lib/feed/keyset";
 import { parseMusicianRoles, type MusicianRole } from "@/lib/musician-roles";
 
 export interface FeedTrack {
@@ -10,6 +11,7 @@ export interface FeedTrack {
   coverImageUrl?: string;
   durationSeconds?: number;
   artistName: string;
+  username?: string;
   // Roles profesionales del autor de la pista (filtro del feed). Vacío si
   // el perfil no eligió ninguno todavía.
   roles: MusicianRole[];
@@ -30,6 +32,7 @@ export interface FeedTrackRow {
   created_at: string;
   profiles: {
     display_name: string;
+    username?: string | null;
     musician_roles?: unknown;
     musician_category?: string | null;
     profile_type?: string | null;
@@ -41,7 +44,7 @@ const VALID_AUDIO_EXTENSIONS = [".mp3", ".m4a", ".aac", ".wav"];
 
 export function validateMp3Url(url: string): boolean {
   try {
-    const parsedUrl = new URL(url);
+    const parsedUrl = new URL(url, mediaKeyFromUrl(url) ? "https://media.invalid" : undefined);
     const pathname = parsedUrl.pathname.toLowerCase();
     return VALID_AUDIO_EXTENSIONS.some((ext) => pathname.endsWith(ext));
   } catch {
@@ -57,28 +60,35 @@ function mapRowToTrack(row: FeedTrackRow): FeedTrack {
     id: row.id,
     profileId: row.profile_id,
     title: row.title,
-    audioUrl: row.audio_url,
-    coverImageUrl: row.cover_image_url || undefined,
+    audioUrl: mediaUrl(row.audio_url),
+    coverImageUrl: row.cover_image_url ? mediaUrl(row.cover_image_url) : undefined,
     durationSeconds: row.duration_seconds || undefined,
     artistName: row.profiles?.display_name || "Artista Desconocido",
+    username: row.profiles?.username ?? undefined,
     roles: parseMusicianRoles(rawRoles),
     isGroup: row.profiles?.profile_type === "band",
     createdAt: row.created_at,
   };
 }
 
-export async function fetchMusicFeed(profileId: string): Promise<FeedTrack[]> {
-  const { data, error } = await supabase
+export const MUSIC_MANAGEMENT_PAGE_SIZE = 50;
+
+export async function fetchMusicFeed(profileId: string, cursor?: CursorFeed): Promise<FeedTrack[]> {
+  let query = supabase
     .from("music_feed")
     .select(`
       id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-      profiles ( display_name )
+      profiles ( display_name, username )
     `)
     .eq("profile_id", profileId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(MUSIC_MANAGEMENT_PAGE_SIZE);
+  if (cursor) query = query.or(expresionKeyset(cursor));
+  const { data, error } = await query;
 
   if (error) throw error;
-  return (data as unknown as FeedTrackRow[]).map(mapRowToTrack);
+  return ((data ?? []) as unknown as FeedTrackRow[]).map(mapRowToTrack);
 }
 
 /**
@@ -90,6 +100,10 @@ export async function fetchMusicFeed(profileId: string): Promise<FeedTrack[]> {
  * página, que es exactamente lo que hacía antes.
  */
 export async function fetchAllPublicFeed(limit: number = 50, cursor?: CursorFeed): Promise<FeedTrack[]> {
+  return (await fetchPublicTrackPage(limit, cursor)).items;
+}
+
+export async function fetchPublicTrackPage(limit = 50, cursor?: CursorFeed, signal?: AbortSignal) {
   // El segundo criterio de orden (`id desc`) no es decorativo: sin un orden
   // TOTAL, dos filas con el mismo `created_at` pueden salir en cualquier
   // orden entre consultas, y la paginación por cursor se cuelga repitiendo
@@ -97,13 +111,14 @@ export async function fetchAllPublicFeed(limit: number = 50, cursor?: CursorFeed
   let consulta = supabase
     .from("music_feed")
     .select(`id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-      profiles ( display_name, musician_roles, profile_type, is_suspended )`)
+      profiles ( display_name, username, musician_roles, profile_type, is_suspended )`)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);
   if (cursor) consulta = consulta.or(expresionKeyset(cursor));
 
-  const { data, error } = await consulta;
+  const deadline = AbortSignal.timeout(15_000);
+  const { data, error } = await consulta.abortSignal(signal ? AbortSignal.any([signal, deadline]) : deadline);
   if (error) throw error;
 
   // Segunda capa de la suspensión (P-34). La RLS de 0008 sólo oculta el
@@ -114,7 +129,8 @@ export async function fetchAllPublicFeed(limit: number = 50, cursor?: CursorFeed
   const filas = (data as unknown as FeedTrackRow[]).filter(
     (fila) => fila.profiles?.is_suspended !== true
   );
-  return filas.map(mapRowToTrack);
+  const next = cursorDeUltimaFila(data as unknown as FeedTrackRow[]);
+  return { items: filas.map(mapRowToTrack), cursor: next, more: data.length === limit && next !== null };
 }
 
 export async function addTrackToFeed(
@@ -137,7 +153,7 @@ export async function addTrackToFeed(
     })
     .select(`
       id, profile_id, title, audio_url, cover_image_url, duration_seconds, created_at,
-      profiles ( display_name )
+      profiles ( display_name, username )
     `)
     .single();
 
@@ -145,11 +161,14 @@ export async function addTrackToFeed(
   return mapRowToTrack(data as unknown as FeedTrackRow);
 }
 
-export async function deleteTrackFromFeed(trackId: string): Promise<void> {
-  const { error } = await supabase
+export async function deleteTrackFromFeed(trackId: string, profileId: string): Promise<void> {
+  const { data, error } = await supabase
     .from("music_feed")
     .delete()
-    .eq("id", trackId);
+    .eq("id", trackId)
+    .eq("profile_id", profileId)
+    .select("id")
+    .single();
 
-  if (error) throw error;
+  if (error || !data) throw new Error("No se confirmó la eliminación de la canción.");
 }
