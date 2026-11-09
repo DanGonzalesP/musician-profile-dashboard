@@ -1,0 +1,4 @@
+# Falso positivo comprobado: ruta playwright.worker-auth.config.ts dentro de
+# los argumentos del comando de Playwright. Sólo esta huella histórica;
+# no se excluye el archivo, una regla ni detecciones de commits futuros.
+a3dbf9b49c6131133d6257945245e56f1b1b8799:scripts/worker-auth-runner.mjs:generic-api-key:133
